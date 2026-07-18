@@ -132,6 +132,22 @@ Some topics that still need community discussion:
 
 ## Contributing
 
-This proposal is intentionally in an early stage.
+This proposal is intentionally in an early draft stage.
 
-If this idea interests you, please open an issue with feedback, questions, or alternative designs.
+The goal is to collaboratively design an open browser standard for provider-agnostic inference—not a specific implementation.
+
+Contributions of all kinds are welcome, including:
+
+- Design feedback
+- API suggestions
+- Security considerations
+- Alternative approaches
+- Reference implementations
+- Browser extension prototypes
+- Related standards or prior art
+
+If you have an idea or concern, please open an issue or start a discussion.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
