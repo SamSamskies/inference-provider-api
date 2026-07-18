@@ -15,7 +15,7 @@ Today, every AI-powered web application has to reinvent the same infrastructure:
 
 The **Inference Provider API (IPA)** proposes a standard browser interface that allows web applications to request inference from a user-approved browser extension without ever accessing API keys.
 
-Inspired by NIP-07, IPA separates **applications** from **providers**, giving users complete control over where inference is performed.
+Inspired by [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md), IPA separates **applications** from **providers**, giving users complete control over where inference is performed.
 
 ## Design Principles
 
