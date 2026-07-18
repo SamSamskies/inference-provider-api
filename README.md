@@ -38,7 +38,7 @@ for await (const chunk of window.inference.request({
   messages: [
     {
       role: "user",
-      content: "Summarize this Nostr note."
+      content: `Is this true?:\n\nNostr is dead.`
     }
   ]
 })) {
