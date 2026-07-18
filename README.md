@@ -146,7 +146,7 @@ Contributions of all kinds are welcome, including:
 - Browser extension prototypes
 - Related standards or prior art
 
-If you have an idea or concern, please open an issue or start a discussion.
+If you have an idea or concern, please open an issue.
 
 ## License
 
