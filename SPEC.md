@@ -6,9 +6,7 @@ Inference Provider API
 
 **Status:** Experimental Draft
 
-Browser extensions (or browsers themselves) may inject a `window.inference` object into web pages. Websites may use it after checking its availability. The extension implements the method; the website only calls it.
-
-That object must define the following method:
+`window.inference` may be injected by a browser or extension. After checking that it exists, websites call:
 
 ```ts
 window.inference.request(request: InferenceRequest): AsyncIterable<InferenceChunk>
