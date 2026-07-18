@@ -2,7 +2,7 @@
 
 > A proposed browser standard for provider-agnostic AI inference.
 
-**Status:** Draft
+**Status:** Experimental Draft
 
 ## Motivation
 
@@ -31,27 +31,27 @@ Inspired by [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md), 
 ## Example
 
 ```ts
-const response = await window.inference.request({
+for await (const chunk of window.inference.request({
   method: "chat",
-
-  preferredModel: "gpt-5",
-
   messages: [
     {
       role: "user",
       content: "Summarize this Nostr note."
     }
   ]
-})
+})) {
+  if (chunk.type === "delta") {
+    // append chunk.content to the UI
+  } else if (chunk.type === "done") {
+    // final message / usage
+  }
+}
 ```
 
 The extension prompts the user for permission:
 
 ```text
 primal.net wants to use inference
-
-Suggested model
-GPT-5
 
 Use:
 
@@ -68,9 +68,11 @@ $0.0012
 [Deny]
 ```
 
-The application can suggest a model.
-
 The user chooses the provider and model.
+
+This first draft intentionally supports only text chat. The goal is to make the
+smallest useful API available for experiments, learn from real applications,
+and expand the standard only when those applications demonstrate a need.
 
 ## Goals
 
@@ -80,7 +82,6 @@ The user chooses the provider and model.
 - Local-first compatible
 - Per-origin permissions
 - Streaming support
-- Capability-based requests
 - Zero backend required
 
 ## Non-goals
@@ -122,11 +123,10 @@ Applications should not need to know which provider the user has selected.
 Some topics that still need community discussion:
 
 - Is `window.inference` the right namespace?
-- Should requests be capability-based instead of model-based?
+- Which capability constraints, if any, do applications need?
 - Should model selection always remain under user control?
-- How should streaming responses work?
-- Should tool calling be included in v1?
-- Should images, embeddings, and speech be part of the core specification?
+- Should tool calling be added in a future version?
+- Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage and cost?
 - Should applications be able to discover available capabilities?
 
