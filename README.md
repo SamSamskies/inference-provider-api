@@ -4,6 +4,8 @@
 
 **Status:** Experimental Draft
 
+**Spec:** [SPEC.md](./SPEC.md)
+
 ## Motivation
 
 Today, every AI-powered web application has to reinvent the same infrastructure:
