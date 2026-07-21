@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Demo Settings</title>
+    <link rel="stylesheet" href="shared.css" />
+  </head>
+  <body>
+    <main class="stack">
+      <header>
+        <div class="eyebrow">Inference Provider API</div>
+        <h1>Extension settings</h1>
+        <p class="hint">
+          API keys stay in this extension. Pages that call
+          <code>window.inference</code> never see them.
+        </p>
+      </header>
+
+      <section class="panel stack">
+        <h2>OpenAI</h2>
+        <div class="field">
+          <span id="apiKeyLabel">API key</span>
+          <div class="secret-input">
+            <input
+              id="apiKey"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="sk-..."
+              aria-labelledby="apiKeyLabel"
+            />
+            <button
+              type="button"
+              id="toggleApiKey"
+              class="ghost"
+              aria-pressed="false"
+              aria-controls="apiKey"
+            >
+              Show
+            </button>
+          </div>
+        </div>
+        <label class="field">
+          <span>Default model</span>
+          <select id="model"></select>
+        </label>
+        <div class="actions">
+          <button type="button" class="primary" id="save">Save</button>
+        </div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="panel stack">
+        <h2>Always-allowed origins</h2>
+        <p class="hint">
+          Origins granted with “Always allow”. Change the model anytime, or revoke
+          to require a fresh prompt.
+        </p>
+        <ul class="list" id="origins"></ul>
+        <p class="hint" id="originsEmpty">No persistent grants yet.</p>
+      </section>
+
+      <section class="panel stack">
+        <h2>Blocked origins</h2>
+        <p class="hint">
+          Origins blocked with “Never allow”. Unblock to show the permission prompt
+          again on the next request.
+        </p>
+        <ul class="list" id="blocked"></ul>
+        <p class="hint" id="blockedEmpty">No blocked origins yet.</p>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

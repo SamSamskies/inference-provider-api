@@ -65,12 +65,14 @@ Use:
 Estimated Cost
 $0.0012
 
-[Allow Once]
-[Always Allow]
+[ ] Remember for this site
+
+[Allow]
 [Deny]
 ```
 
-The user chooses the provider and model.
+The user chooses the provider and model. With “Remember for this site” checked, Allow
+persists access for that origin and Deny permanently blocks it.
 
 This first draft intentionally supports only text chat. The goal is to make the
 smallest useful API available for experiments, learn from real applications,

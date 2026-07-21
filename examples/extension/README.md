@@ -1,3 +1,117 @@
 # IPA Demo Extension
 
-Placeholder for a browser extension that implements [SPEC.md](../../SPEC.md) by injecting `window.inference`.
+Minimal Manifest V3 Chrome extension that implements [`SPEC.md`](../../SPEC.md) by injecting `window.inference` and routing chat requests to **OpenAI**.
+
+API keys stay in the extension. Page scripts never see them.
+
+## Load the extension
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select this folder: `examples/extension`
+5. Open the extension **Options** page (or click the toolbar icon)
+6. Paste your OpenAI API key and choose a default model
+7. Click **Save**
+
+## Try it
+
+On any top-level HTTPS page (or `http://localhost`), open DevTools and run:
+
+```js
+for await (const chunk of window.inference.request({
+  method: "chat",
+  messages: [{ role: "user", content: "Say hello in one short sentence." }],
+})) {
+  if (chunk.type === "delta") {
+    console.log("delta", chunk.content);
+  } else if (chunk.type === "done") {
+    console.log("done", chunk.model, chunk.message, chunk.usage);
+  }
+}
+```
+
+The extension prompts for permission (**Allow** / **Deny**, with optional **Remember for this site**) unless the origin was previously always-allowed or blocked.
+
+Abort example:
+
+```js
+const controller = new AbortController();
+const iter = window.inference.request({
+  method: "chat",
+  messages: [{ role: "user", content: "Write a long poem." }],
+  signal: controller.signal,
+});
+
+setTimeout(() => controller.abort(), 500);
+
+try {
+  for await (const chunk of iter) {
+    console.log(chunk);
+  }
+} catch (err) {
+  console.log(err.code); // "aborted"
+}
+```
+
+## Layout
+
+```text
+examples/extension/
+  manifest.json
+  background/service-worker.js   # permissions + orchestration
+  content/inject.js              # MAIN world: window.inference
+  content/content-script.js      # ISOLATED relay
+  src/
+    errors.js
+    validate.js
+    storage.js
+    permissions.js
+    providers/
+      registry.js                # add providers here
+      openai.js                  # OpenAI streaming adapter
+  ui/
+    options.html|.js             # API key + default model
+    approval.html|.js            # origin permission prompt
+    shared.css
+```
+
+To add another provider later: implement the same `streamChat` shape as [`src/providers/openai.js`](src/providers/openai.js), register it in [`src/providers/registry.js`](src/providers/registry.js), and extend the options/approval UI to choose among providers.
+
+## Security behavior
+
+- Injects only into top-level frames
+- Requires a secure context (`https:`, `localhost` / loopback `http:`, or `file:`)
+- Permission is per origin for HTTP(S); for `file:` documents, per document URL (never the shared opaque `"null"` origin)
+- Request validation happens in the extension before any provider call
+- OpenAI credentials are read only inside the service worker
+
+## Manual checks
+
+- [ ] `window.inference` exists on `https://example.com` after install
+- [ ] Missing on an `http://` non-localhost page (or request fails with `unavailable`)
+- [ ] First request shows the approval popup; Deny → `permission_denied`
+- [ ] Remember + Deny blocks the origin; later requests fail with `permission_denied` without prompting
+- [ ] Unblock in Options restores the permission prompt
+- [ ] Allow once works without persisting; Remember + Allow appears under Options
+- [ ] Streaming yields `delta` chunks then a single `done`
+- [ ] `done.message.content` matches concatenated deltas
+- [ ] AbortSignal / tab close produces `aborted`
+- [ ] Empty API key yields `unavailable` with a setup hint
+
+## Demo limitations
+
+- OpenAI only
+- Text chat only (no tools, images, embeddings, speech)
+- No cost estimate in the approval UI
+- Cross-realm errors are reconstructed as `Error` objects with a `code` property
+
+## Spec notes from this implementation
+
+Things worth clarifying in the vision/spec based on building this demo:
+
+1. **Request preview in the approval UI** — showing message content helps informed consent but is an extension-UI disclosure. Spec should say whether that is allowed or expected.
+2. **Persistent permission scope** — this demo stores origin + model from the approval choice and reuses that model on later requests. Spec should define whether grants are origin-only or origin + provider/model, and whether changing the global default affects existing grants (here it does not).
+3. **Cross-realm `InferenceError`** — `Error` subclasses do not clone cleanly across isolated worlds. Spec should allow reconstructing `{ name, message, code }` as an `Error` with a `code` field.
+4. **Unobservable abort on navigation** — closing/navigating the page aborts provider work, but the page often cannot observe the thrown `aborted` error. Worth stating explicitly.
+5. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.
