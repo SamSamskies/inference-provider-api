@@ -134,7 +134,6 @@
           const started = await sendToExtension({
             type: "start",
             request: serializable,
-            origin: location.origin,
           });
 
           streamId = started.streamId;

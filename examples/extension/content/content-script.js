@@ -118,10 +118,11 @@
     }
 
     try {
+      // Always use the tab's real origin — never trust a page-claimed origin.
       port.postMessage({
         type: "start",
         request: data.request,
-        origin: data.origin || location.origin,
+        origin: location.origin,
         pageUrl: location.href,
       });
     } catch (err) {
