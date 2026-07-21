@@ -105,9 +105,3 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 - Text chat only (no tools, images, embeddings, speech)
 - No cost estimate in the approval UI
 - Cross-realm errors are reconstructed as `Error` objects with a `code` property
-
-## Spec notes from this implementation
-
-Things worth clarifying in the vision/spec based on building this demo:
-
-1. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.

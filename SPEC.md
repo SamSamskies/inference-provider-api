@@ -80,3 +80,5 @@ Implementations may show a truncated preview of request content in the permissio
 ### Out of scope for this draft
 
 Tool calling, images, embeddings, speech, and capability discovery.
+
+Estimated cost in the permission UI is optional extension UX and is not required by this draft.
