@@ -122,6 +122,8 @@
         let streamId = "";
         /** @type {(() => void) | null} */
         let onAbort = null;
+        /** @type {Promise<void> | null} */
+        let startPromise = null;
 
         function wake() {
           if (notify) {
@@ -223,13 +225,15 @@
         return {
           async next() {
             if (state === "idle") {
-              try {
-                await start();
-              } catch (err) {
-                state = "closed";
-                cleanupListeners();
-                throw err;
+              // Share one in-flight start across concurrent next() callers.
+              if (!startPromise) {
+                startPromise = start().catch((err) => {
+                  state = "closed";
+                  cleanupListeners();
+                  throw err;
+                });
               }
+              await startPromise;
             }
 
             while (true) {
