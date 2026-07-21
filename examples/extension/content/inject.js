@@ -199,18 +199,10 @@
             request && typeof request === "object" ? { ...request } : {};
           delete serializable.signal;
 
-          const started = await sendToExtension({
-            type: "start",
-            request: serializable,
-          });
-
-          streamId = started.streamId;
-          state = "open";
-          streamHandlers.set(streamId, onStreamData);
-
+          // Register AbortSignal before the round-trip so abort during start
+          // marks the iterator closed; abortRemote runs once streamId exists.
           if (signal) {
             if (signal.aborted) {
-              abortRemote();
               throw makeError("aborted", "Request aborted");
             }
             onAbort = () => {
@@ -219,6 +211,50 @@
             };
             signal.addEventListener("abort", onAbort, { once: true });
           }
+
+          const started = await sendToExtension({
+            type: "start",
+            request: serializable,
+          });
+
+          streamId = started.streamId;
+
+          // return()/throw()/AbortSignal may have closed us while start was
+          // in flight — abortRemote was a no-op without streamId, so do it now.
+          if (state === "closed") {
+            abortRemote();
+            cleanupListeners();
+            return;
+          }
+
+          state = "open";
+          streamHandlers.set(streamId, onStreamData);
+
+          if (signal?.aborted) {
+            abortRemote();
+            throw makeError("aborted", "Request aborted");
+          }
+        }
+
+        /**
+         * Close locally and ensure any in-flight start still aborts the remote
+         * once streamId is known.
+         */
+        async function closeLocal() {
+          state = "closed";
+          queue.length = 0;
+          wake();
+
+          if (startPromise) {
+            try {
+              await startPromise;
+            } catch {
+              // Ignore start failures after the consumer already closed.
+            }
+          }
+
+          abortRemote();
+          cleanupListeners();
         }
 
         return {
@@ -254,18 +290,12 @@
           },
 
           async return() {
-            abortRemote();
-            cleanupListeners();
-            state = "closed";
-            queue.length = 0;
+            await closeLocal();
             return { value: undefined, done: true };
           },
 
           async throw(err) {
-            abortRemote();
-            cleanupListeners();
-            state = "closed";
-            queue.length = 0;
+            await closeLocal();
             throw err;
           },
         };
