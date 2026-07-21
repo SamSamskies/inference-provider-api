@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
+        --radius: 10px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem 0.75rem;
+        max-width: 42rem;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1 span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        margin-left: 0.4rem;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      #status.ready {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      #status.missing {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        max-width: 42rem;
+        width: 100%;
+        margin: 0 auto;
+        padding: 0 1.5rem 1.25rem;
+        min-height: 0;
+      }
+
+      #log {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.5rem 0 1rem;
+        min-height: 12rem;
+      }
+
+      .msg {
+        max-width: 92%;
+        padding: 0.7rem 0.9rem;
+        border-radius: var(--radius);
+        line-height: 1.45;
+        font-size: 0.95rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .msg.user {
+        align-self: flex-end;
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .msg.assistant {
+        align-self: flex-start;
+        background: var(--surface);
+        border: 1px solid var(--line);
+      }
+
+      .msg.meta {
+        align-self: stretch;
+        max-width: 100%;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        padding: 0.25rem 0;
+      }
+
+      .msg.error {
+        align-self: stretch;
+        max-width: 100%;
+        background: var(--danger-soft);
+        color: var(--danger);
+        border: 1px solid #efc4c4;
+        font-size: 0.875rem;
+      }
+
+      .msg .label {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.7;
+        margin-bottom: 0.25rem;
+      }
+
+      form {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+      }
+
+      textarea {
+        flex: 1;
+        resize: none;
+        min-height: 2.75rem;
+        max-height: 8rem;
+        padding: 0.7rem 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        font: inherit;
+        color: inherit;
+        line-height: 1.4;
+      }
+
+      textarea:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+        border-color: transparent;
+      }
+
+      textarea:disabled {
+        opacity: 0.6;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 500;
+        font-size: 0.9rem;
+        padding: 0.7rem 1rem;
+        border-radius: var(--radius);
+        border: none;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        min-height: 2.75rem;
+      }
+
+      button:hover:not(:disabled) {
+        filter: brightness(1.05);
+      }
+
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      button.secondary {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--line);
+      }
+
+      button.secondary:hover:not(:disabled) {
+        filter: none;
+        background: var(--surface);
+        color: var(--ink);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>IPA Demo<span>window.inference</span></h1>
+      <div id="status" class="missing" role="status">checking…</div>
+    </header>
+
+    <main>
+      <div id="log" aria-live="polite"></div>
+
+      <form id="form">
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="Message…"
+          autocomplete="off"
+          disabled
+        ></textarea>
+        <button type="button" id="abort" class="secondary" hidden>Stop</button>
+        <button type="submit" id="send" disabled>Send</button>
+      </form>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const sendBtn = document.getElementById("send");
+      const abortBtn = document.getElementById("abort");
+
+      /** @type {AbortController | null} */
+      let activeController = null;
+
+      function setBusy(busy) {
+        sendBtn.disabled = busy || !window.inference;
+        input.disabled = busy || !window.inference;
+        abortBtn.hidden = !busy;
+        if (!busy) activeController = null;
+      }
+
+      function appendMessage(role, text) {
+        const el = document.createElement("div");
+        el.className = `msg ${role}`;
+        if (role === "user" || role === "assistant") {
+          const label = document.createElement("span");
+          label.className = "label";
+          label.textContent = role;
+          el.appendChild(label);
+        }
+        const body = document.createElement("span");
+        body.className = "body";
+        body.textContent = text;
+        el.appendChild(body);
+        logEl.appendChild(el);
+        logEl.scrollTop = logEl.scrollHeight;
+        return body;
+      }
+
+      function appendMeta(text) {
+        const el = document.createElement("div");
+        el.className = "msg meta";
+        el.textContent = text;
+        logEl.appendChild(el);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function appendError(err) {
+        const code = err && err.code ? err.code : "unknown";
+        const message = err && err.message ? err.message : String(err);
+        const el = document.createElement("div");
+        el.className = "msg error";
+        el.textContent = `${code}: ${message}`;
+        logEl.appendChild(el);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function refreshAvailability() {
+        if (window.inference && typeof window.inference.request === "function") {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+          setBusy(false);
+          input.focus();
+          return true;
+        }
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        sendBtn.disabled = true;
+        input.disabled = true;
+        return false;
+      }
+
+      async function sendMessage(content) {
+        if (!refreshAvailability()) {
+          appendError({
+            code: "unavailable",
+            message:
+              "window.inference is missing. Load the IPA demo extension, then open this page as a file or over https/localhost.",
+          });
+          return;
+        }
+
+        appendMessage("user", content);
+        const assistantBody = appendMessage("assistant", "");
+        activeController = new AbortController();
+        setBusy(true);
+
+        try {
+          for await (const chunk of window.inference.request({
+            method: "chat",
+            messages: [{ role: "user", content }],
+            signal: activeController.signal,
+          })) {
+            if (chunk.type === "delta") {
+              assistantBody.textContent += chunk.content;
+              logEl.scrollTop = logEl.scrollHeight;
+            } else if (chunk.type === "done") {
+              assistantBody.textContent = chunk.message.content;
+              const parts = [`model ${chunk.model}`];
+              if (chunk.usage) {
+                const { inputTokens, outputTokens } = chunk.usage;
+                if (inputTokens != null) parts.push(`in ${inputTokens}`);
+                if (outputTokens != null) parts.push(`out ${outputTokens}`);
+              }
+              appendMeta(parts.join(" · "));
+            }
+          }
+        } catch (err) {
+          if (!assistantBody.textContent) {
+            assistantBody.parentElement.remove();
+          }
+          appendError(err);
+        } finally {
+          setBusy(false);
+          input.focus();
+        }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const content = input.value.trim();
+        if (!content || activeController) return;
+        input.value = "";
+        input.style.height = "auto";
+        sendMessage(content);
+      });
+
+      abortBtn.addEventListener("click", () => {
+        if (activeController) activeController.abort();
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      input.addEventListener("input", () => {
+        input.style.height = "auto";
+        input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
+      });
+
+      if (!refreshAvailability()) {
+        appendMeta(
+          "window.inference is missing — install examples/extension and reload.",
+        );
+      }
+    </script>
+  </body>
+</html>
