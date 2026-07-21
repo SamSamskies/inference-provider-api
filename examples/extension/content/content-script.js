@@ -70,6 +70,7 @@
 
     let streamId = "";
     let started = false;
+    let cleanedUp = false;
 
     port.onMessage.addListener((msg) => {
       if (msg.type === "started") {
@@ -89,6 +90,10 @@
           type: "chunk",
           chunk: msg.chunk,
         });
+        // Final done chunk ends the stream — drop the port map entry and disconnect.
+        if (msg.chunk?.type === "done") {
+          cleanup();
+        }
         return;
       }
 
@@ -110,6 +115,7 @@
     });
 
     port.onDisconnect.addListener(() => {
+      if (cleanedUp) return;
       if (!started) {
         postToPage({
           id: correlationId,
@@ -129,6 +135,8 @@
     });
 
     function cleanup() {
+      if (cleanedUp) return;
+      cleanedUp = true;
       if (streamId) ports.delete(streamId);
       try {
         port.disconnect();
