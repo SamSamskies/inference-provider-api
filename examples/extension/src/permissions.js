@@ -119,11 +119,21 @@ function promptUser(request) {
           reject(new Error(chrome.runtime.lastError?.message || "Failed to open approval window"));
           return;
         }
+
+        // Assign before any await/callback so onRemoved can match this entry.
         entry.windowId = win.id;
 
         // Some Chrome builds ignore or clamp the initial create size; force it.
         chrome.windows.update(win.id, { width, height }, () => {
           void chrome.runtime.lastError;
+        });
+
+        // If the user closed the popup before windowId was stored, onRemoved
+        // missed this entry — settle as deny once we learn the window is gone.
+        chrome.windows.get(win.id, (existing) => {
+          if (chrome.runtime.lastError || !existing) {
+            cancelApproval(request.requestId);
+          }
         });
       }
     );
