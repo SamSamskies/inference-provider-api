@@ -277,9 +277,18 @@
       /** @type {AbortController | null} */
       let activeController = null;
 
+      /**
+       * Spec: only top-level secure contexts with a tuple origin
+       * (https: or loopback http:). Opaque origins like file: are unsupported.
+       */
+      function isSupportedContext() {
+        return window.isSecureContext && location.origin !== "null";
+      }
+
       function setBusy(busy) {
-        sendBtn.disabled = busy || !window.inference;
-        input.disabled = busy || !window.inference;
+        const available = Boolean(window.inference) && isSupportedContext();
+        sendBtn.disabled = busy || !available;
+        input.disabled = busy || !available;
         abortBtn.hidden = !busy;
         if (!busy) activeController = null;
       }
@@ -321,7 +330,11 @@
       }
 
       function refreshAvailability() {
-        if (window.inference && typeof window.inference.request === "function") {
+        if (
+          window.inference &&
+          typeof window.inference.request === "function" &&
+          isSupportedContext()
+        ) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
           setBusy(false);
@@ -339,8 +352,9 @@
         if (!refreshAvailability()) {
           appendError({
             code: "unavailable",
-            message:
-              "window.inference is missing. Load the IPA demo extension and open this page over https or localhost.",
+            message: window.inference
+              ? "window.inference requires a secure context with a tuple origin (https or localhost)."
+              : "window.inference is missing. Load the IPA demo extension and open this page over https or localhost.",
           });
           return;
         }
@@ -408,7 +422,9 @@
 
       if (!refreshAvailability()) {
         appendMeta(
-          "window.inference is missing — install examples/extension and reload.",
+          window.inference
+            ? "Unsupported context — open over https or localhost (not file: or plain http)."
+            : "window.inference is missing — install examples/extension and reload.",
         );
       }
     </script>
