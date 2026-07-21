@@ -111,46 +111,71 @@ export const openaiProvider = {
     /** @type {{ inputTokens?: number, outputTokens?: number } | undefined} */
     let usage;
 
+    /**
+     * @param {string} line
+     */
+    function handleLine(line) {
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (!line.startsWith("data:")) return;
+
+      const data = line.slice(5).trimStart();
+      if (!data || data === "[DONE]") return;
+
+      let parsed;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        return;
+      }
+
+      if (typeof parsed.model === "string" && parsed.model) {
+        resolvedModel = parsed.model;
+      }
+
+      if (parsed.usage) {
+        usage = {
+          inputTokens: parsed.usage.prompt_tokens,
+          outputTokens: parsed.usage.completion_tokens,
+        };
+      }
+
+      const choice = parsed.choices?.[0];
+      const delta = choice?.delta?.content;
+      if (typeof delta === "string" && delta.length > 0) {
+        content += delta;
+        onDelta(delta);
+      }
+    }
+
+    /**
+     * @param {boolean} flushRemainder
+     */
+    function drainBuffer(flushRemainder) {
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+        handleLine(line);
+      }
+      if (flushRemainder && buffer.length > 0) {
+        const line = buffer;
+        buffer = "";
+        handleLine(line);
+      }
+    }
+
     try {
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex;
-        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data:")) continue;
-
-          const data = line.slice(5).trimStart();
-          if (!data || data === "[DONE]") continue;
-
-          let parsed;
-          try {
-            parsed = JSON.parse(data);
-          } catch {
-            continue;
-          }
-
-          if (typeof parsed.model === "string" && parsed.model) {
-            resolvedModel = parsed.model;
-          }
-
-          if (parsed.usage) {
-            usage = {
-              inputTokens: parsed.usage.prompt_tokens,
-              outputTokens: parsed.usage.completion_tokens,
-            };
-          }
-
-          const choice = parsed.choices?.[0];
-          const delta = choice?.delta?.content;
-          if (typeof delta === "string" && delta.length > 0) {
-            content += delta;
-            onDelta(delta);
-          }
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          drainBuffer(false);
+        }
+        if (done) {
+          // Flush decoder state and any final SSE line without a trailing newline.
+          buffer += decoder.decode();
+          drainBuffer(true);
+          break;
         }
       }
     } catch (err) {
