@@ -110,8 +110,7 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 
 Things worth clarifying in the vision/spec based on building this demo:
 
-1. **Request preview in the approval UI** — showing message content helps informed consent but is an extension-UI disclosure. Spec should say whether that is allowed or expected.
-2. **Persistent permission scope** — this demo stores origin + model from the approval choice and reuses that model on later requests. Spec should define whether grants are origin-only or origin + provider/model, and whether changing the global default affects existing grants (here it does not).
-3. **Cross-realm `InferenceError`** — `Error` subclasses do not clone cleanly across isolated worlds. Spec should allow reconstructing `{ name, message, code }` as an `Error` with a `code` field.
-4. **Unobservable abort on navigation** — closing/navigating the page aborts provider work, but the page often cannot observe the thrown `aborted` error. Worth stating explicitly.
-5. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.
+1. **Persistent permission scope** — this demo stores origin + model from the approval choice and reuses that model on later requests. Spec should define whether grants are origin-only or origin + provider/model, and whether changing the global default affects existing grants (here it does not).
+2. **Cross-realm `InferenceError`** — `Error` subclasses do not clone cleanly across isolated worlds. Spec should allow reconstructing `{ name, message, code }` as an `Error` with a `code` field.
+3. **Unobservable abort on navigation** — closing/navigating the page aborts provider work, but the page often cannot observe the thrown `aborted` error. Worth stating explicitly.
+4. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.

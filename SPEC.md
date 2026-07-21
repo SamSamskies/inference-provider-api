@@ -73,6 +73,8 @@ for await (const chunk of window.inference.request({
 
 The API is available only to top-level pages in a secure context. Permission is scoped to the page's origin. Implementations must validate requests and must not expose API keys or provider credentials to page scripts.
 
+Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content.
+
 ### Out of scope for this draft
 
 Tool calling, images, embeddings, speech, and capability discovery.
