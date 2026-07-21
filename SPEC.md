@@ -69,7 +69,7 @@ for await (const chunk of window.inference.request({
 5. `request` yields zero or more `delta` chunks, then exactly one `done` chunk. No chunks follow `done`.
 6. Concatenating every `delta.content` produces `done.message.content`, the full assistant reply.
 7. Providers that do not stream may yield no `delta` chunks and only a final `done`.
-8. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code.
+8. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
 ### Security
 
