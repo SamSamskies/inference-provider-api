@@ -54,11 +54,15 @@ export function validateInferenceRequest(request) {
 }
 
 /**
+ * True for a serialized origin string from `location.origin`.
+ * Accepts opaque origins (`"null"`), which `file:` documents typically use.
  * @param {string} origin
  * @returns {boolean}
  */
 export function isValidOrigin(origin) {
   if (typeof origin !== "string" || !origin) return false;
+  // Opaque origins serialize as the literal string "null" (not a URL).
+  if (origin === "null") return true;
   try {
     const url = new URL(origin);
     return url.origin === origin;
