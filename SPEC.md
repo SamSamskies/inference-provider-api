@@ -43,6 +43,8 @@ type InferenceError = Error & {
 }
 ```
 
+`InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
+
 ### Example
 
 ```ts

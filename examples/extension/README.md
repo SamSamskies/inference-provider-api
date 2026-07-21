@@ -110,6 +110,5 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 
 Things worth clarifying in the vision/spec based on building this demo:
 
-1. **Cross-realm `InferenceError`** — `Error` subclasses do not clone cleanly across isolated worlds. Spec should allow reconstructing `{ name, message, code }` as an `Error` with a `code` field.
-2. **Unobservable abort on navigation** — closing/navigating the page aborts provider work, but the page often cannot observe the thrown `aborted` error. Worth stating explicitly.
-3. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.
+1. **Unobservable abort on navigation** — closing/navigating the page aborts provider work, but the page often cannot observe the thrown `aborted` error. Worth stating explicitly.
+2. **Cost estimation** — the README mockup shows estimated cost; the draft SPEC does not require it. Treat cost as optional until pricing/metadata is defined.
