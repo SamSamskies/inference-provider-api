@@ -359,6 +359,10 @@
           return;
         }
 
+        // Clear only after availability succeeds so a failed check keeps the draft.
+        input.value = "";
+        input.style.height = "auto";
+
         appendMessage("user", content);
         const assistantBody = appendMessage("assistant", "");
         activeController = new AbortController();
@@ -399,8 +403,6 @@
         event.preventDefault();
         const content = input.value.trim();
         if (!content || activeController) return;
-        input.value = "";
-        input.style.height = "auto";
         sendMessage(content);
       });
 
