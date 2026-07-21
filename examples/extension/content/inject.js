@@ -124,6 +124,8 @@
         let onAbort = null;
         /** @type {Promise<void> | null} */
         let startPromise = null;
+        /** @type {Error | null} */
+        let terminalError = null;
 
         function wake() {
           if (waiters.size === 0) return;
@@ -160,6 +162,9 @@
         function closeWithError(error) {
           if (state === "closed") return;
           state = "closed";
+          // Keep the error so concurrent next() callers all throw (SPEC §4),
+          // not just the one that dequeues the queued error item.
+          terminalError = error;
           cleanupListeners();
           enqueue({ kind: "error", error });
         }
@@ -242,6 +247,7 @@
          */
         async function closeLocal() {
           state = "closed";
+          terminalError = null;
           queue.length = 0;
           wake();
 
@@ -264,6 +270,7 @@
               if (!startPromise) {
                 startPromise = start().catch((err) => {
                   state = "closed";
+                  terminalError = err instanceof Error ? err : makeError("provider_error", String(err));
                   cleanupListeners();
                   throw err;
                 });
@@ -280,6 +287,9 @@
               }
 
               if (state === "closed") {
+                // Concurrent next() may miss the queued error item after another
+                // caller already shifted it — still throw the terminal failure.
+                if (terminalError) throw terminalError;
                 return { value: undefined, done: true };
               }
 
