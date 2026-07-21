@@ -71,8 +71,13 @@ $0.0012
 [Deny]
 ```
 
+Estimated cost is optional extension UX for this draft, not part of the API
+contract.
+
 The user chooses the provider and model. With “Remember for this site” checked, Allow
-persists access for that origin and Deny permanently blocks it.
+persists access for that origin together with the chosen provider and model; Deny
+permanently blocks it. Changing the extension’s global default does not alter
+existing origin grants.
 
 This first draft intentionally supports only text chat. The goal is to make the
 smallest useful API available for experiments, learn from real applications,
@@ -131,7 +136,7 @@ Some topics that still need community discussion:
 - Should model selection always remain under user control?
 - Should tool calling be added in a future version?
 - Should images, embeddings, and speech use this API or separate APIs?
-- How should extensions surface token usage and cost?
+- How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
 - Should applications be able to discover available capabilities?
 
 ## Contributing
