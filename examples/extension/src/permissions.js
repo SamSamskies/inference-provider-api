@@ -116,7 +116,12 @@ function promptUser(request) {
         if (!entry) return;
         if (chrome.runtime.lastError || !win?.id) {
           pendingApprovals.delete(request.requestId);
-          reject(new Error(chrome.runtime.lastError?.message || "Failed to open approval window"));
+          const error = new Error(
+            chrome.runtime.lastError?.message || "Failed to open approval window"
+          );
+          error.name = "InferenceError";
+          /** @type {any} */ (error).code = "unavailable";
+          reject(error);
           return;
         }
 
