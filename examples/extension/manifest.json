@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "IPA Demo",
+  "version": "0.1.0",
+  "description": "Minimal demo of the Inference Provider API.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://api.openai.com/*"],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "ui/options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "IPA Demo — open settings"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file://*/*"],
+      "js": ["content/content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://*/*", "https://*/*", "file://*/*"],
+      "js": ["content/inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ]
+}
