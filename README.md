@@ -72,7 +72,9 @@ $0.0012
 ```
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
-persists access for that origin and Deny permanently blocks it.
+persists access for that origin together with the chosen provider and model; Deny
+permanently blocks it. Changing the extension’s global default does not alter
+existing origin grants.
 
 This first draft intentionally supports only text chat. The goal is to make the
 smallest useful API available for experiments, learn from real applications,
