@@ -82,7 +82,7 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 
 - Injects only into top-level frames
 - Requires a secure context (`https:`, `localhost` / loopback `http:`, or `file:`)
-- Permission is per origin
+- Permission is per origin for HTTP(S); for `file:` documents, per document URL (never the shared opaque `"null"` origin)
 - Request validation happens in the extension before any provider call
 - OpenAI credentials are read only inside the service worker
 

@@ -54,19 +54,43 @@ export function validateInferenceRequest(request) {
 }
 
 /**
- * True for a serialized origin string from `location.origin`.
- * Accepts opaque origins (`"null"`), which `file:` documents typically use.
+ * True for a serialized tuple origin from `location.origin`.
+ * Rejects the opaque-origin sentinel `"null"` — that string is shared by every
+ * opaque context (`file:`, sandboxed docs, etc.) and must not be treated as a
+ * site identity for grants or blocks.
  * @param {string} origin
  * @returns {boolean}
  */
 export function isValidOrigin(origin) {
   if (typeof origin !== "string" || !origin) return false;
-  // Opaque origins serialize as the literal string "null" (not a URL).
-  if (origin === "null") return true;
+  if (origin === "null") return false;
   try {
     const url = new URL(origin);
     return url.origin === origin;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Stable permission key for grants/blocks.
+ * HTTPS (and other tuple) origins use `location.origin`. Opaque `file:` pages
+ * use the document URL without a fragment so one local file cannot allow or
+ * block every other opaque-origin page under the shared `"null"` key.
+ * @param {string} origin
+ * @param {string} pageUrl
+ * @returns {string | null}
+ */
+export function resolvePermissionPrincipal(origin, pageUrl) {
+  if (isValidOrigin(origin)) return origin;
+  if (origin !== "null") return null;
+  if (typeof pageUrl !== "string" || !pageUrl) return null;
+  try {
+    const url = new URL(pageUrl);
+    if (url.protocol !== "file:") return null;
+    url.hash = "";
+    return url.href;
+  } catch {
+    return null;
   }
 }

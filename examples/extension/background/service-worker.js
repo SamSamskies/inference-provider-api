@@ -3,7 +3,10 @@
  */
 
 import { serializeInferenceError } from "../src/errors.js";
-import { validateInferenceRequest, isValidOrigin } from "../src/validate.js";
+import {
+  validateInferenceRequest,
+  resolvePermissionPrincipal,
+} from "../src/validate.js";
 import { getSettings } from "../src/storage.js";
 import {
   ensurePermission,
@@ -144,13 +147,14 @@ async function handleStart(port, msg, onStreamId) {
 
   try {
     const origin = typeof msg.origin === "string" ? msg.origin : "";
-    if (!isValidOrigin(origin)) {
+    const pageUrl = typeof msg.pageUrl === "string" ? msg.pageUrl : "";
+    const principal = resolvePermissionPrincipal(origin, pageUrl);
+    if (!principal) {
       sendError("invalid_request", "Invalid origin.");
       activeStreams.delete(streamId);
       return null;
     }
 
-    const pageUrl = typeof msg.pageUrl === "string" ? msg.pageUrl : "";
     if (pageUrl && !isPageSecureContext(pageUrl)) {
       sendError(
         "unavailable",
@@ -172,7 +176,7 @@ async function handleStart(port, msg, onStreamId) {
 
     const permission = await ensurePermission({
       requestId: streamId,
-      origin,
+      origin: principal,
       messages: validated.value.messages,
     });
 
