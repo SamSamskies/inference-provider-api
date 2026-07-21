@@ -19,15 +19,15 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*", "file://*/*"],
-      "js": ["content/content-script.js"],
+      "js": ["content/inject.js"],
       "run_at": "document_start",
+      "world": "MAIN",
       "all_frames": false
     },
     {
       "matches": ["http://*/*", "https://*/*", "file://*/*"],
-      "js": ["content/inject.js"],
+      "js": ["content/content-script.js"],
       "run_at": "document_start",
-      "world": "MAIN",
       "all_frames": false
     }
   ]

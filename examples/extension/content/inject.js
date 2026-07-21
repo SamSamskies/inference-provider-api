@@ -1,6 +1,10 @@
 /**
  * MAIN-world bridge: defines window.inference per SPEC.md.
  * Injected only into top-level frames (manifest all_frames: false).
+ *
+ * Talks to the isolated content script over a MessagePort established at
+ * document_start (before page scripts run), so other MAIN-world scripts
+ * cannot observe or forge stream events via window.postMessage.
  */
 (() => {
   if (window !== window.top) return;
@@ -8,6 +12,13 @@
 
   const CHANNEL = "__ipa_inference__";
   let nextId = 1;
+
+  /** @type {MessagePort | null} */
+  let bridgePort = null;
+  /** @type {Map<string, (data: any) => void>} */
+  const pending = new Map();
+  /** @type {Map<string, (data: any) => void>} */
+  const streamHandlers = new Map();
 
   /**
    * @param {string} code
@@ -20,34 +31,76 @@
     return error;
   }
 
+  function onWindowInit(event) {
+    if (event.source !== window) return;
+    const data = event.data;
+    if (!data || data.channel !== CHANNEL || data.direction !== "init") return;
+    if (bridgePort || !event.ports || !event.ports[0]) return;
+
+    bridgePort = event.ports[0];
+    bridgePort.onmessage = onBridgeMessage;
+    window.removeEventListener("message", onWindowInit);
+  }
+
+  window.addEventListener("message", onWindowInit);
+
   /**
-   * One-shot request/response with the content script.
+   * @param {MessageEvent} event
+   */
+  function onBridgeMessage(event) {
+    const data = event.data;
+    if (!data || typeof data !== "object") return;
+
+    if (typeof data.id === "string" && pending.has(data.id)) {
+      const settle = pending.get(data.id);
+      pending.delete(data.id);
+      settle(data);
+      return;
+    }
+
+    if (typeof data.streamId === "string" && streamHandlers.has(data.streamId)) {
+      streamHandlers.get(data.streamId)(data);
+    }
+  }
+
+  /**
+   * One-shot request/response with the content script over the private port.
    * @param {object} payload
    */
   function sendToExtension(payload) {
     return new Promise((resolve, reject) => {
+      if (!bridgePort) {
+        reject(makeError("unavailable", "Extension bridge is not ready."));
+        return;
+      }
+
       const id = `req_${nextId++}_${Math.random().toString(36).slice(2, 9)}`;
       const timeout = setTimeout(() => {
-        window.removeEventListener("message", onMessage);
+        pending.delete(id);
         reject(makeError("unavailable", "Extension did not respond."));
       }, 30_000);
 
-      function onMessage(event) {
-        if (event.source !== window) return;
-        const data = event.data;
-        if (!data || data.channel !== CHANNEL || data.direction !== "from-extension") return;
-        if (data.id !== id) return;
+      pending.set(id, (data) => {
         clearTimeout(timeout);
-        window.removeEventListener("message", onMessage);
         if (data.error) {
           reject(makeError(data.error.code || "provider_error", data.error.message));
         } else {
           resolve(data);
         }
-      }
+      });
 
-      window.addEventListener("message", onMessage);
-      window.postMessage({ channel: CHANNEL, direction: "to-extension", id, ...payload }, "*");
+      try {
+        bridgePort.postMessage({ id, ...payload });
+      } catch (err) {
+        clearTimeout(timeout);
+        pending.delete(id);
+        reject(
+          makeError(
+            "unavailable",
+            err instanceof Error ? err.message : "Extension unavailable"
+          )
+        );
+      }
     });
   }
 
@@ -67,8 +120,6 @@
         /** @type {(() => void) | null} */
         let notify = null;
         let streamId = "";
-        /** @type {((event: MessageEvent) => void) | null} */
-        let onMessage = null;
         /** @type {(() => void) | null} */
         let onAbort = null;
 
@@ -87,9 +138,8 @@
         }
 
         function cleanupListeners() {
-          if (onMessage) {
-            window.removeEventListener("message", onMessage);
-            onMessage = null;
+          if (streamId) {
+            streamHandlers.delete(streamId);
           }
           if (onAbort && signal) {
             signal.removeEventListener("abort", onAbort);
@@ -98,11 +148,12 @@
         }
 
         function abortRemote() {
-          if (!streamId) return;
-          window.postMessage(
-            { channel: CHANNEL, direction: "to-extension", type: "abort", streamId },
-            "*"
-          );
+          if (!streamId || !bridgePort) return;
+          try {
+            bridgePort.postMessage({ type: "abort", streamId });
+          } catch {
+            // ignore
+          }
         }
 
         function closeWithError(error) {
@@ -117,6 +168,22 @@
           state = "closed";
           cleanupListeners();
           enqueue({ kind: "end" });
+        }
+
+        /**
+         * @param {any} data
+         */
+        function onStreamData(data) {
+          if (data.type === "chunk") {
+            enqueue({ kind: "chunk", value: data.chunk });
+            if (data.chunk?.type === "done") {
+              closeNormally();
+            }
+          } else if (data.type === "error") {
+            closeWithError(
+              makeError(data.error?.code || "provider_error", data.error?.message)
+            );
+          }
         }
 
         async function start() {
@@ -138,25 +205,7 @@
 
           streamId = started.streamId;
           state = "open";
-
-          onMessage = (event) => {
-            if (event.source !== window) return;
-            const data = event.data;
-            if (!data || data.channel !== CHANNEL || data.direction !== "from-extension") return;
-            if (data.streamId !== streamId) return;
-
-            if (data.type === "chunk") {
-              enqueue({ kind: "chunk", value: data.chunk });
-              if (data.chunk?.type === "done") {
-                closeNormally();
-              }
-            } else if (data.type === "error") {
-              closeWithError(
-                makeError(data.error?.code || "provider_error", data.error?.message)
-              );
-            }
-          };
-          window.addEventListener("message", onMessage);
+          streamHandlers.set(streamId, onStreamData);
 
           if (signal) {
             if (signal.aborted) {

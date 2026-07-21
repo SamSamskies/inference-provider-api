@@ -1,5 +1,9 @@
 /**
  * ISOLATED-world content script: relays between page (MAIN) and service worker.
+ *
+ * Establishes a MessageChannel with the MAIN-world bridge at document_start
+ * (before page scripts run). Stream traffic stays on that port so other
+ * MAIN-world scripts cannot forge or sniff window.postMessage events.
  */
 (() => {
   const CHANNEL = "__ipa_inference__";
@@ -7,10 +11,11 @@
   /** @type {Map<string, chrome.runtime.Port>} */
   const ports = new Map();
 
-  window.addEventListener("message", (event) => {
-    if (event.source !== window) return;
+  const { port1: bridgePort, port2 } = new MessageChannel();
+
+  bridgePort.onmessage = (event) => {
     const data = event.data;
-    if (!data || data.channel !== CHANNEL || data.direction !== "to-extension") return;
+    if (!data || typeof data !== "object") return;
 
     if (data.type === "start") {
       handleStart(data);
@@ -27,13 +32,28 @@
         }
       }
     }
-  });
+  };
+
+  // inject.js is listed first in the manifest so its init listener is ready.
+  window.postMessage({ channel: CHANNEL, direction: "init" }, "*", [port2]);
 
   /**
    * @param {any} data
    */
   function handleStart(data) {
     const correlationId = data.id;
+
+    /**
+     * @param {object} payload
+     */
+    function postToPage(payload) {
+      try {
+        bridgePort.postMessage(payload);
+      } catch {
+        // ignore — page may have navigated away
+      }
+    }
+
     let port;
     try {
       port = chrome.runtime.connect({ name: "ipa-inference" });
@@ -135,19 +155,5 @@
       });
       cleanup();
     }
-  }
-
-  /**
-   * @param {object} payload
-   */
-  function postToPage(payload) {
-    window.postMessage(
-      {
-        channel: CHANNEL,
-        direction: "from-extension",
-        ...payload,
-      },
-      "*"
-    );
   }
 })();
