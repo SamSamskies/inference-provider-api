@@ -117,8 +117,8 @@
         let state = "idle";
         /** @type {Array<{ kind: "chunk", value: any } | { kind: "end" } | { kind: "error", error: Error }>} */
         const queue = [];
-        /** @type {(() => void) | null} */
-        let notify = null;
+        /** @type {Set<() => void>} */
+        const waiters = new Set();
         let streamId = "";
         /** @type {(() => void) | null} */
         let onAbort = null;
@@ -126,11 +126,10 @@
         let startPromise = null;
 
         function wake() {
-          if (notify) {
-            const n = notify;
-            notify = null;
-            n();
-          }
+          if (waiters.size === 0) return;
+          const pending = [...waiters];
+          waiters.clear();
+          for (const n of pending) n();
         }
 
         function enqueue(item) {
@@ -249,7 +248,7 @@
               }
 
               await new Promise((resolve) => {
-                notify = resolve;
+                waiters.add(resolve);
               });
             }
           },
