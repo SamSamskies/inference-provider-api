@@ -38,16 +38,20 @@ export async function getSettings() {
       ? /** @type {Record<string, OriginBlock>} */ ({ ...stored.blockedOrigins })
       : {};
 
-  // Drop the opaque-origin sentinel if a prior build stored grants under it.
-  // That key is shared by every opaque context and must never authorize broadly.
+  // Drop opaque / file principals if a prior build stored grants under them.
+  // Those keys are not stable site identities and must never authorize broadly.
   let scrubbed = false;
-  if ("null" in allowedOrigins) {
-    delete allowedOrigins["null"];
-    scrubbed = true;
+  for (const key of Object.keys(allowedOrigins)) {
+    if (key === "null" || key === "file://" || key.startsWith("file:")) {
+      delete allowedOrigins[key];
+      scrubbed = true;
+    }
   }
-  if ("null" in blockedOrigins) {
-    delete blockedOrigins["null"];
-    scrubbed = true;
+  for (const key of Object.keys(blockedOrigins)) {
+    if (key === "null" || key === "file://" || key.startsWith("file:")) {
+      delete blockedOrigins[key];
+      scrubbed = true;
+    }
   }
   if (scrubbed) {
     await chrome.storage.local.set({ allowedOrigins, blockedOrigins });
