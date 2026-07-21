@@ -81,8 +81,9 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 ## Security behavior
 
 - Injects only into top-level frames
-- Requires a secure context (`https:`, `localhost` / loopback `http:`, or `file:`)
-- Permission is per origin for HTTP(S); for `file:` documents, per document URL (never the shared opaque `"null"` origin)
+- Requires a secure context (`https:` or `localhost` / loopback `http:`)
+- Does not inject into `file:` pages
+- Permission is per HTTP(S) origin
 - Request validation happens in the extension before any provider call
 - OpenAI credentials are read only inside the service worker
 
@@ -90,6 +91,7 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 
 - [ ] `window.inference` exists on `https://example.com` after install
 - [ ] Missing on an `http://` non-localhost page (or request fails with `unavailable`)
+- [ ] Missing on `file://` pages
 - [ ] First request shows the approval popup; Deny → `permission_denied`
 - [ ] Remember + Deny blocks the origin; later requests fail with `permission_denied` without prompting
 - [ ] Unblock in Options restores the permission prompt
@@ -103,5 +105,6 @@ To add another provider later: implement the same `streamChat` shape as [`src/pr
 
 - OpenAI only
 - Text chat only (no tools, images, embeddings, speech)
+- No `file:` / opaque-origin pages
 - No cost estimate in the approval UI
 - Cross-realm errors are reconstructed as `Error` objects with a `code` property

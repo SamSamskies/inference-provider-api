@@ -73,7 +73,17 @@ for await (const chunk of window.inference.request({
 
 ### Security
 
-The API is available only to top-level pages in a secure context. Permission is scoped to the page's origin. A persistent allow grant records the provider and model chosen at approval time; later requests for that origin reuse that saved choice. Changing a global default provider or model does not rewrite existing origin grants. Implementations must validate requests and must not expose API keys or provider credentials to page scripts.
+The API is available only to top-level pages in a secure context that have a
+tuple origin — typically `https:` and loopback `http:` (`localhost`,
+`127.0.0.1`, `[::1]`). Opaque origins, including `file:` documents, are not
+supported: permission is scoped to the page's origin, and those contexts do not
+provide a stable site identity for grants or blocks.
+
+A persistent allow grant records the provider and model chosen at approval time;
+later requests for that origin reuse that saved choice. Changing a global
+default provider or model does not rewrite existing origin grants.
+Implementations must validate requests and must not expose API keys or provider
+credentials to page scripts.
 
 Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content.
 
