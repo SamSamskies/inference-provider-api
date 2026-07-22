@@ -85,6 +85,15 @@ default provider or model does not rewrite existing origin grants.
 Implementations must validate requests and must not expose API keys or provider
 credentials to page scripts.
 
+Implementations that call local inference servers (for example Ollama on
+loopback) should avoid requiring users to widen the server's allowed origins.
+Browser extension requests often include a `chrome-extension://` (or similar)
+`Origin` header that many local servers reject with HTTP 403. Prefer stripping
+or rewriting that header on extension-initiated requests to the local server so
+default local installs work without configuring `OLLAMA_ORIGINS` or equivalent
+allowlists. Broad wildcards such as `chrome-extension://*` remain an optional
+fallback, not the recommended default.
+
 Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content.
 
 ### Out of scope for this draft

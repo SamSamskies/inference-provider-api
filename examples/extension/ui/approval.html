@@ -26,9 +26,15 @@
         <section class="panel stack">
           <h2>Provider / model</h2>
           <label class="field">
-            <span>OpenAI model</span>
+            <span>Provider</span>
+            <select id="provider"></select>
+          </label>
+          <p class="hint" id="ollamaHint" hidden></p>
+          <label class="field">
+            <span>Model</span>
             <select id="model"></select>
           </label>
+          <p class="hint" id="modelHint" hidden></p>
         </section>
 
         <section class="panel stack preview-panel">
@@ -48,7 +54,7 @@
           Allow once, or deny only this request.
         </p>
         <div class="actions approval-actions">
-          <button type="button" class="primary" id="allow">Allow</button>
+          <button type="button" class="primary" id="allow" disabled>Allow</button>
           <button type="button" class="danger" id="deny">Deny</button>
         </div>
       </div>

@@ -23,10 +23,12 @@ export const OPENAI_MODELS = Object.freeze([
  * @typedef {{
  *   id: string,
  *   label: string,
- *   models: readonly string[],
+ *   requiresApiKey: boolean,
  *   defaultModel: string,
+ *   models?: readonly string[],
+ *   listModels?: (args?: { signal?: AbortSignal }) => Promise<string[]>,
  *   streamChat: (args: {
- *     apiKey: string,
+ *     apiKey?: string,
  *     model: string,
  *     messages: Array<{ role: string, content: string }>,
  *     signal: AbortSignal,
@@ -39,6 +41,7 @@ export const OPENAI_MODELS = Object.freeze([
 export const openaiProvider = {
   id: "openai",
   label: "OpenAI",
+  requiresApiKey: true,
   models: OPENAI_MODELS,
   defaultModel: "gpt-4o-mini",
 

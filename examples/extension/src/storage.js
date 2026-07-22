@@ -3,12 +3,13 @@
  */
 
 /**
- * @typedef {{ allowedAt: number, model?: string }} OriginGrant
+ * @typedef {{ allowedAt: number, providerId?: string, model?: string }} OriginGrant
  * @typedef {{ blockedAt: number }} OriginBlock
  */
 
 const DEFAULTS = Object.freeze({
   openaiApiKey: "",
+  defaultProviderId: "openai",
   defaultModel: "gpt-4o-mini",
   /** @type {Record<string, OriginGrant>} */
   allowedOrigins: {},
@@ -17,8 +18,20 @@ const DEFAULTS = Object.freeze({
 });
 
 /**
+ * Legacy grants / settings without a providerId are treated as OpenAI.
+ * @param {string | undefined} providerId
+ * @returns {string}
+ */
+export function normalizeProviderId(providerId) {
+  return typeof providerId === "string" && providerId.trim()
+    ? providerId.trim()
+    : DEFAULTS.defaultProviderId;
+}
+
+/**
  * @returns {Promise<{
  *   openaiApiKey: string,
+ *   defaultProviderId: string,
  *   defaultModel: string,
  *   allowedOrigins: Record<string, OriginGrant>,
  *   blockedOrigins: Record<string, OriginBlock>
@@ -60,6 +73,9 @@ export async function getSettings() {
   return {
     openaiApiKey:
       typeof stored.openaiApiKey === "string" ? stored.openaiApiKey : DEFAULTS.openaiApiKey,
+    defaultProviderId: normalizeProviderId(
+      typeof stored.defaultProviderId === "string" ? stored.defaultProviderId : undefined
+    ),
     defaultModel:
       typeof stored.defaultModel === "string" && stored.defaultModel
         ? stored.defaultModel
@@ -79,12 +95,19 @@ function isPersistableOriginKey(origin) {
 }
 
 /**
- * @param {Partial<{ openaiApiKey: string, defaultModel: string }>} patch
+ * @param {Partial<{
+ *   openaiApiKey: string,
+ *   defaultProviderId: string,
+ *   defaultModel: string
+ * }>} patch
  */
 export async function saveSettings(patch) {
   const next = {};
   if (typeof patch.openaiApiKey === "string") {
     next.openaiApiKey = patch.openaiApiKey.trim();
+  }
+  if (typeof patch.defaultProviderId === "string" && patch.defaultProviderId.trim()) {
+    next.defaultProviderId = patch.defaultProviderId.trim();
   }
   if (typeof patch.defaultModel === "string" && patch.defaultModel.trim()) {
     next.defaultModel = patch.defaultModel.trim();
@@ -116,14 +139,15 @@ export async function isOriginBlocked(origin) {
 
 /**
  * @param {string} origin
- * @param {{ model: string }} options
+ * @param {{ providerId: string, model: string }} options
  */
-export async function grantOriginAlways(origin, { model }) {
+export async function grantOriginAlways(origin, { providerId, model }) {
   if (!isPersistableOriginKey(origin)) return;
   const { allowedOrigins, blockedOrigins } = await getSettings();
   delete blockedOrigins[origin];
   allowedOrigins[origin] = {
     allowedAt: Date.now(),
+    providerId: normalizeProviderId(providerId),
     model: typeof model === "string" && model.trim() ? model.trim() : undefined,
   };
   await chrome.storage.local.set({ allowedOrigins, blockedOrigins });
@@ -152,12 +176,12 @@ export async function unblockOrigin(origin) {
 }
 
 /**
- * Update the saved model for an existing always-allow grant.
+ * Update the saved provider/model for an existing always-allow grant.
  * @param {string} origin
- * @param {string} model
+ * @param {{ providerId: string, model: string }} options
  * @returns {Promise<boolean>} false if the origin is not granted
  */
-export async function setOriginModel(origin, model) {
+export async function setOriginProviderModel(origin, { providerId, model }) {
   if (!isPersistableOriginKey(origin)) return false;
   const { allowedOrigins } = await getSettings();
   const grant = allowedOrigins[origin];
@@ -166,10 +190,28 @@ export async function setOriginModel(origin, model) {
   if (!nextModel) return false;
   allowedOrigins[origin] = {
     ...grant,
+    providerId: normalizeProviderId(providerId),
     model: nextModel,
   };
   await chrome.storage.local.set({ allowedOrigins });
   return true;
+}
+
+/**
+ * @deprecated Prefer setOriginProviderModel — kept for call-site migration.
+ * @param {string} origin
+ * @param {string} model
+ * @returns {Promise<boolean>}
+ */
+export async function setOriginModel(origin, model) {
+  if (!isPersistableOriginKey(origin)) return false;
+  const { allowedOrigins } = await getSettings();
+  const grant = allowedOrigins[origin];
+  if (!grant) return false;
+  return setOriginProviderModel(origin, {
+    providerId: normalizeProviderId(grant.providerId),
+    model,
+  });
 }
 
 /**
@@ -183,13 +225,14 @@ export async function revokeOrigin(origin) {
 }
 
 /**
- * @returns {Promise<Array<{ origin: string, model?: string, allowedAt: number }>>}
+ * @returns {Promise<Array<{ origin: string, providerId: string, model?: string, allowedAt: number }>>}
  */
 export async function listAllowedOrigins() {
   const { allowedOrigins } = await getSettings();
   return Object.entries(allowedOrigins)
     .map(([origin, grant]) => ({
       origin,
+      providerId: normalizeProviderId(grant?.providerId),
       model: grant?.model,
       allowedAt: grant?.allowedAt ?? 0,
     }))
