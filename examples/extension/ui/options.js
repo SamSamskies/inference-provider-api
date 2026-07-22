@@ -222,6 +222,19 @@ async function refreshDefaultModels(providerId, preferredModel) {
   }
 }
 
+/** Last saved defaults — restored when switching back to the saved provider. */
+let savedDefaultProviderId = "openai";
+let savedDefaultModel = "gpt-4o-mini";
+
+/**
+ * @param {string} providerId
+ * @returns {string | undefined}
+ */
+function preferredDefaultModel(providerId) {
+  if (providerId === savedDefaultProviderId) return savedDefaultModel;
+  return providers.find((p) => p.id === providerId)?.defaultModel || undefined;
+}
+
 toggleApiKeyButton.addEventListener("click", () => {
   const showing = apiKeyInput.type === "text";
   apiKeyInput.type = showing ? "password" : "text";
@@ -232,12 +245,8 @@ toggleApiKeyButton.addEventListener("click", () => {
 providerSelect.addEventListener("change", async () => {
   const providerId = providerSelect.value;
   updateProviderChrome(providerId);
-  const provider = providers.find((p) => p.id === providerId);
-  await refreshDefaultModels(providerId, provider?.defaultModel || undefined);
+  await refreshDefaultModels(providerId, preferredDefaultModel(providerId));
 });
-
-/** Last saved default provider — used when Ollama becomes available again. */
-let savedDefaultProviderId = "openai";
 
 checkOllamaButton.addEventListener("click", async () => {
   checkOllamaButton.disabled = true;
@@ -254,8 +263,7 @@ checkOllamaButton.addEventListener("click", async () => {
           : providerSelect.value
     );
     updateProviderChrome(nextId);
-    const provider = providers.find((p) => p.id === nextId);
-    await refreshDefaultModels(nextId, provider?.defaultModel || undefined);
+    await refreshDefaultModels(nextId, preferredDefaultModel(nextId));
     await renderOrigins();
     setStatus(
       ollamaStatus.available ? "Ollama is available." : "Ollama is still unavailable.",
@@ -449,18 +457,14 @@ async function load() {
   await refreshOllamaStatus();
   const settings = await getSettings();
   savedDefaultProviderId = settings.defaultProviderId;
+  savedDefaultModel = settings.defaultModel;
   apiKeyInput.value = settings.openaiApiKey;
   const effectiveProvider = populateProviderSelect(
     providerSelect,
     settings.defaultProviderId
   );
   updateProviderChrome(effectiveProvider);
-  await refreshDefaultModels(
-    effectiveProvider,
-    effectiveProvider === settings.defaultProviderId
-      ? settings.defaultModel
-      : providers.find((p) => p.id === effectiveProvider)?.defaultModel
-  );
+  await refreshDefaultModels(effectiveProvider, preferredDefaultModel(effectiveProvider));
   await renderOrigins();
   await renderBlocked();
 }
@@ -484,6 +488,7 @@ saveButton.addEventListener("click", async () => {
       defaultModel: model,
     });
     savedDefaultProviderId = providerId;
+    savedDefaultModel = model;
     setStatus("Saved.", "ok");
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Failed to save", "err");
