@@ -83,6 +83,7 @@ try {
 examples/extension/
   manifest.json
   package.json                 # vitest for focused unit tests
+  icons/                       # toolbar / extension management PNGs (16, 48, 128)
   test/                        # validate / storage / permissions / registry
   background/service-worker.js   # permissions + orchestration
   content/inject.js              # MAIN world: window.inference
