@@ -172,46 +172,44 @@ function populateModelSelect(select, models, selected, opts = {}) {
 }
 
 /**
- * Map a stored/preferred provider id onto one that exists in the select and is
- * currently choosable. Unknown ids (and unavailable Ollama) must not be
- * returned as-is: the browser would select the first option while callers keep
- * the stale id, and refreshDefaultModels would then bail on the mismatch.
- * @param {string} selectedId
- * @returns {string}
- */
-function resolveSelectableProviderId(selectedId) {
-  /** @param {{ id: string }} p */
-  const isChoosable = (p) => p.id !== "ollama" || ollamaStatus.available;
-  const fallback =
-    providers.find((p) => p.id === "openai" && isChoosable(p))?.id ||
-    providers.find(isChoosable)?.id ||
-    "";
-  const known = providers.some((p) => p.id === selectedId);
-  let effectiveId = known ? selectedId : fallback;
-  if (!providers.some((p) => p.id === effectiveId && isChoosable(p))) {
-    effectiveId = fallback;
-  }
-  return effectiveId;
-}
-
-/**
+ * Populate the default-provider select. Keeps the stored selection even when
+ * that provider is unavailable (e.g. Ollama down) so Save cannot silently
+ * persist a UI fallback onto another provider. Unknown ids are listed as
+ * "(unknown)" — same fail-closed pattern as origin grants.
  * @param {HTMLSelectElement} select
  * @param {string} selectedId
- * @returns {string} the provider id actually selected after availability rules
+ * @returns {string} the provider id actually selected
  */
 function populateProviderSelect(select, selectedId) {
   select.replaceChildren();
-  const effectiveId = resolveSelectableProviderId(selectedId);
+  const known = providers.some((p) => p.id === selectedId);
+
+  if (!known && selectedId) {
+    const unknownOpt = document.createElement("option");
+    unknownOpt.value = selectedId;
+    unknownOpt.textContent = `${selectedId} (unknown)`;
+    unknownOpt.selected = true;
+    select.append(unknownOpt);
+  }
+
+  const fallback =
+    providers.find((p) => p.id === "openai")?.id || providers[0]?.id || "";
+  // Empty selectedId (fresh install) falls back; a known/unknown id is kept
+  // even when that provider is currently unavailable.
+  const effectiveId = selectedId || fallback;
 
   for (const provider of providers) {
     const option = document.createElement("option");
     option.value = provider.id;
     const unavailable = provider.id === "ollama" && !ollamaStatus.available;
-    option.disabled = unavailable;
+    // Keep the current selection choosable; block switching *to* Ollama when down.
+    option.disabled = unavailable && effectiveId !== provider.id;
     option.textContent = unavailable
       ? `${provider.label} (unavailable)`
       : provider.label;
-    if (provider.id === effectiveId) option.selected = true;
+    if ((known || !selectedId) && provider.id === effectiveId) {
+      option.selected = true;
+    }
     select.append(option);
   }
   return effectiveId;
@@ -234,6 +232,19 @@ async function refreshDefaultModels(providerId, preferredModel) {
   const { models, error } = await fetchModels(providerId);
   // Ignore stale responses after the user switches providers mid-flight.
   if (loadId !== defaultModelsLoadId || providerSelect.value !== providerId) {
+    return;
+  }
+
+  // Keep the saved Ollama model visible (read-only) while Ollama is down so
+  // the UI reflects the persisted default rather than an empty remapped catalog.
+  if (providerId === "ollama" && !ollamaStatus.available) {
+    populateModelSelect(
+      modelSelect,
+      preferredModel ? [preferredModel] : [],
+      preferredModel,
+      { allowUnknown: true }
+    );
+    modelSelect.disabled = true;
     return;
   }
 
@@ -283,13 +294,12 @@ checkOllamaButton.addEventListener("click", async () => {
   try {
     const wantedOllama = savedDefaultProviderId === "ollama";
     await refreshOllamaStatus();
+    // Restore saved Ollama when it becomes available; otherwise keep the
+    // current UI selection (including unavailable Ollama) — never remap to
+    // OpenAI, which would make Save overwrite the stored default.
     const nextId = populateProviderSelect(
       providerSelect,
-      wantedOllama && ollamaStatus.available
-        ? "ollama"
-        : providerSelect.value === "ollama" && !ollamaStatus.available
-          ? "openai"
-          : providerSelect.value
+      wantedOllama && ollamaStatus.available ? "ollama" : providerSelect.value
     );
     updateProviderChrome(nextId);
     await refreshDefaultModels(nextId, preferredDefaultModel(nextId));
@@ -487,9 +497,10 @@ async function renderOrigins() {
 }
 
 /**
- * Like populateProviderSelect, but keeps a current Ollama grant selected even if disabled.
- * Unknown provider ids are listed as "(unknown)" so Options never silently remaps
- * a fail-closed grant onto the first registered provider.
+ * Populate a per-origin provider select. Same availability rules as
+ * populateProviderSelect: keep a current Ollama grant selected even if
+ * unavailable. Unknown provider ids are listed as "(unknown)" so Options
+ * never silently remaps a fail-closed grant onto the first registered provider.
  * @param {HTMLSelectElement} select
  * @param {string} selectedId
  * @returns {{ providerId: string, known: boolean }}
@@ -572,6 +583,10 @@ saveButton.addEventListener("click", async () => {
   try {
     const providerId = providerSelect.value;
     const model = modelSelect.value;
+    if (!providers.some((p) => p.id === providerId)) {
+      setStatus("Choose a registered provider before saving.", "err");
+      return;
+    }
     if (providerId === "ollama" && !ollamaStatus.available) {
       setStatus("Ollama is unavailable. Choose another provider or click Check again.", "err");
       return;
