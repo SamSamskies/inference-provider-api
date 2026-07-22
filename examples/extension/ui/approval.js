@@ -135,15 +135,35 @@ function fillModels(select, models, selected, opts = {}) {
 }
 
 /**
+ * Map a stored/preferred provider id onto one that exists in the select and is
+ * currently choosable. Unknown ids (and unavailable Ollama) must not be
+ * returned as-is: the browser would select the first option while callers keep
+ * the stale id, and loadModelsForProvider would then bail on the mismatch.
+ * @param {string} selectedId
+ * @returns {string}
+ */
+function resolveSelectableProviderId(selectedId) {
+  /** @param {{ id: string }} p */
+  const isChoosable = (p) => p.id !== "ollama" || ollamaStatus.available;
+  const fallback =
+    providers.find((p) => p.id === "openai" && isChoosable(p))?.id ||
+    providers.find(isChoosable)?.id ||
+    "";
+  const known = providers.some((p) => p.id === selectedId);
+  let effectiveId = known ? selectedId : fallback;
+  if (!providers.some((p) => p.id === effectiveId && isChoosable(p))) {
+    effectiveId = fallback;
+  }
+  return effectiveId;
+}
+
+/**
  * @param {string} selectedId
  * @returns {string}
  */
 function fillProviders(selectedId) {
   providerSelect.replaceChildren();
-  let effectiveId = selectedId;
-  if (effectiveId === "ollama" && !ollamaStatus.available) {
-    effectiveId = providers.find((p) => p.id === "openai")?.id || providers[0]?.id || "";
-  }
+  const effectiveId = resolveSelectableProviderId(selectedId);
 
   for (const provider of providers) {
     const option = document.createElement("option");

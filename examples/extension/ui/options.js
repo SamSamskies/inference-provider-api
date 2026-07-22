@@ -172,16 +172,36 @@ function populateModelSelect(select, models, selected, opts = {}) {
 }
 
 /**
+ * Map a stored/preferred provider id onto one that exists in the select and is
+ * currently choosable. Unknown ids (and unavailable Ollama) must not be
+ * returned as-is: the browser would select the first option while callers keep
+ * the stale id, and refreshDefaultModels would then bail on the mismatch.
+ * @param {string} selectedId
+ * @returns {string}
+ */
+function resolveSelectableProviderId(selectedId) {
+  /** @param {{ id: string }} p */
+  const isChoosable = (p) => p.id !== "ollama" || ollamaStatus.available;
+  const fallback =
+    providers.find((p) => p.id === "openai" && isChoosable(p))?.id ||
+    providers.find(isChoosable)?.id ||
+    "";
+  const known = providers.some((p) => p.id === selectedId);
+  let effectiveId = known ? selectedId : fallback;
+  if (!providers.some((p) => p.id === effectiveId && isChoosable(p))) {
+    effectiveId = fallback;
+  }
+  return effectiveId;
+}
+
+/**
  * @param {HTMLSelectElement} select
  * @param {string} selectedId
  * @returns {string} the provider id actually selected after availability rules
  */
 function populateProviderSelect(select, selectedId) {
   select.replaceChildren();
-  let effectiveId = selectedId;
-  if (effectiveId === "ollama" && !ollamaStatus.available) {
-    effectiveId = "openai";
-  }
+  const effectiveId = resolveSelectableProviderId(selectedId);
 
   for (const provider of providers) {
     const option = document.createElement("option");
@@ -309,7 +329,10 @@ async function renderOrigins() {
       `Provider for ${grant.origin}`
     );
     // Keep an already-granted Ollama selection visible even if currently unavailable.
-    populateOriginProviderSelect(originProviderSelect, grant.providerId);
+    const originProviderId = populateOriginProviderSelect(
+      originProviderSelect,
+      grant.providerId
+    );
     providerLabel.append(providerCaption, originProviderSelect);
     meta.append(providerLabel);
 
@@ -424,29 +447,37 @@ async function renderOrigins() {
     li.append(meta, button);
     originsEl.append(li);
 
-    void loadOriginModels(grant.providerId, grant.model);
+    void loadOriginModels(originProviderId, grant.model);
   }
 }
 
 /**
  * Like populateProviderSelect, but keeps a current Ollama grant selected even if disabled.
+ * Unknown provider ids fall back so the select value matches what callers load.
  * @param {HTMLSelectElement} select
  * @param {string} selectedId
+ * @returns {string} the provider id actually selected
  */
 function populateOriginProviderSelect(select, selectedId) {
   select.replaceChildren();
+  const known = providers.some((p) => p.id === selectedId);
+  const effectiveId = known
+    ? selectedId
+    : providers.find((p) => p.id === "openai")?.id || providers[0]?.id || "";
+
   for (const provider of providers) {
     const option = document.createElement("option");
     option.value = provider.id;
     const unavailable = provider.id === "ollama" && !ollamaStatus.available;
     // Allow keeping the current grant visible; block switching *to* Ollama when down.
-    option.disabled = unavailable && selectedId !== "ollama";
+    option.disabled = unavailable && effectiveId !== "ollama";
     option.textContent = unavailable
       ? `${provider.label} (unavailable)`
       : provider.label;
-    if (provider.id === selectedId) option.selected = true;
+    if (provider.id === effectiveId) option.selected = true;
     select.append(option);
   }
+  return effectiveId;
 }
 
 async function renderBlocked() {
