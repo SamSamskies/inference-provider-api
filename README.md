@@ -53,25 +53,27 @@ for await (const chunk of window.inference.request({
 The extension prompts the user for permission:
 
 ```text
-primal.net wants to use inference
+Allow inference?
+primal.net
 
-Use:
+Provider
+[ Ollama ▼ ]
 
-○ GPT-5
-● Claude Sonnet 4
-○ PPQ Auto
-○ Gemma 4 (Local)
+Model
+[ Gemma 4 ▼ ]
 
-Estimated Cost
-$0.0012
+Request preview
+user: Is this true?:
+
+Nostr is dead.
 
 [ ] Remember for this site
+Allow once, or deny only this request.
 
-[Allow]
-[Deny]
+[Allow]  [Deny]
 ```
 
-Estimated cost is optional extension UX for this draft, not part of the API
+Request preview is optional extension UX for this draft, not part of the API
 contract.
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
