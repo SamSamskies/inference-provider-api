@@ -16,7 +16,6 @@ import {
   cancelApproval,
 } from "../src/permissions.js";
 import {
-  getDefaultProvider,
   getProvider,
   listProviders,
   resolveProviderModels,
@@ -238,10 +237,13 @@ async function handleStart(port, msg, onStreamId) {
     }
 
     const settings = await getSettings();
-    const provider =
-      getProvider(permission.providerId) ||
-      getProvider(settings.defaultProviderId) ||
-      getDefaultProvider();
+    const provider = getProvider(permission.providerId);
+    if (!provider) {
+      throwInference(
+        "unavailable",
+        `Unknown provider "${permission.providerId}". Open the IPA Demo extension options and update this site's grant.`
+      );
+    }
 
     if (provider.requiresApiKey && !settings.openaiApiKey) {
       throwInference(
