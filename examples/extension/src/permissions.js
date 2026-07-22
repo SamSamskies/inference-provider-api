@@ -50,9 +50,17 @@ export async function ensurePermission(args) {
     args.preferredProviderId || settings.defaultProviderId || defaultProvider.id
   );
   const provider = getProvider(providerId) || defaultProvider;
+  // Only reuse settings.defaultModel when it belongs to this provider.
+  // Otherwise the approval UI can pre-select (and OpenAI can persist) a name
+  // from another catalog — e.g. an Ollama tag after switching defaults, or
+  // when preferredProviderId differs from settings.defaultProviderId.
+  const settingsModelForProvider =
+    normalizeProviderId(settings.defaultProviderId) === provider.id
+      ? settings.defaultModel
+      : "";
   const globalDefaultModel =
     (typeof args.preferredModel === "string" && args.preferredModel) ||
-    settings.defaultModel ||
+    settingsModelForProvider ||
     provider.defaultModel ||
     "";
 
@@ -91,7 +99,14 @@ export async function ensurePermission(args) {
   const chosenProviderId = normalizeProviderId(
     decision.providerId || provider.id
   );
-  const chosenModel = decision.model || globalDefaultModel;
+  const chosenProvider = getProvider(chosenProviderId) || provider;
+  // If the user picked a different provider in the approval UI, do not fall
+  // back to globalDefaultModel (it was resolved for the prompt's provider).
+  const chosenModel =
+    decision.model ||
+    (chosenProviderId === provider.id ? globalDefaultModel : "") ||
+    chosenProvider.defaultModel ||
+    "";
 
   switch (decision.decision) {
     case "allow_once":
