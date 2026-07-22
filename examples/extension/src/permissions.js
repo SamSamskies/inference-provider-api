@@ -68,10 +68,14 @@ export async function ensurePermission(args) {
   const existing = await getOriginGrant(args.origin);
   if (existing) {
     const grantProviderId = normalizeProviderId(existing.providerId);
+    // Fall back to the grant provider's default — not settings.defaultModel,
+    // which may belong to a different provider.
+    const grantProvider = getProvider(grantProviderId);
+    const grantFallbackModel = grantProvider?.defaultModel || "";
     return {
       allowed: true,
       providerId: grantProviderId,
-      model: existing.model || globalDefaultModel,
+      model: existing.model || grantFallbackModel,
       once: false,
     };
   }
