@@ -166,6 +166,63 @@
         margin-bottom: 0.25rem;
       }
 
+      .msg.assistant.pending .body {
+        display: none;
+      }
+
+      .typing {
+        display: none;
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 1.35em;
+        color: var(--muted);
+      }
+
+      .msg.assistant.pending .typing {
+        display: inline-flex;
+      }
+
+      .typing-label {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+      }
+
+      .typing-dots {
+        display: inline-flex;
+        gap: 0.2rem;
+        align-items: center;
+      }
+
+      .typing-dots span {
+        width: 0.35rem;
+        height: 0.35rem;
+        border-radius: 50%;
+        background: var(--muted);
+        opacity: 0.35;
+        animation: typing-bounce 1.2s ease-in-out infinite;
+      }
+
+      .typing-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+
+      .typing-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes typing-bounce {
+        0%,
+        80%,
+        100% {
+          opacity: 0.35;
+          transform: translateY(0);
+        }
+        40% {
+          opacity: 1;
+          transform: translateY(-0.15rem);
+        }
+      }
+
       form {
         display: flex;
         gap: 0.5rem;
@@ -240,6 +297,11 @@
       @media (prefers-reduced-motion: reduce) {
         * {
           transition: none !important;
+          animation: none !important;
+        }
+
+        .typing-dots {
+          display: none;
         }
       }
     </style>
@@ -293,14 +355,23 @@
         if (!busy) activeController = null;
       }
 
-      function appendMessage(role, text) {
+      function appendMessage(role, text, { pending = false } = {}) {
         const el = document.createElement("div");
         el.className = `msg ${role}`;
+        if (pending) el.classList.add("pending");
         if (role === "user" || role === "assistant") {
           const label = document.createElement("span");
           label.className = "label";
           label.textContent = role;
           el.appendChild(label);
+        }
+        if (pending) {
+          const typing = document.createElement("span");
+          typing.className = "typing";
+          typing.setAttribute("aria-label", "Generating response");
+          typing.innerHTML =
+            '<span class="typing-label">Generating</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>';
+          el.appendChild(typing);
         }
         const body = document.createElement("span");
         body.className = "body";
@@ -309,6 +380,13 @@
         logEl.appendChild(el);
         logEl.scrollTop = logEl.scrollHeight;
         return body;
+      }
+
+      function clearPending(body) {
+        const bubble = body.parentElement;
+        if (!bubble || !bubble.classList.contains("pending")) return;
+        bubble.classList.remove("pending");
+        bubble.querySelector(".typing")?.remove();
       }
 
       function appendMeta(text) {
@@ -364,7 +442,7 @@
         input.style.height = "auto";
 
         appendMessage("user", content);
-        const assistantBody = appendMessage("assistant", "");
+        const assistantBody = appendMessage("assistant", "", { pending: true });
         activeController = new AbortController();
         setBusy(true);
 
@@ -375,9 +453,11 @@
             signal: activeController.signal,
           })) {
             if (chunk.type === "delta") {
+              clearPending(assistantBody);
               assistantBody.textContent += chunk.content;
               logEl.scrollTop = logEl.scrollHeight;
             } else if (chunk.type === "done") {
+              clearPending(assistantBody);
               assistantBody.textContent = chunk.message.content;
               const parts = [`model ${chunk.model}`];
               if (chunk.usage) {
@@ -391,6 +471,8 @@
         } catch (err) {
           if (!assistantBody.textContent) {
             assistantBody.parentElement.remove();
+          } else {
+            clearPending(assistantBody);
           }
           appendError(err);
         } finally {
