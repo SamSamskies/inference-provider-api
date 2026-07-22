@@ -4,14 +4,19 @@ import {
   listAllowedOrigins,
   listBlockedOrigins,
   revokeOrigin,
-  setOriginModel,
+  setOriginProviderModel,
   unblockOrigin,
 } from "../src/storage.js";
-import { OPENAI_MODELS } from "../src/providers/openai.js";
 
+const providerSelect = document.getElementById("provider");
+const apiKeyField = document.getElementById("apiKeyField");
 const apiKeyInput = document.getElementById("apiKey");
 const toggleApiKeyButton = document.getElementById("toggleApiKey");
+const ollamaStatusRow = document.getElementById("ollamaStatusRow");
+const ollamaHint = document.getElementById("ollamaHint");
+const checkOllamaButton = document.getElementById("checkOllama");
 const modelSelect = document.getElementById("model");
+const modelHint = document.getElementById("modelHint");
 const saveButton = document.getElementById("save");
 const statusEl = document.getElementById("status");
 const originsEl = document.getElementById("origins");
@@ -19,9 +24,202 @@ const originsEmpty = document.getElementById("originsEmpty");
 const blockedEl = document.getElementById("blocked");
 const blockedEmpty = document.getElementById("blockedEmpty");
 
+/** @type {Array<{ id: string, label: string, requiresApiKey: boolean, defaultModel: string, models?: string[] }>} */
+let providers = [];
+
+/** @type {Map<string, { models: string[], error?: string }>} */
+const modelCache = new Map();
+
+/**
+ * @type {{
+ *   available: boolean,
+ *   models: string[],
+ *   message: string,
+ * }}
+ */
+let ollamaStatus = {
+  available: false,
+  models: [],
+  message: "",
+};
+
 function setStatus(message, kind) {
   statusEl.textContent = message;
   statusEl.className = `status${kind ? ` ${kind}` : ""}`;
+}
+
+/**
+ * Probe local Ollama. Unavailable or empty installs keep the option disabled.
+ */
+async function refreshOllamaStatus() {
+  const response = await chrome.runtime.sendMessage({
+    type: "list-models",
+    providerId: "ollama",
+  });
+
+  if (!response?.ok) {
+    ollamaStatus = {
+      available: false,
+      models: [],
+      message:
+        "Ollama is unavailable at http://localhost:11434, so this option is disabled. Install and start Ollama, then click Check again.",
+    };
+    modelCache.delete("ollama");
+    return ollamaStatus;
+  }
+
+  const models = Array.isArray(response.models) ? response.models : [];
+  if (models.length === 0) {
+    ollamaStatus = {
+      available: false,
+      models: [],
+      message:
+        "Ollama is running but has no models installed, so this option is disabled. Run ollama pull gemma4, then click Check again.",
+    };
+    modelCache.delete("ollama");
+    return ollamaStatus;
+  }
+
+  ollamaStatus = {
+    available: true,
+    models,
+    message:
+      "Ollama is available at http://localhost:11434. Models are listed from your local install.",
+  };
+  modelCache.delete("ollama");
+  return ollamaStatus;
+}
+
+/**
+ * @param {string} providerId
+ */
+function updateProviderChrome(providerId) {
+  const provider = providers.find((p) => p.id === providerId);
+  const needsKey = Boolean(provider?.requiresApiKey);
+  apiKeyField.hidden = !needsKey;
+
+  // Only surface Ollama help + Check again when the option is disabled.
+  const showOllamaStatus = !ollamaStatus.available;
+  ollamaStatusRow.hidden = !showOllamaStatus;
+  checkOllamaButton.hidden = !showOllamaStatus;
+  if (showOllamaStatus) {
+    ollamaHint.textContent =
+      ollamaStatus.message ||
+      "Ollama is unavailable at http://localhost:11434, so this option is disabled.";
+  }
+}
+
+/**
+ * @param {string} providerId
+ * @returns {Promise<{ models: string[], error?: string }>}
+ */
+async function fetchModels(providerId) {
+  if (providerId === "ollama") {
+    if (!ollamaStatus.available) {
+      return { models: [], error: ollamaStatus.message };
+    }
+    return { models: ollamaStatus.models };
+  }
+
+  const cached = modelCache.get(providerId);
+  if (cached) return cached;
+
+  const response = await chrome.runtime.sendMessage({
+    type: "list-models",
+    providerId,
+  });
+
+  if (!response?.ok) {
+    const result = {
+      models: /** @type {string[]} */ ([]),
+      error: response?.error?.message || "Failed to list models",
+    };
+    modelCache.set(providerId, result);
+    return result;
+  }
+
+  const result = {
+    models: Array.isArray(response.models) ? response.models : [],
+  };
+  modelCache.set(providerId, result);
+  return result;
+}
+
+/**
+ * @param {HTMLSelectElement} select
+ * @param {string[]} models
+ * @param {string | undefined} selected
+ * @param {{ allowUnknown?: boolean }} [opts]
+ */
+function populateModelSelect(select, models, selected, opts = {}) {
+  const allowUnknown = opts.allowUnknown !== false;
+  select.replaceChildren();
+  const set = new Set(models);
+  // OpenAI may keep a saved model outside the curated list; Ollama only shows installed tags.
+  if (selected && (models.includes(selected) || (allowUnknown && models.length > 0))) {
+    set.add(selected);
+  }
+  for (const model of set) {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    if (model === selected) option.selected = true;
+    select.append(option);
+  }
+  if ((!selected || !set.has(selected)) && select.options.length > 0) {
+    select.selectedIndex = 0;
+  }
+}
+
+/**
+ * @param {HTMLSelectElement} select
+ * @param {string} selectedId
+ * @returns {string} the provider id actually selected after availability rules
+ */
+function populateProviderSelect(select, selectedId) {
+  select.replaceChildren();
+  let effectiveId = selectedId;
+  if (effectiveId === "ollama" && !ollamaStatus.available) {
+    effectiveId = "openai";
+  }
+
+  for (const provider of providers) {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    const unavailable = provider.id === "ollama" && !ollamaStatus.available;
+    option.disabled = unavailable;
+    option.textContent = unavailable
+      ? `${provider.label} (unavailable)`
+      : provider.label;
+    if (provider.id === effectiveId) option.selected = true;
+    select.append(option);
+  }
+  return effectiveId;
+}
+
+/**
+ * @param {string} providerId
+ * @param {string | undefined} preferredModel
+ */
+async function refreshDefaultModels(providerId, preferredModel) {
+  modelHint.hidden = true;
+  modelHint.textContent = "";
+  modelSelect.disabled = true;
+  populateModelSelect(modelSelect, [], preferredModel);
+
+  const { models, error } = await fetchModels(providerId);
+  populateModelSelect(modelSelect, models, preferredModel, {
+    allowUnknown: providerId !== "ollama",
+  });
+  modelSelect.disabled = models.length === 0;
+
+  if (error && providerId !== "ollama") {
+    modelHint.hidden = false;
+    modelHint.textContent = error;
+  } else if (models.length === 0 && providerId !== "ollama") {
+    modelHint.hidden = false;
+    modelHint.textContent = "No models available for this provider.";
+  }
 }
 
 toggleApiKeyButton.addEventListener("click", () => {
@@ -31,27 +229,45 @@ toggleApiKeyButton.addEventListener("click", () => {
   toggleApiKeyButton.setAttribute("aria-pressed", showing ? "false" : "true");
 });
 
-/**
- * @param {HTMLSelectElement} select
- * @param {string | undefined} selected
- */
-function populateModelSelect(select, selected) {
-  select.replaceChildren();
-  const models = new Set(OPENAI_MODELS);
-  if (selected) models.add(selected);
-  for (const model of models) {
-    const option = document.createElement("option");
-    option.value = model;
-    option.textContent = model;
-    if (model === selected) option.selected = true;
-    select.append(option);
-  }
-  if (!selected && select.options.length > 0) {
-    select.selectedIndex = 0;
-  }
-}
+providerSelect.addEventListener("change", async () => {
+  const providerId = providerSelect.value;
+  updateProviderChrome(providerId);
+  const provider = providers.find((p) => p.id === providerId);
+  await refreshDefaultModels(providerId, provider?.defaultModel || undefined);
+});
 
-async function renderOrigins(fallbackModel) {
+/** Last saved default provider — used when Ollama becomes available again. */
+let savedDefaultProviderId = "openai";
+
+checkOllamaButton.addEventListener("click", async () => {
+  checkOllamaButton.disabled = true;
+  checkOllamaButton.textContent = "Checking…";
+  try {
+    const wantedOllama = savedDefaultProviderId === "ollama";
+    await refreshOllamaStatus();
+    const nextId = populateProviderSelect(
+      providerSelect,
+      wantedOllama && ollamaStatus.available
+        ? "ollama"
+        : providerSelect.value === "ollama" && !ollamaStatus.available
+          ? "openai"
+          : providerSelect.value
+    );
+    updateProviderChrome(nextId);
+    const provider = providers.find((p) => p.id === nextId);
+    await refreshDefaultModels(nextId, provider?.defaultModel || undefined);
+    await renderOrigins();
+    setStatus(
+      ollamaStatus.available ? "Ollama is available." : "Ollama is still unavailable.",
+      ollamaStatus.available ? "ok" : "err"
+    );
+  } finally {
+    checkOllamaButton.disabled = false;
+    checkOllamaButton.textContent = "Check again";
+  }
+});
+
+async function renderOrigins() {
   const grants = await listAllowedOrigins();
   originsEl.replaceChildren();
   originsEmpty.hidden = grants.length > 0;
@@ -66,24 +282,81 @@ async function renderOrigins(fallbackModel) {
     code.textContent = grant.origin;
     meta.append(code);
 
+    const providerLabel = document.createElement("label");
+    providerLabel.className = "origin-model";
+    const providerCaption = document.createElement("span");
+    providerCaption.textContent = "Provider";
+    const originProviderSelect = document.createElement("select");
+    originProviderSelect.setAttribute(
+      "aria-label",
+      `Provider for ${grant.origin}`
+    );
+    // Keep an already-granted Ollama selection visible even if currently unavailable.
+    populateOriginProviderSelect(originProviderSelect, grant.providerId);
+    providerLabel.append(providerCaption, originProviderSelect);
+    meta.append(providerLabel);
+
     const modelLabel = document.createElement("label");
     modelLabel.className = "origin-model";
     const modelCaption = document.createElement("span");
     modelCaption.textContent = "Model";
     const originModelSelect = document.createElement("select");
     originModelSelect.setAttribute("aria-label", `Model for ${grant.origin}`);
-    populateModelSelect(originModelSelect, grant.model || fallbackModel);
-    originModelSelect.addEventListener("change", async () => {
-      const ok = await setOriginModel(grant.origin, originModelSelect.value);
-      if (ok) {
-        setStatus(`Updated model for ${grant.origin}`, "ok");
-      } else {
-        setStatus(`Could not update ${grant.origin}`, "err");
-        await renderOrigins(fallbackModel);
-      }
-    });
     modelLabel.append(modelCaption, originModelSelect);
     meta.append(modelLabel);
+
+    const modelStatus = document.createElement("p");
+    modelStatus.className = "hint origin-model-hint";
+    meta.append(modelStatus);
+
+    /**
+     * @param {string} providerId
+     * @param {string | undefined} selectedModel
+     */
+    async function loadOriginModels(providerId, selectedModel) {
+      originModelSelect.disabled = true;
+      modelStatus.textContent = "Loading models…";
+      const { models, error } = await fetchModels(providerId);
+      populateModelSelect(originModelSelect, models, selectedModel, {
+        allowUnknown: providerId !== "ollama",
+      });
+      originModelSelect.disabled = models.length === 0;
+      if (error) {
+        modelStatus.textContent = error;
+      } else if (models.length === 0) {
+        modelStatus.textContent = "No models available.";
+      } else {
+        modelStatus.textContent = "";
+      }
+    }
+
+    async function persistGrant() {
+      const providerId = originProviderSelect.value;
+      const model = originModelSelect.value;
+      if (!model) {
+        setStatus(`Choose a model for ${grant.origin}`, "err");
+        return;
+      }
+      const ok = await setOriginProviderModel(grant.origin, {
+        providerId,
+        model,
+      });
+      if (ok) {
+        setStatus(`Updated ${grant.origin}`, "ok");
+      } else {
+        setStatus(`Could not update ${grant.origin}`, "err");
+        await renderOrigins();
+      }
+    }
+
+    originProviderSelect.addEventListener("change", async () => {
+      await loadOriginModels(originProviderSelect.value, undefined);
+      await persistGrant();
+    });
+
+    originModelSelect.addEventListener("change", () => {
+      void persistGrant();
+    });
 
     const button = document.createElement("button");
     button.type = "button";
@@ -91,12 +364,35 @@ async function renderOrigins(fallbackModel) {
     button.textContent = "Revoke";
     button.addEventListener("click", async () => {
       await revokeOrigin(grant.origin);
-      await renderOrigins(fallbackModel);
+      await renderOrigins();
       setStatus(`Revoked ${grant.origin}`, "ok");
     });
 
     li.append(meta, button);
     originsEl.append(li);
+
+    void loadOriginModels(grant.providerId, grant.model);
+  }
+}
+
+/**
+ * Like populateProviderSelect, but keeps a current Ollama grant selected even if disabled.
+ * @param {HTMLSelectElement} select
+ * @param {string} selectedId
+ */
+function populateOriginProviderSelect(select, selectedId) {
+  select.replaceChildren();
+  for (const provider of providers) {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    const unavailable = provider.id === "ollama" && !ollamaStatus.available;
+    // Allow keeping the current grant visible; block switching *to* Ollama when down.
+    option.disabled = unavailable && selectedId !== "ollama";
+    option.textContent = unavailable
+      ? `${provider.label} (unavailable)`
+      : provider.label;
+    if (provider.id === selectedId) option.selected = true;
+    select.append(option);
   }
 }
 
@@ -124,21 +420,51 @@ async function renderBlocked() {
   }
 }
 
+async function loadProviders() {
+  const response = await chrome.runtime.sendMessage({ type: "list-providers" });
+  providers = Array.isArray(response?.providers) ? response.providers : [];
+}
+
 async function load() {
+  await loadProviders();
+  await refreshOllamaStatus();
   const settings = await getSettings();
+  savedDefaultProviderId = settings.defaultProviderId;
   apiKeyInput.value = settings.openaiApiKey;
-  populateModelSelect(modelSelect, settings.defaultModel);
-  await renderOrigins(settings.defaultModel);
+  const effectiveProvider = populateProviderSelect(
+    providerSelect,
+    settings.defaultProviderId
+  );
+  updateProviderChrome(effectiveProvider);
+  await refreshDefaultModels(
+    effectiveProvider,
+    effectiveProvider === settings.defaultProviderId
+      ? settings.defaultModel
+      : providers.find((p) => p.id === effectiveProvider)?.defaultModel
+  );
+  await renderOrigins();
   await renderBlocked();
 }
 
 saveButton.addEventListener("click", async () => {
   saveButton.disabled = true;
   try {
+    const providerId = providerSelect.value;
+    const model = modelSelect.value;
+    if (providerId === "ollama" && !ollamaStatus.available) {
+      setStatus("Ollama is unavailable. Choose another provider or click Check again.", "err");
+      return;
+    }
+    if (!model) {
+      setStatus("Choose a default model before saving.", "err");
+      return;
+    }
     await saveSettings({
       openaiApiKey: apiKeyInput.value,
-      defaultModel: modelSelect.value,
+      defaultProviderId: providerId,
+      defaultModel: model,
     });
+    savedDefaultProviderId = providerId;
     setStatus("Saved.", "ok");
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Failed to save", "err");

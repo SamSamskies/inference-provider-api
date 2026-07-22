@@ -3,8 +3,12 @@
   "name": "IPA Demo",
   "version": "0.1.0",
   "description": "Minimal demo of the Inference Provider API.",
-  "permissions": ["storage", "tabs"],
-  "host_permissions": ["https://api.openai.com/*"],
+  "permissions": ["storage", "tabs", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"

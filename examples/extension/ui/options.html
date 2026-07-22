@@ -18,9 +18,17 @@
       </header>
 
       <section class="panel stack">
-        <h2>OpenAI</h2>
-        <div class="field">
-          <span id="apiKeyLabel">API key</span>
+        <h2>Provider</h2>
+        <label class="field">
+          <span>Default provider</span>
+          <select id="provider"></select>
+        </label>
+        <div class="hint-row" id="ollamaStatusRow" hidden>
+          <p class="hint" id="ollamaHint"></p>
+          <button type="button" class="ghost" id="checkOllama">Check again</button>
+        </div>
+        <div class="field" id="apiKeyField">
+          <span id="apiKeyLabel">OpenAI API key</span>
           <div class="secret-input">
             <input
               id="apiKey"
@@ -45,6 +53,7 @@
           <span>Default model</span>
           <select id="model"></select>
         </label>
+        <p class="hint" id="modelHint" hidden></p>
         <div class="actions">
           <button type="button" class="primary" id="save">Save</button>
         </div>
@@ -54,8 +63,8 @@
       <section class="panel stack">
         <h2>Always-allowed origins</h2>
         <p class="hint">
-          Origins granted with “Always allow”. Change the model anytime, or revoke
-          to require a fresh prompt.
+          Origins granted with “Always allow”. Change the provider and model
+          anytime, or revoke to require a fresh prompt.
         </p>
         <ul class="list" id="origins"></ul>
         <p class="hint" id="originsEmpty">No persistent grants yet.</p>

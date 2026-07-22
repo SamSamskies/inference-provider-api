@@ -15,7 +15,16 @@ import {
   handleApprovalWindowClosed,
   cancelApproval,
 } from "../src/permissions.js";
-import { getDefaultProvider, listProviders } from "../src/providers/registry.js";
+import {
+  getDefaultProvider,
+  getProvider,
+  listProviders,
+  resolveProviderModels,
+} from "../src/providers/registry.js";
+import { ensureOllamaOriginBypass } from "../src/ollama-origin-bypass.js";
+
+// Drop chrome-extension Origin so local Ollama does not 403 chat requests.
+void ensureOllamaOriginBypass();
 
 /** @type {Map<string, {
  *   port: chrome.runtime.Port,
@@ -79,6 +88,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({
       ok: resolveApproval(message.requestId, {
         decision: message.decision,
+        providerId: message.providerId,
         model: message.model,
       }),
     });
@@ -90,11 +100,50 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       providers: listProviders().map((p) => ({
         id: p.id,
         label: p.label,
-        models: [...p.models],
+        requiresApiKey: Boolean(p.requiresApiKey),
         defaultModel: p.defaultModel,
+        // Static catalogs only; dynamic providers omit models here.
+        models: p.models ? [...p.models] : undefined,
       })),
     });
     return false;
+  }
+
+  if (message?.type === "list-models") {
+    const providerId =
+      typeof message.providerId === "string" ? message.providerId : "";
+    const provider = getProvider(providerId);
+    if (!provider) {
+      sendResponse({
+        ok: false,
+        error: { code: "invalid_request", message: `Unknown provider: ${providerId}` },
+      });
+      return false;
+    }
+
+    void resolveProviderModels(provider)
+      .then((models) => {
+        sendResponse({
+          ok: true,
+          providerId: provider.id,
+          models,
+          defaultModel: provider.defaultModel,
+        });
+      })
+      .catch((err) => {
+        sendResponse({
+          ok: false,
+          providerId: provider.id,
+          error: {
+            code: /** @type {any} */ (err)?.code || "unavailable",
+            message:
+              err instanceof Error
+                ? err.message
+                : "Failed to list models for provider",
+          },
+        });
+      });
+    return true; // async sendResponse
   }
 
   return false;
@@ -189,15 +238,28 @@ async function handleStart(port, msg, onStreamId) {
     }
 
     const settings = await getSettings();
-    if (!settings.openaiApiKey) {
+    const provider =
+      getProvider(permission.providerId) ||
+      getProvider(settings.defaultProviderId) ||
+      getDefaultProvider();
+
+    if (provider.requiresApiKey && !settings.openaiApiKey) {
       throwInference(
         "unavailable",
         "OpenAI API key not configured. Open the IPA Demo extension options to add your key."
       );
     }
 
-    const provider = getDefaultProvider();
     const model = permission.model || settings.defaultModel || provider.defaultModel;
+    if (!model) {
+      if (provider.id === "ollama") {
+        throwInference(
+          "unavailable",
+          "No Ollama model selected. Start Ollama, pull a model (e.g. ollama pull gemma4), then choose it in the extension."
+        );
+      }
+      throwInference("unavailable", "No model selected for this provider.");
+    }
 
     const result = await provider.streamChat({
       apiKey: settings.openaiApiKey,

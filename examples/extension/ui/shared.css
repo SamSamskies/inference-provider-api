@@ -95,6 +95,11 @@ a {
   gap: 6px;
 }
 
+/* Author display rules otherwise override the UA [hidden] stylesheet. */
+[hidden] {
+  display: none !important;
+}
+
 .field > span {
   font-size: 0.85rem;
   font-weight: 600;
@@ -238,6 +243,31 @@ button:disabled {
 
 .origin-model select {
   max-width: 280px;
+}
+
+.origin-model-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  min-height: 1.1em;
+}
+
+.hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+}
+
+.hint-row .hint {
+  flex: 1;
+  min-width: 12rem;
+  margin: 0;
+}
+
+.hint-row .ghost {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 0.85rem;
 }
 
 .list code {

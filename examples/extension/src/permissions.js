@@ -8,8 +8,9 @@ import {
   getOriginGrant,
   isOriginBlocked,
   blockOrigin,
+  normalizeProviderId,
 } from "./storage.js";
-import { getDefaultProvider } from "./providers/registry.js";
+import { getDefaultProvider, getProvider } from "./providers/registry.js";
 
 /**
  * @typedef {{
@@ -25,7 +26,7 @@ import { getDefaultProvider } from "./providers/registry.js";
 
 /** @type {Map<string, {
  *   request: ApprovalRequest,
- *   resolve: (result: { decision: ApprovalDecision, model: string }) => void,
+ *   resolve: (result: { decision: ApprovalDecision, providerId: string, model: string }) => void,
  *   windowId?: number,
  * }>} */
 const pendingApprovals = new Map();
@@ -36,27 +37,41 @@ const pendingApprovals = new Map();
  *   requestId: string,
  *   origin: string,
  *   messages: Array<{ role: string, content: string }>,
+ *   preferredProviderId?: string,
  *   preferredModel?: string,
  * }} args
- * @returns {Promise<{ allowed: boolean, model: string, once: boolean }>}
+ * @returns {Promise<{ allowed: boolean, providerId: string, model: string, once: boolean }>}
  */
 export async function ensurePermission(args) {
   const settings = await getSettings();
-  const provider = getDefaultProvider();
-  const globalDefault =
+  const defaultProvider =
+    getProvider(settings.defaultProviderId) || getDefaultProvider();
+  const providerId = normalizeProviderId(
+    args.preferredProviderId || settings.defaultProviderId || defaultProvider.id
+  );
+  const provider = getProvider(providerId) || defaultProvider;
+  const globalDefaultModel =
     (typeof args.preferredModel === "string" && args.preferredModel) ||
     settings.defaultModel ||
-    provider.defaultModel;
+    provider.defaultModel ||
+    "";
 
   if (await isOriginBlocked(args.origin)) {
-    return { allowed: false, model: globalDefault, once: false };
+    return {
+      allowed: false,
+      providerId: provider.id,
+      model: globalDefaultModel,
+      once: false,
+    };
   }
 
   const existing = await getOriginGrant(args.origin);
   if (existing) {
+    const grantProviderId = normalizeProviderId(existing.providerId);
     return {
       allowed: true,
-      model: existing.model || globalDefault,
+      providerId: grantProviderId,
+      model: existing.model || globalDefaultModel,
       once: false,
     };
   }
@@ -66,31 +81,62 @@ export async function ensurePermission(args) {
     origin: args.origin,
     messages: args.messages,
     providerId: provider.id,
-    model: globalDefault,
+    model: globalDefaultModel,
   });
 
-  const chosenModel = decision.model || globalDefault;
+  const chosenProviderId = normalizeProviderId(
+    decision.providerId || provider.id
+  );
+  const chosenModel = decision.model || globalDefaultModel;
 
   switch (decision.decision) {
     case "allow_once":
-      return { allowed: true, model: chosenModel, once: true };
+      return {
+        allowed: true,
+        providerId: chosenProviderId,
+        model: chosenModel,
+        once: true,
+      };
     case "always":
-      await grantOriginAlways(args.origin, { model: chosenModel });
-      return { allowed: true, model: chosenModel, once: false };
+      await grantOriginAlways(args.origin, {
+        providerId: chosenProviderId,
+        model: chosenModel,
+      });
+      return {
+        allowed: true,
+        providerId: chosenProviderId,
+        model: chosenModel,
+        once: false,
+      };
     case "never":
       await blockOrigin(args.origin);
-      return { allowed: false, model: chosenModel, once: false };
+      return {
+        allowed: false,
+        providerId: chosenProviderId,
+        model: chosenModel,
+        once: false,
+      };
     case "deny":
-      return { allowed: false, model: chosenModel, once: false };
+      return {
+        allowed: false,
+        providerId: chosenProviderId,
+        model: chosenModel,
+        once: false,
+      };
     default:
       // Fail closed on unknown decisions.
-      return { allowed: false, model: chosenModel, once: false };
+      return {
+        allowed: false,
+        providerId: chosenProviderId,
+        model: chosenModel,
+        once: false,
+      };
   }
 }
 
 /**
  * @param {ApprovalRequest} request
- * @returns {Promise<{ decision: ApprovalDecision, model: string }>}
+ * @returns {Promise<{ decision: ApprovalDecision, providerId: string, model: string }>}
  */
 function promptUser(request) {
   return new Promise((resolve, reject) => {
@@ -148,7 +194,7 @@ function promptUser(request) {
 /**
  * Called by the approval page.
  * @param {string} requestId
- * @param {{ decision: ApprovalDecision, model: string }} result
+ * @param {{ decision: ApprovalDecision, providerId?: string, model: string }} result
  * @returns {boolean}
  */
 export function resolveApproval(requestId, result) {
@@ -166,6 +212,11 @@ export function resolveApproval(requestId, result) {
 
   entry.resolve({
     decision,
+    providerId: normalizeProviderId(
+      typeof result.providerId === "string"
+        ? result.providerId
+        : entry.request.providerId
+    ),
     model: typeof result.model === "string" ? result.model : entry.request.model,
   });
 
@@ -190,7 +241,11 @@ export function handleApprovalWindowClosed(windowId) {
   for (const [requestId, entry] of pendingApprovals.entries()) {
     if (entry.windowId === windowId) {
       pendingApprovals.delete(requestId);
-      entry.resolve({ decision: "deny", model: entry.request.model });
+      entry.resolve({
+        decision: "deny",
+        providerId: entry.request.providerId,
+        model: entry.request.model,
+      });
     }
   }
 }
@@ -203,7 +258,11 @@ export function cancelApproval(requestId) {
   const entry = pendingApprovals.get(requestId);
   if (!entry) return;
   pendingApprovals.delete(requestId);
-  entry.resolve({ decision: "deny", model: entry.request.model });
+  entry.resolve({
+    decision: "deny",
+    providerId: entry.request.providerId,
+    model: entry.request.model,
+  });
   if (entry.windowId != null) {
     chrome.windows.remove(entry.windowId, () => {
       void chrome.runtime.lastError;

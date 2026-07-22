@@ -118,6 +118,31 @@ An IPA-compatible browser extension could route requests to any provider, includ
 
 Applications should not need to know which provider the user has selected.
 
+### Local providers (Ollama, LM Studio, etc.)
+
+Local servers often reject requests that carry a `chrome-extension://` `Origin`
+header (commonly HTTP 403). IPA extensions that support local inference should
+strip or rewrite that header on their own requests to loopback endpoints so
+users are not asked to set `OLLAMA_ORIGINS=chrome-extension://*` or similar
+allowlists. Widening the local server's origin allowlist remains a fallback, not
+the preferred path.
+
+**Chrome MV3 reference:** the [demo extension](./examples/extension/) does this
+with `declarativeNetRequestWithHostAccess` and dynamic rules in
+[`examples/extension/src/ollama-origin-bypass.js`](./examples/extension/src/ollama-origin-bypass.js)
+that remove `Origin` / `Referer` only for local Ollama. See [SPEC.md](./SPEC.md)
+Security for the normative guidance.
+
+That permission lets the extension modify request headers only for hosts already
+listed in `host_permissions`—it is not a browser-wide rewrite capability. Still
+treat it as privileged: a compromised or overly broad extension could alter
+headers on those hosts. Prefer port-scoped loopback permissions (for example
+`http://localhost:11434/*`) over `http://localhost/*`, keep DNR rules limited to
+local inference endpoints, and do not use DNR to touch remote provider traffic.
+This is still preferable to asking every user to set
+`OLLAMA_ORIGINS=chrome-extension://*`, which trusts every installed extension
+talking to Ollama.
+
 ## Example Use Cases
 
 - A "Grok" button on every Nostr note.

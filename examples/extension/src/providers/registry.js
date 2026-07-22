@@ -3,12 +3,18 @@
  */
 
 import { openaiProvider } from "./openai.js";
+import { ollamaProvider } from "./ollama.js";
 
-/** @type {Map<string, import("./openai.js").Provider>} */
-const providers = new Map([[openaiProvider.id, openaiProvider]]);
+/** @typedef {import("./openai.js").Provider} Provider */
+
+/** @type {Map<string, Provider>} */
+const providers = new Map([
+  [openaiProvider.id, openaiProvider],
+  [ollamaProvider.id, ollamaProvider],
+]);
 
 /**
- * @returns {import("./openai.js").Provider[]}
+ * @returns {Provider[]}
  */
 export function listProviders() {
   return [...providers.values()];
@@ -16,16 +22,29 @@ export function listProviders() {
 
 /**
  * @param {string} id
- * @returns {import("./openai.js").Provider | undefined}
+ * @returns {Provider | undefined}
  */
 export function getProvider(id) {
   return providers.get(id);
 }
 
 /**
- * Default provider for this demo build.
- * @returns {import("./openai.js").Provider}
+ * Default provider for this demo build (OpenAI).
+ * @returns {Provider}
  */
 export function getDefaultProvider() {
   return openaiProvider;
+}
+
+/**
+ * Resolve models for a provider (static catalog or async discovery).
+ * @param {Provider} provider
+ * @param {{ signal?: AbortSignal }} [args]
+ * @returns {Promise<string[]>}
+ */
+export async function resolveProviderModels(provider, args = {}) {
+  if (typeof provider.listModels === "function") {
+    return provider.listModels(args);
+  }
+  return provider.models ? [...provider.models] : [];
 }
