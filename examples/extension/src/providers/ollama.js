@@ -3,6 +3,8 @@
  * Models are discovered via GET /api/tags — no hardcoded catalog.
  */
 
+import { ensureOllamaOriginBypass } from "../ollama-origin-bypass.js";
+
 export const OLLAMA_BASE_URL = "http://localhost:11434";
 
 /**
@@ -40,6 +42,8 @@ function rethrowNetwork(err, signal) {
  * @returns {Promise<string[]>}
  */
 export async function listOllamaModels({ signal } = {}) {
+  await ensureOllamaOriginBypass();
+
   let response;
   try {
     response = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { signal });
@@ -120,6 +124,8 @@ export const ollamaProvider = {
         "No Ollama model selected. Pull a model (e.g. ollama pull gemma4) and choose it in the extension."
       );
     }
+
+    await ensureOllamaOriginBypass();
 
     let response;
     try {

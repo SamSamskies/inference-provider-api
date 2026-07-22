@@ -6,10 +6,28 @@
 
 const OLLAMA_ORIGIN_BYPASS_RULE_IDS = Object.freeze([11434, 11435]);
 
+/** @type {Promise<void> | null} */
+let installPromise = null;
+
+/**
+ * Install (or re-assert) DNR rules that strip Origin/Referer for local Ollama.
+ * Concurrent callers share one in-flight install so early chat/list-models
+ * requests wait for the rules before fetching. Failed installs clear the
+ * memo so a later call can retry.
+ *
+ * @returns {Promise<void>}
+ */
+export function ensureOllamaOriginBypass() {
+  if (!installPromise) {
+    installPromise = installOllamaOriginBypass();
+  }
+  return installPromise;
+}
+
 /**
  * @returns {Promise<void>}
  */
-export async function ensureOllamaOriginBypass() {
+async function installOllamaOriginBypass() {
   if (
     typeof chrome === "undefined" ||
     !chrome.declarativeNetRequest?.updateDynamicRules
@@ -58,5 +76,6 @@ export async function ensureOllamaOriginBypass() {
     });
   } catch (err) {
     console.warn("Failed to install Ollama Origin bypass rule", err);
+    installPromise = null;
   }
 }
