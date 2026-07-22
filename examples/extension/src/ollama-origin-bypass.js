@@ -19,7 +19,11 @@ let installPromise = null;
  */
 export function ensureOllamaOriginBypass() {
   if (!installPromise) {
-    installPromise = installOllamaOriginBypass();
+    installPromise = installOllamaOriginBypass().catch((err) => {
+      console.warn("Failed to install Ollama Origin bypass rule", err);
+      installPromise = null;
+      throw err;
+    });
   }
   return installPromise;
 }
@@ -69,13 +73,8 @@ async function installOllamaOriginBypass() {
     },
   ];
 
-  try {
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [...OLLAMA_ORIGIN_BYPASS_RULE_IDS],
-      addRules: rules,
-    });
-  } catch (err) {
-    console.warn("Failed to install Ollama Origin bypass rule", err);
-    installPromise = null;
-  }
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [...OLLAMA_ORIGIN_BYPASS_RULE_IDS],
+    addRules: rules,
+  });
 }

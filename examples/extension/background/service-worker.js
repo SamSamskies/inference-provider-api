@@ -23,7 +23,9 @@ import {
 import { ensureOllamaOriginBypass } from "../src/ollama-origin-bypass.js";
 
 // Drop chrome-extension Origin so local Ollama does not 403 chat requests.
-void ensureOllamaOriginBypass();
+// Provider calls await their own retry; this eager attempt must not create an
+// unhandled rejection if Chrome rejects the rule update during worker startup.
+void ensureOllamaOriginBypass().catch(() => {});
 
 /** @type {Map<string, {
  *   port: chrome.runtime.Port,
