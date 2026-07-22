@@ -214,13 +214,16 @@ export function resolveApproval(requestId, result) {
       ? result.decision
       : "deny";
 
+  // Blank providerId (e.g. Allow clicked before the select was filled) must
+  // not go through normalizeProviderId — that maps "" to OpenAI.
+  const rawProviderId =
+    typeof result.providerId === "string" && result.providerId.trim()
+      ? result.providerId
+      : entry.request.providerId;
+
   entry.resolve({
     decision,
-    providerId: normalizeProviderId(
-      typeof result.providerId === "string"
-        ? result.providerId
-        : entry.request.providerId
-    ),
+    providerId: normalizeProviderId(rawProviderId),
     model: typeof result.model === "string" ? result.model : entry.request.model,
   });
 

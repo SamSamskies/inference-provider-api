@@ -19,6 +19,9 @@ let providers = [];
 /** Whether the current provider has a usable model selection. */
 let modelsReady = false;
 
+// Keep Allow disabled until loadModelsForProvider finishes (HTML also starts disabled).
+allowBtn.disabled = true;
+
 /**
  * @type {{
  *   available: boolean,
