@@ -350,8 +350,27 @@ async function renderOrigins() {
     }
 
     originProviderSelect.addEventListener("change", async () => {
-      await loadOriginModels(originProviderSelect.value, undefined);
-      await persistGrant();
+      originProviderSelect.disabled = true;
+      const providerId = originProviderSelect.value;
+      try {
+        await loadOriginModels(providerId, undefined);
+
+        if (!originModelSelect.value) {
+          // The select changes before dynamic model discovery completes.
+          // Restore the persisted grant when the new provider cannot supply a
+          // model so the UI never implies an unpersisted provider is active.
+          await renderOrigins();
+          setStatus(
+            `Could not switch ${grant.origin}: no models are available.`,
+            "err"
+          );
+          return;
+        }
+
+        await persistGrant();
+      } finally {
+        originProviderSelect.disabled = false;
+      }
     });
 
     originModelSelect.addEventListener("change", () => {
