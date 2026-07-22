@@ -82,6 +82,8 @@ try {
 ```text
 examples/extension/
   manifest.json
+  package.json                 # vitest for focused unit tests
+  test/                        # validate / storage / permissions / registry
   background/service-worker.js   # permissions + orchestration
   content/inject.js              # MAIN world: window.inference
   content/content-script.js      # ISOLATED relay
@@ -115,6 +117,16 @@ If you are building your own IPA extension with local providers, follow the Orig
 - OpenAI credentials are read only inside the service worker
 - Ollama traffic stays on `http://localhost:11434` (fixed for this demo)
 - Local Ollama requests drop the extension `Origin` header (avoids Ollama's default 403 for `chrome-extension://`)
+
+## Unit tests
+
+Focused Node tests cover request validation, storage/grants, permission decisions, and the provider registry (no full MV3 e2e).
+
+```bash
+cd examples/extension
+npm install
+npm test
+```
 
 ## Manual checks
 
