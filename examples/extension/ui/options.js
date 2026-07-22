@@ -197,17 +197,26 @@ function populateProviderSelect(select, selectedId) {
   return effectiveId;
 }
 
+/** Bumped on each default-model load so a slower earlier fetch cannot repaint. */
+let defaultModelsLoadId = 0;
+
 /**
  * @param {string} providerId
  * @param {string | undefined} preferredModel
  */
 async function refreshDefaultModels(providerId, preferredModel) {
+  const loadId = ++defaultModelsLoadId;
   modelHint.hidden = true;
   modelHint.textContent = "";
   modelSelect.disabled = true;
   populateModelSelect(modelSelect, [], preferredModel);
 
   const { models, error } = await fetchModels(providerId);
+  // Ignore stale responses after the user switches providers mid-flight.
+  if (loadId !== defaultModelsLoadId || providerSelect.value !== providerId) {
+    return;
+  }
+
   populateModelSelect(modelSelect, models, preferredModel, {
     allowUnknown: providerId !== "ollama",
   });
@@ -317,14 +326,27 @@ async function renderOrigins() {
     modelStatus.className = "hint origin-model-hint";
     meta.append(modelStatus);
 
+    /** Bumped on each model load for this grant so slower fetches cannot repaint. */
+    let originModelsLoadId = 0;
+
     /**
      * @param {string} providerId
      * @param {string | undefined} selectedModel
+     * @returns {Promise<boolean>} true when this load still matches the select
      */
     async function loadOriginModels(providerId, selectedModel) {
+      const loadId = ++originModelsLoadId;
       originModelSelect.disabled = true;
       modelStatus.textContent = "Loading models…";
       const { models, error } = await fetchModels(providerId);
+      // Ignore stale responses after the user switches providers mid-flight.
+      if (
+        loadId !== originModelsLoadId ||
+        originProviderSelect.value !== providerId
+      ) {
+        return false;
+      }
+
       populateModelSelect(originModelSelect, models, selectedModel, {
         allowUnknown: providerId !== "ollama",
       });
@@ -336,6 +358,7 @@ async function renderOrigins() {
       } else {
         modelStatus.textContent = "";
       }
+      return true;
     }
 
     async function persistGrant() {
@@ -361,7 +384,10 @@ async function renderOrigins() {
       originProviderSelect.disabled = true;
       const providerId = originProviderSelect.value;
       try {
-        await loadOriginModels(providerId, undefined);
+        const applied = await loadOriginModels(providerId, undefined);
+        if (!applied || originProviderSelect.value !== providerId) {
+          return;
+        }
 
         if (!originModelSelect.value) {
           // The select changes before dynamic model discovery completes.

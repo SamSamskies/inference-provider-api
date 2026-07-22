@@ -19,6 +19,9 @@ let providers = [];
 /** Whether the current provider has a usable model selection. */
 let modelsReady = false;
 
+/** Bumped on each model load so a slower earlier fetch cannot repaint. */
+let modelsLoadId = 0;
+
 // Keep Allow disabled until loadModelsForProvider finishes (HTML also starts disabled).
 allowBtn.disabled = true;
 
@@ -161,6 +164,7 @@ function fillProviders(selectedId) {
  * @param {string | undefined} preferredModel
  */
 async function loadModelsForProvider(providerId, preferredModel) {
+  const loadId = ++modelsLoadId;
   modelsReady = false;
   updateAllowEnabled();
   updateOllamaHint(providerId);
@@ -168,7 +172,15 @@ async function loadModelsForProvider(providerId, preferredModel) {
   setModelHint("Loading models…");
   fillModels(modelSelect, [], preferredModel);
 
+  /**
+   * @returns {boolean}
+   */
+  function isCurrentLoad() {
+    return loadId === modelsLoadId && providerSelect.value === providerId;
+  }
+
   if (providerId === "ollama") {
+    if (!isCurrentLoad()) return;
     if (!ollamaStatus.available) {
       setModelHint("");
       fillModels(modelSelect, [], undefined);
@@ -190,6 +202,9 @@ async function loadModelsForProvider(providerId, preferredModel) {
     type: "list-models",
     providerId,
   });
+
+  // Ignore stale responses after the user switches providers mid-flight.
+  if (!isCurrentLoad()) return;
 
   if (!response?.ok) {
     setModelHint(response?.error?.message || "Failed to list models.");
