@@ -329,10 +329,10 @@ async function renderOrigins() {
       `Provider for ${grant.origin}`
     );
     // Keep an already-granted Ollama selection visible even if currently unavailable.
-    const originProviderId = populateOriginProviderSelect(
-      originProviderSelect,
-      grant.providerId
-    );
+    // Unknown providerIds stay selected as "(unknown)" — never remapped to a
+    // registered provider (that would silently overwrite the fail-closed grant).
+    const { providerId: originProviderId, known: providerKnown } =
+      populateOriginProviderSelect(originProviderSelect, grant.providerId);
     providerLabel.append(providerCaption, originProviderSelect);
     meta.append(providerLabel);
 
@@ -384,12 +384,25 @@ async function renderOrigins() {
       return true;
     }
 
+    /**
+     * @returns {Promise<boolean>}
+     */
     async function persistGrant() {
       const providerId = originProviderSelect.value;
+      // Refuse to rewrite an unknown grant via the model dropdown (or any path
+      // that still has the stale id selected). Only an explicit switch to a
+      // registered provider may update storage.
+      if (!providers.some((p) => p.id === providerId)) {
+        setStatus(
+          `Choose a registered provider for ${grant.origin} before updating.`,
+          "err"
+        );
+        return false;
+      }
       const model = originModelSelect.value;
       if (!model) {
         setStatus(`Choose a model for ${grant.origin}`, "err");
-        return;
+        return false;
       }
       const ok = await setOriginProviderModel(grant.origin, {
         providerId,
@@ -397,16 +410,22 @@ async function renderOrigins() {
       });
       if (ok) {
         setStatus(`Updated ${grant.origin}`, "ok");
-      } else {
-        setStatus(`Could not update ${grant.origin}`, "err");
-        await renderOrigins();
+        return true;
       }
+      setStatus(`Could not update ${grant.origin}`, "err");
+      await renderOrigins();
+      return false;
     }
 
     originProviderSelect.addEventListener("change", async () => {
       originProviderSelect.disabled = true;
       const providerId = originProviderSelect.value;
       try {
+        if (!providers.some((p) => p.id === providerId)) {
+          // User re-selected the unknown placeholder; keep the grant untouched.
+          return;
+        }
+
         const applied = await loadOriginModels(providerId, undefined);
         if (!applied || originProviderSelect.value !== providerId) {
           return;
@@ -424,7 +443,11 @@ async function renderOrigins() {
           return;
         }
 
-        await persistGrant();
+        const saved = await persistGrant();
+        // Drop the "(unknown)" option after a successful recovery.
+        if (saved && !providerKnown) {
+          await renderOrigins();
+        }
       } finally {
         originProviderSelect.disabled = false;
       }
@@ -447,37 +470,55 @@ async function renderOrigins() {
     li.append(meta, button);
     originsEl.append(li);
 
-    void loadOriginModels(originProviderId, grant.model);
+    if (!providerKnown) {
+      // Show the saved model read-only; do not load another provider's catalog.
+      originModelSelect.disabled = true;
+      populateModelSelect(
+        originModelSelect,
+        grant.model ? [grant.model] : [],
+        grant.model,
+        { allowUnknown: true }
+      );
+      modelStatus.textContent = `Unknown provider "${grant.providerId}". Choose a registered provider to update this grant. Requests for this origin fail until then.`;
+    } else {
+      void loadOriginModels(originProviderId, grant.model);
+    }
   }
 }
 
 /**
  * Like populateProviderSelect, but keeps a current Ollama grant selected even if disabled.
- * Unknown provider ids fall back so the select value matches what callers load.
+ * Unknown provider ids are listed as "(unknown)" so Options never silently remaps
+ * a fail-closed grant onto the first registered provider.
  * @param {HTMLSelectElement} select
  * @param {string} selectedId
- * @returns {string} the provider id actually selected
+ * @returns {{ providerId: string, known: boolean }}
  */
 function populateOriginProviderSelect(select, selectedId) {
   select.replaceChildren();
   const known = providers.some((p) => p.id === selectedId);
-  const effectiveId = known
-    ? selectedId
-    : providers.find((p) => p.id === "openai")?.id || providers[0]?.id || "";
+
+  if (!known && selectedId) {
+    const unknownOpt = document.createElement("option");
+    unknownOpt.value = selectedId;
+    unknownOpt.textContent = `${selectedId} (unknown)`;
+    unknownOpt.selected = true;
+    select.append(unknownOpt);
+  }
 
   for (const provider of providers) {
     const option = document.createElement("option");
     option.value = provider.id;
     const unavailable = provider.id === "ollama" && !ollamaStatus.available;
     // Allow keeping the current grant visible; block switching *to* Ollama when down.
-    option.disabled = unavailable && effectiveId !== "ollama";
+    option.disabled = unavailable && !(known && selectedId === "ollama");
     option.textContent = unavailable
       ? `${provider.label} (unavailable)`
       : provider.label;
-    if (provider.id === effectiveId) option.selected = true;
+    if (known && provider.id === selectedId) option.selected = true;
     select.append(option);
   }
-  return effectiveId;
+  return { providerId: selectedId, known };
 }
 
 async function renderBlocked() {
