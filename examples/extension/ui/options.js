@@ -380,6 +380,22 @@ async function renderOrigins() {
         return false;
       }
 
+      // Keep the saved Ollama grant model visible (read-only) while Ollama is
+      // down — same pattern as refreshDefaultModels / unknown-provider grants.
+      if (providerId === "ollama" && !ollamaStatus.available) {
+        populateModelSelect(
+          originModelSelect,
+          selectedModel ? [selectedModel] : [],
+          selectedModel,
+          { allowUnknown: true }
+        );
+        originModelSelect.disabled = true;
+        modelStatus.textContent =
+          error ||
+          "Ollama is unavailable. The saved model is shown read-only until it is running again.";
+        return true;
+      }
+
       populateModelSelect(originModelSelect, models, selectedModel, {
         allowUnknown: providerId !== "ollama",
       });
