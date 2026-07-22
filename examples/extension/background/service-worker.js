@@ -252,7 +252,10 @@ async function handleStart(port, msg, onStreamId) {
       );
     }
 
-    const model = permission.model || settings.defaultModel || provider.defaultModel;
+    // A saved grant can outlive or differ from the global default provider.
+    // Never use settings.defaultModel here: it may name a model belonging to
+    // another provider.
+    const model = permission.model || provider.defaultModel;
     if (!model) {
       if (provider.id === "ollama") {
         throwInference(
