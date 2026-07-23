@@ -432,7 +432,7 @@
             code: "unavailable",
             message: window.inference
               ? "window.inference requires a secure context with a tuple origin (https or localhost)."
-              : "window.inference is missing. Load the IPA demo extension and open this page over https or localhost.",
+              : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
           return;
         }
@@ -508,7 +508,7 @@
         appendMeta(
           window.inference
             ? "Unsupported context — open over https or localhost (not file: or plain http)."
-            : "window.inference is missing — install examples/extension and reload.",
+            : "window.inference is missing — install Inference Bridge and reload.",
         );
       }
     </script>

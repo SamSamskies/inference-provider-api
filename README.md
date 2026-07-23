@@ -6,10 +6,17 @@
 
 **Spec:** [SPEC.md](./SPEC.md)
 
-## Demos
+## Try It
 
-- [Chrome extension](./examples/extension/) — injects `window.inference`, routes to OpenAI or Ollama
-- [Web app](./examples/webapp/) — minimal chat UI that uses the API
+### Reference Implementation
+
+- [Inference Bridge](https://github.com/SamSamskies/inference-bridge) — official Chrome extension that injects `window.inference` and routes to OpenAI or Ollama
+
+### Example Applications
+
+- [Chat demo](./examples/webapp/) — minimal chat UI that uses the API
+
+The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API, not extension-specific behavior.
 
 ## Motivation
 
@@ -134,9 +141,9 @@ users are not asked to set `OLLAMA_ORIGINS=chrome-extension://*` or similar
 allowlists. Widening the local server's origin allowlist remains a fallback, not
 the preferred path.
 
-**Chrome MV3 reference:** the [demo extension](./examples/extension/) does this
-with `declarativeNetRequestWithHostAccess` and dynamic rules in
-[`examples/extension/src/ollama-origin-bypass.js`](./examples/extension/src/ollama-origin-bypass.js)
+**Chrome MV3 reference:** [Inference Bridge](https://github.com/SamSamskies/inference-bridge)
+does this with `declarativeNetRequestWithHostAccess` and dynamic rules in
+[`src/ollama-origin-bypass.js`](https://github.com/SamSamskies/inference-bridge/blob/main/src/ollama-origin-bypass.js)
 that remove `Origin` / `Referer` only for local Ollama. See [SPEC.md](./SPEC.md)
 Security for the normative guidance.
 

@@ -4,7 +4,7 @@ Minimal single-page chat app that consumes [`window.inference`](../../SPEC.md).
 
 ## Try it
 
-1. Load the [demo extension](../extension/) in Chrome
+1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge) (load unpacked from that repository until the Chrome Web Store listing is live)
 2. Serve this folder over a secure context, e.g.:
 
    ```bash
