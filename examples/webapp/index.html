@@ -368,9 +368,9 @@
         if (pending) {
           const typing = document.createElement("span");
           typing.className = "typing";
-          typing.setAttribute("aria-label", "Generating response");
+          typing.setAttribute("aria-label", "Waiting for response");
           typing.innerHTML =
-            '<span class="typing-label">Generating</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>';
+            '<span class="typing-label">Waiting</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>';
           el.appendChild(typing);
         }
         const body = document.createElement("span");
@@ -387,6 +387,18 @@
         if (!bubble || !bubble.classList.contains("pending")) return;
         bubble.classList.remove("pending");
         bubble.querySelector(".typing")?.remove();
+      }
+
+      function setPendingLabel(body, label) {
+        const bubble = body.parentElement;
+        const typing = bubble?.querySelector(".typing");
+        const text = typing?.querySelector(".typing-label");
+        if (!typing || !text) return;
+        text.textContent = label;
+        typing.setAttribute(
+          "aria-label",
+          label === "Generating" ? "Generating response" : "Waiting for response",
+        );
       }
 
       function appendMeta(text) {
@@ -452,7 +464,9 @@
             messages: [{ role: "user", content }],
             signal: activeController.signal,
           })) {
-            if (chunk.type === "delta") {
+            if (chunk.type === "accepted") {
+              setPendingLabel(assistantBody, "Generating");
+            } else if (chunk.type === "delta") {
               clearPending(assistantBody);
               assistantBody.textContent += chunk.content;
               logEl.scrollTop = logEl.scrollHeight;

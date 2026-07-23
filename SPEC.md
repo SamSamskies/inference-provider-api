@@ -30,6 +30,7 @@ type Usage = {
 }
 
 type InferenceChunk =
+  | { type: "accepted" }
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
@@ -52,7 +53,9 @@ for await (const chunk of window.inference.request({
   method: "chat",
   messages: [{ role: "user", content: "Hello" }],
 })) {
-  if (chunk.type === "delta") {
+  if (chunk.type === "accepted") {
+    // permission resolved; provider call may begin
+  } else if (chunk.type === "delta") {
     // append chunk.content to the UI
   } else if (chunk.type === "done") {
     // final message / usage
@@ -66,10 +69,11 @@ for await (const chunk of window.inference.request({
 2. The user chooses the provider and model, or the extension uses the provider and model previously saved for that origin.
 3. API keys never leave the extension. Applications never see them.
 4. If a request fails, iteration throws an `InferenceError`. A failed request does not yield a `done` chunk.
-5. `request` yields zero or more `delta` chunks, then exactly one `done` chunk. No chunks follow `done`.
-6. Concatenating every `delta.content` produces `done.message.content`, the full assistant reply.
-7. Providers that do not stream may yield no `delta` chunks and only a final `done`.
-8. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
+5. `request` yields exactly one `accepted` chunk after the origin is permitted and the request is cleared to call a provider — including when a persistent grant already exists and no prompt is shown. `accepted` does not mean the user clicked Allow in a UI; applications must not assume a prompt occurred. Failures during permission or preflight do not yield `accepted`.
+6. After `accepted`, `request` yields zero or more `delta` chunks, then exactly one `done` chunk. No chunks follow `done`.
+7. Concatenating every `delta.content` produces `done.message.content`, the full assistant reply.
+8. Providers that do not stream may yield no `delta` chunks and only a final `done`.
+9. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
 ### Security
 

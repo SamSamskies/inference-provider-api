@@ -56,7 +56,9 @@ for await (const chunk of window.inference.request({
     }
   ]
 })) {
-  if (chunk.type === "delta") {
+  if (chunk.type === "accepted") {
+    // permission resolved; provider call may begin
+  } else if (chunk.type === "delta") {
     // append chunk.content to the UI
   } else if (chunk.type === "done") {
     // final message / usage

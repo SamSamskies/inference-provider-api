@@ -14,6 +14,6 @@ Minimal single-page chat app that consumes [`window.inference`](../../SPEC.md).
 3. Open the URL (typically `http://localhost:3000`)
 4. Type a message and click **Send**
 
-The extension prompts for permission on first use. Streaming replies append as `delta` chunks; the final `done` chunk shows the model and optional usage.
+The extension prompts for permission on first use. The UI shows **Waiting…** until the `accepted` chunk (permission resolved), then **Generating…** until the first `delta` or `done`. Streaming replies append as `delta` chunks; the final `done` chunk shows the model and optional usage.
 
 Use **Stop** to abort via `AbortSignal` (`aborted` error code).
