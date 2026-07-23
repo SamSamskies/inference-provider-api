@@ -16,7 +16,7 @@ Until a Chrome Web Store listing is available, clone that repository and load it
 
 ### Example Applications
 
-- [Chat demo](./examples/chatapp/) — minimal chat UI that uses the API
+- [Chat demo](https://samsamskies.github.io/inference-provider-api/) — minimal chat UI that uses the API ([source](./examples/chatapp/))
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API, not extension-specific behavior.
 
