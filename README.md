@@ -12,6 +12,8 @@
 
 - [Inference Bridge](https://github.com/SamSamskies/inference-bridge) — official Chrome extension that injects `window.inference` and routes to OpenAI or Ollama
 
+Until a Chrome Web Store listing is available, clone that repository and load it unpacked from `chrome://extensions` (Developer mode → Load unpacked → select the repo root).
+
 ### Example Applications
 
 - [Chat demo](./examples/webapp/) — minimal chat UI that uses the API
