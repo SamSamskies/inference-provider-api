@@ -1,4 +1,4 @@
-# IPA Demo Web App
+# IPA Demo Chat App
 
 Minimal single-page chat app that consumes [`window.inference`](../../SPEC.md).
 
