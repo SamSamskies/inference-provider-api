@@ -6,6 +6,11 @@
 
 **Spec:** [SPEC.md](./SPEC.md)
 
+## Demos
+
+- [Chrome extension](./examples/extension/) — injects `window.inference`, routes to OpenAI or Ollama
+- [Web app](./examples/webapp/) — minimal chat UI that uses the API
+
 ## Motivation
 
 Today, every AI-powered web application has to reinvent the same infrastructure:
