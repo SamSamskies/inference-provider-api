@@ -323,6 +323,7 @@
           autocomplete="off"
           disabled
         ></textarea>
+        <button type="button" id="clear" class="secondary" disabled>Clear</button>
         <button type="button" id="abort" class="secondary" hidden>Stop</button>
         <button type="submit" id="send" disabled>Send</button>
       </form>
@@ -334,10 +335,14 @@
       const form = document.getElementById("form");
       const input = document.getElementById("input");
       const sendBtn = document.getElementById("send");
+      const clearBtn = document.getElementById("clear");
       const abortBtn = document.getElementById("abort");
 
       /** @type {AbortController | null} */
       let activeController = null;
+
+      /** @type {{ role: "user" | "assistant"; content: string }[]} */
+      const history = [];
 
       /**
        * Spec: only top-level secure contexts with a tuple origin
@@ -351,8 +356,17 @@
         const available = Boolean(window.inference) && isSupportedContext();
         sendBtn.disabled = busy || !available;
         input.disabled = busy || !available;
+        clearBtn.disabled = busy || history.length === 0;
         abortBtn.hidden = !busy;
         if (!busy) activeController = null;
+      }
+
+      function clearChat() {
+        if (activeController) return;
+        history.length = 0;
+        logEl.replaceChildren();
+        clearBtn.disabled = true;
+        input.focus();
       }
 
       function appendMessage(role, text, { pending = false } = {}) {
@@ -453,6 +467,7 @@
         input.value = "";
         input.style.height = "auto";
 
+        history.push({ role: "user", content });
         appendMessage("user", content);
         const assistantBody = appendMessage("assistant", "", { pending: true });
         activeController = new AbortController();
@@ -461,7 +476,7 @@
         try {
           for await (const chunk of window.inference.request({
             method: "chat",
-            messages: [{ role: "user", content }],
+            messages: history,
             signal: activeController.signal,
           })) {
             if (chunk.type === "accepted") {
@@ -473,6 +488,10 @@
             } else if (chunk.type === "done") {
               clearPending(assistantBody);
               assistantBody.textContent = chunk.message.content;
+              history.push({
+                role: "assistant",
+                content: chunk.message.content,
+              });
               const parts = [`model ${chunk.model}`];
               if (chunk.usage) {
                 const { inputTokens, outputTokens } = chunk.usage;
@@ -487,6 +506,10 @@
             assistantBody.parentElement.remove();
           } else {
             clearPending(assistantBody);
+            history.push({
+              role: "assistant",
+              content: assistantBody.textContent,
+            });
           }
           appendError(err);
         } finally {
@@ -501,6 +524,8 @@
         if (!content || activeController) return;
         sendMessage(content);
       });
+
+      clearBtn.addEventListener("click", clearChat);
 
       abortBtn.addEventListener("click", () => {
         if (activeController) activeController.abort();
