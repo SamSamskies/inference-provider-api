@@ -130,6 +130,12 @@
         color: var(--paper);
       }
 
+      .msg.user.failed {
+        background: var(--danger-soft);
+        color: var(--danger);
+        border: 1px solid #efc4c4;
+      }
+
       .msg.assistant {
         align-self: flex-start;
         background: var(--surface);
@@ -356,7 +362,8 @@
         const available = Boolean(window.inference) && isSupportedContext();
         sendBtn.disabled = busy || !available;
         input.disabled = busy || !available;
-        clearBtn.disabled = busy || history.length === 0;
+        clearBtn.disabled =
+          busy || (history.length === 0 && !logEl.firstChild);
         abortBtn.hidden = !busy;
         if (!busy) activeController = null;
       }
@@ -468,7 +475,7 @@
         input.style.height = "auto";
 
         history.push({ role: "user", content });
-        appendMessage("user", content);
+        const userBody = appendMessage("user", content);
         const assistantBody = appendMessage("assistant", "", { pending: true });
         activeController = new AbortController();
         setBusy(true);
@@ -504,6 +511,10 @@
         } catch (err) {
           if (!assistantBody.textContent) {
             assistantBody.parentElement.remove();
+            const userBubble = userBody.parentElement;
+            userBubble.classList.add("failed");
+            const label = userBubble.querySelector(".label");
+            if (label) label.textContent = "user · failed";
             // Drop the unpaired user turn so the next request isn't invalid.
             history.pop();
           } else {
