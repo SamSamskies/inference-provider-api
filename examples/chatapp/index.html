@@ -372,7 +372,7 @@
         if (activeController) return;
         history.length = 0;
         logEl.replaceChildren();
-        clearBtn.disabled = true;
+        setBusy(false);
         input.focus();
       }
 
@@ -456,6 +456,7 @@
         statusEl.className = "missing";
         sendBtn.disabled = true;
         input.disabled = true;
+        clearBtn.disabled = history.length === 0 && !logEl.firstChild;
         return false;
       }
 
@@ -467,6 +468,7 @@
               ? "window.inference requires a secure context with a tuple origin (https or localhost)."
               : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
+          clearBtn.disabled = false;
           return;
         }
 
@@ -562,6 +564,7 @@
             ? "Unsupported context — open over https or localhost (not file: or plain http)."
             : "window.inference is missing — install Inference Bridge and reload.",
         );
+        clearBtn.disabled = false;
       }
     </script>
   </body>
