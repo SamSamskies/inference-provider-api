@@ -504,6 +504,8 @@
         } catch (err) {
           if (!assistantBody.textContent) {
             assistantBody.parentElement.remove();
+            // Drop the unpaired user turn so the next request isn't invalid.
+            history.pop();
           } else {
             clearPending(assistantBody);
             history.push({
