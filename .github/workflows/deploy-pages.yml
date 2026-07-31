@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "examples/chatapp/**"
+      - "examples/chat/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp examples/chatapp/index.html _site/index.html
+          cp examples/chat/index.html _site/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
