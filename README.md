@@ -181,6 +181,8 @@ Some topics that still need community discussion:
 - Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
 - Should applications be able to discover available capabilities?
+- Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
+- How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
 
 ## Contributing
 

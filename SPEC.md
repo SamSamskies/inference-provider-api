@@ -98,7 +98,7 @@ default local installs work without configuring `OLLAMA_ORIGINS` or equivalent
 allowlists. Broad wildcards such as `chrome-extension://*` remain an optional
 fallback, not the recommended default.
 
-Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content.
+Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content. Implementations may emphasize some messages and collapse others (for example by role) without changing the request sent to the provider.
 
 ### Out of scope for this draft
 
