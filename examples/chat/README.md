@@ -6,7 +6,7 @@ Minimal single-page chat app that consumes [`window.inference`](../../SPEC.md).
 
 **Live demo:** [https://samsamskies.github.io/inference-provider-api/](https://samsamskies.github.io/inference-provider-api/)
 
-1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge): clone the repo, then in `chrome://extensions` enable Developer mode → Load unpacked → select the repo root (until a Chrome Web Store listing is available)
+1. Install [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) from the Chrome Web Store (or for development, [clone the repo](https://github.com/SamSamskies/inference-bridge) and load it unpacked from `chrome://extensions`)
 2. Open the [live demo](https://samsamskies.github.io/inference-provider-api/), or serve this folder locally over a secure context:
 
    ```bash
