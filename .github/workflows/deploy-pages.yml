@@ -1,10 +1,10 @@
-name: Deploy chat demo to GitHub Pages
+name: Deploy examples to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
-      - "examples/chat/**"
+      - "examples/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -29,8 +29,12 @@ jobs:
 
       - name: Prepare site
         run: |
-          mkdir -p _site
-          cp examples/chat/index.html _site/index.html
+          mkdir -p _site/chat _site/social/avatars
+          cp examples/index.html _site/index.html
+          cp examples/chat/index.html _site/chat/index.html
+          cp examples/social/index.html _site/social/index.html
+          cp examples/social/data.json _site/social/data.json
+          cp examples/social/avatars/* _site/social/avatars/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

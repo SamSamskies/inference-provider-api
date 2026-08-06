@@ -16,7 +16,9 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 
 ### Example Applications
 
-- [Chat demo](https://samsamskies.github.io/inference-provider-api/) — minimal chat UI that uses the API ([source](./examples/chat/))
+- [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))
+- [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
+- [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API, not extension-specific behavior.
 
@@ -163,7 +165,7 @@ talking to Ollama.
 
 ## Example Use Cases
 
-- A "Grok" button on every Nostr note.
+- A "Grok" button on every social post.
 - AI-powered documentation.
 - Browser-based coding tools.
 - Translation.
