@@ -1048,7 +1048,14 @@
       async function startSummary() {
         if (!threadData) return false;
         seedHistoryForSummary();
-        return runInference({ showUserBubble: false });
+        const ok = await runInference({ showUserBubble: false });
+        // Availability / hard failures never produce an assistant turn — roll back so
+        // reopen or Clear can retry (e.g. after installing Inference Bridge).
+        if (!ok && !history.some((m) => m.role === "assistant")) {
+          history = [];
+          summaryStarted = false;
+        }
+        return ok;
       }
 
       async function sendFollowUp(content) {
