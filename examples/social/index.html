@@ -962,6 +962,7 @@
         ];
       }
 
+      /** @returns {Promise<boolean>} true when the request finished without error */
       async function runInference({ showUserBubble = false, userText = "" } = {}) {
         if (!refreshAvailability()) {
           appendError({
@@ -971,7 +972,7 @@
               : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
           clearBtn.disabled = false;
-          return;
+          return false;
         }
 
         /** @type {HTMLElement | null} */
@@ -1012,6 +1013,7 @@
               appendMeta(parts.join(" · "));
             }
           }
+          return true;
         } catch (err) {
           if (!assistantBody.textContent) {
             assistantBody.parentElement.remove();
@@ -1035,16 +1037,18 @@
             });
           }
           appendError(err);
+          return false;
         } finally {
           setBusy(false);
           if (document.body.classList.contains("panel-open")) input.focus();
         }
       }
 
+      /** @returns {Promise<boolean>} */
       async function startSummary() {
-        if (!threadData) return;
+        if (!threadData) return false;
         seedHistoryForSummary();
-        await runInference({ showUserBubble: false });
+        return runInference({ showUserBubble: false });
       }
 
       async function sendFollowUp(content) {
@@ -1060,8 +1064,8 @@
         if (!content || activeController) return;
         if (!summaryStarted) {
           summaryStarted = true;
-          startSummary().then(() => {
-            if (!activeController) sendFollowUp(content);
+          startSummary().then((ok) => {
+            if (ok && !activeController) sendFollowUp(content);
           });
           return;
         }
