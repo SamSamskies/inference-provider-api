@@ -1,0 +1,71 @@
+{
+  "note": {
+    "id": "demo0001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pubkey": "demoaaaa11111111111111111111111111111111111111111111111111111111",
+    "author": {
+      "name": "maya",
+      "nip05": "maya@example.invalid",
+      "avatar": "./avatars/maya.jpg"
+    },
+    "content": "Hot take: every social app should ship an “explain this thread” button that runs on the user’s own inference — not the app’s backend.\n\nKeys and model choice stay with the user. The app just passes the note + replies as context.\n\nIf your client can’t do that without asking me for an OpenAI key, it’s doing it wrong.",
+    "created_at": 1735689600
+  },
+  "comments": [
+    {
+      "id": "demo0002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pubkey": "demobbbb22222222222222222222222222222222222222222222222222222222",
+      "author": { "name": "rio", "avatar": "./avatars/rio.jpg" },
+      "content": "This is basically NIP-07 energy for AI. Love it.",
+      "created_at": 1735690500,
+      "replyTo": ["maya"]
+    },
+    {
+      "id": "demo0003cccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "pubkey": "democccc33333333333333333333333333333333333333333333333333333333",
+      "author": { "name": "jade", "avatar": "./avatars/jade.jpg" },
+      "content": "Counterpoint: most users won’t install an extension. Without a fallback, the button is dead UI for 95% of people.",
+      "created_at": 1735691400,
+      "replyTo": ["maya"]
+    },
+    {
+      "id": "demo0004dddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "pubkey": "demodddd44444444444444444444444444444444444444444444444444444444",
+      "author": { "name": "knox", "avatar": "./avatars/knox.jpg" },
+      "content": "jade’s right about adoption, but the point is optionality. Ship the button; degrade gracefully when inference isn’t available.",
+      "created_at": 1735692300,
+      "replyTo": ["maya", "jade"]
+    },
+    {
+      "id": "demo0005eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "pubkey": "demoeeee55555555555555555555555555555555555555555555555555555555",
+      "author": { "name": "sable", "avatar": "./avatars/sable.jpg" },
+      "content": "Does “user’s own inference” include local models, or only BYOK to cloud providers?",
+      "created_at": 1735693200,
+      "replyTo": ["maya"]
+    },
+    {
+      "id": "demo0006ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pubkey": "demoaaaa11111111111111111111111111111111111111111111111111111111",
+      "author": { "name": "maya", "avatar": "./avatars/maya.jpg" },
+      "content": "@sable both. Local-first when you can, remote when you want. The app shouldn’t care which.",
+      "created_at": 1735694100,
+      "replyTo": ["maya", "sable"]
+    },
+    {
+      "id": "demo0007gggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "pubkey": "demogggg77777777777777777777777777777777777777777777777777777777",
+      "author": { "name": "quin", "avatar": "./avatars/quin.jpg" },
+      "content": "Privacy angle: I do not want my timeline pasted into someone else’s logging proxy every time I tap “explain.”",
+      "created_at": 1735695000,
+      "replyTo": ["maya"]
+    },
+    {
+      "id": "demo0008hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "pubkey": "demohhhh88888888888888888888888888888888888888888888888888888888",
+      "author": { "name": "vesper", "avatar": "./avatars/vesper.jpg" },
+      "content": "unrelated but has anyone tried the new sats-for-commits bounty board? wild.",
+      "created_at": 1735695900,
+      "replyTo": ["maya"]
+    }
+  ]
+}
