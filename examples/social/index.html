@@ -1046,7 +1046,10 @@
 
       /** @returns {Promise<boolean>} */
       async function startSummary() {
-        if (!threadData) return false;
+        if (!threadData) {
+          summaryStarted = false;
+          return false;
+        }
         seedHistoryForSummary();
         const ok = await runInference({ showUserBubble: false });
         // Availability / hard failures never produce an assistant turn — roll back so
