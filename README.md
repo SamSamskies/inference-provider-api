@@ -60,10 +60,12 @@ for await (const chunk of window.inference.request({
 })) {
   if (chunk.type === "accepted") {
     // permission resolved; provider call may begin
+  } else if (chunk.type === "reasoning_delta") {
+    // optional: model reasoning / chain-of-thought
   } else if (chunk.type === "delta") {
-    // append chunk.content to the UI
+    // append chunk.content to the reply UI
   } else if (chunk.type === "done") {
-    // final message / usage
+    // final message / usage; message.reasoning when reasoning was streamed
   }
 }
 ```
@@ -185,6 +187,7 @@ Some topics that still need community discussion:
 - Should applications be able to discover available capabilities?
 - Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
 - How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
+- Should applications be encouraged or required to round-trip `message.reasoning` on later turns for providers that benefit from it?
 
 ## Contributing
 

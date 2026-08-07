@@ -22,6 +22,8 @@ type InferenceRequest = {
 type Message = {
   role: "system" | "user" | "assistant";
   content: string;
+  /** Model reasoning / chain-of-thought, when the provider exposes it. */
+  reasoning?: string;
 }
 
 type Usage = {
@@ -31,6 +33,7 @@ type Usage = {
 
 type InferenceChunk =
   | { type: "accepted" }
+  | { type: "reasoning_delta"; content: string }
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
@@ -55,10 +58,12 @@ for await (const chunk of window.inference.request({
 })) {
   if (chunk.type === "accepted") {
     // permission resolved; provider call may begin
+  } else if (chunk.type === "reasoning_delta") {
+    // append chunk.content to a reasoning UI (optional)
   } else if (chunk.type === "delta") {
-    // append chunk.content to the UI
+    // append chunk.content to the reply UI
   } else if (chunk.type === "done") {
-    // final message / usage
+    // final message / usage; message.reasoning is set when reasoning was streamed
   }
 }
 ```
@@ -70,10 +75,13 @@ for await (const chunk of window.inference.request({
 3. API keys never leave the extension. Applications never see them.
 4. If a request fails, iteration throws an `InferenceError`. A failed request does not yield a `done` chunk.
 5. `request` yields exactly one `accepted` chunk after the origin is permitted and the request is cleared to call a provider — including when a persistent grant already exists and no prompt is shown. `accepted` does not mean the user clicked Allow in a UI; applications must not assume a prompt occurred. Failures during permission or preflight do not yield `accepted`.
-6. After `accepted`, `request` yields zero or more `delta` chunks, then exactly one `done` chunk. No chunks follow `done`.
-7. Concatenating every `delta.content` produces `done.message.content`, the full assistant reply.
-8. Providers that do not stream may yield no `delta` chunks and only a final `done`.
-9. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
+6. After `accepted`, `request` yields zero or more `reasoning_delta` and/or `delta` chunks (in any order), then exactly one `done` chunk. No chunks follow `done`.
+7. Concatenating every `delta.content` produces `done.message.content`, the full assistant reply. Reasoning is not included in `content`.
+8. Concatenating every `reasoning_delta.content` produces `done.message.reasoning` when the provider exposed reasoning. If there were no `reasoning_delta` chunks, `done.message.reasoning` is omitted.
+9. Providers or models that do not expose reasoning yield no `reasoning_delta` chunks and omit `message.reasoning`. Applications must treat reasoning as optional.
+10. Providers that do not stream may yield no `reasoning_delta` or `delta` chunks and only a final `done` (with `message.content` and optional `message.reasoning`).
+11. When sending prior assistant turns back in `messages`, applications may include `reasoning` if they received it. Implementations map it to the provider when the provider supports round-tripping reasoning; otherwise they may ignore it. Applications must not rely on every provider consuming prior reasoning.
+12. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
 ### Security
 
