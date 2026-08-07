@@ -10,7 +10,7 @@
 
 ### Reference Implementation
 
-- [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) — official Chrome extension that injects `window.inference` and routes to OpenAI, OpenRouter, or Ollama ([source](https://github.com/SamSamskies/inference-bridge))
+- [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) — official Chrome extension that injects `window.inference` and routes to OpenAI, OpenRouter, Ollama, or experimental OpenAI-compatible servers ([source](https://github.com/SamSamskies/inference-bridge))
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd), or for development clone the repository and load it unpacked from `chrome://extensions` (Developer mode → Load unpacked → select the repo root).
 
@@ -152,8 +152,11 @@ the preferred path.
 **Chrome MV3 reference:** [Inference Bridge](https://github.com/SamSamskies/inference-bridge)
 does this with `declarativeNetRequestWithHostAccess` and dynamic rules in
 [`src/ollama-origin-bypass.js`](https://github.com/SamSamskies/inference-bridge/blob/main/src/ollama-origin-bypass.js)
-that remove `Origin` / `Referer` only for local Ollama. See [SPEC.md](./SPEC.md)
-Security for the normative guidance.
+and
+[`src/loopback-origin-bypass.js`](https://github.com/SamSamskies/inference-bridge/blob/main/src/loopback-origin-bypass.js)
+that remove `Origin` / `Referer` for local Ollama and other loopback
+OpenAI-compatible servers. See [SPEC.md](./SPEC.md) Security for the normative
+guidance.
 
 That permission lets the extension modify request headers only for hosts already
 listed in `host_permissions`—it is not a browser-wide rewrite capability. Still
