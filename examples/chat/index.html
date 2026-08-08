@@ -203,6 +203,60 @@
         display: none;
       }
 
+      .reasoning {
+        display: none;
+        margin: 0 0 0.55rem;
+        padding: 0;
+        border: none;
+        background: transparent;
+      }
+
+      .msg.assistant.has-reasoning .reasoning {
+        display: block;
+      }
+
+      .reasoning > summary {
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        list-style: none;
+        user-select: none;
+      }
+
+      .reasoning > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .reasoning > summary::before {
+        content: "▸ ";
+        display: inline-block;
+        width: 0.85em;
+      }
+
+      .reasoning[open] > summary::before {
+        content: "▾ ";
+      }
+
+      .reasoning > summary:hover {
+        color: var(--ink);
+      }
+
+      .reasoning-body {
+        margin-top: 0.4rem;
+        padding: 0.55rem 0.65rem;
+        border-radius: 6px;
+        background: rgba(26, 31, 28, 0.04);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
       .typing {
         display: none;
         align-items: center;
@@ -213,6 +267,10 @@
 
       .msg.assistant.pending .typing {
         display: inline-flex;
+      }
+
+      .msg.assistant.pending.has-reasoning .typing {
+        display: none;
       }
 
       .typing-label {
@@ -429,6 +487,17 @@
           label.textContent = role;
           el.appendChild(label);
         }
+        if (role === "assistant") {
+          const reasoning = document.createElement("details");
+          reasoning.className = "reasoning";
+          reasoning.open = true;
+          const summary = document.createElement("summary");
+          summary.textContent = "Reasoning";
+          const reasoningBody = document.createElement("div");
+          reasoningBody.className = "reasoning-body";
+          reasoning.append(summary, reasoningBody);
+          el.appendChild(reasoning);
+        }
         if (pending) {
           const typing = document.createElement("span");
           typing.className = "typing";
@@ -459,10 +528,38 @@
         const text = typing?.querySelector(".typing-label");
         if (!typing || !text) return;
         text.textContent = label;
-        typing.setAttribute(
-          "aria-label",
-          label === "Generating" ? "Generating response" : "Waiting for response",
-        );
+        const aria =
+          label === "Thinking"
+            ? "Model is reasoning"
+            : label === "Generating"
+              ? "Generating response"
+              : "Waiting for response";
+        typing.setAttribute("aria-label", aria);
+      }
+
+      /** @returns {HTMLElement | null} */
+      function ensureReasoning(body) {
+        const bubble = body.parentElement;
+        const reasoning = bubble?.querySelector(".reasoning");
+        const reasoningBody = reasoning?.querySelector(".reasoning-body");
+        if (!bubble || !reasoning || !reasoningBody) return null;
+        bubble.classList.add("has-reasoning");
+        reasoning.open = true;
+        return reasoningBody;
+      }
+
+      function setReasoning(body, text) {
+        const reasoningBody = ensureReasoning(body);
+        if (!reasoningBody) return;
+        reasoningBody.textContent = text;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function appendReasoning(body, text) {
+        const reasoningBody = ensureReasoning(body);
+        if (!reasoningBody) return;
+        reasoningBody.textContent += text;
+        logEl.scrollTop = logEl.scrollHeight;
       }
 
       function appendMeta(text) {
@@ -522,6 +619,7 @@
         history.push({ role: "user", content });
         const userBody = appendMessage("user", content);
         const assistantBody = appendMessage("assistant", "", { pending: true });
+        let sawReasoning = false;
         activeController = new AbortController();
         setBusy(true);
 
@@ -533,6 +631,10 @@
           })) {
             if (chunk.type === "accepted") {
               setPendingLabel(assistantBody, "Generating");
+            } else if (chunk.type === "reasoning_delta") {
+              sawReasoning = true;
+              appendReasoning(assistantBody, chunk.content);
+              setPendingLabel(assistantBody, "Thinking");
             } else if (chunk.type === "delta") {
               clearPending(assistantBody);
               assistantBody.textContent += chunk.content;
@@ -540,6 +642,10 @@
             } else if (chunk.type === "done") {
               clearPending(assistantBody);
               assistantBody.textContent = chunk.message.content;
+              if (chunk.message.reasoning) {
+                setReasoning(assistantBody, chunk.message.reasoning);
+                sawReasoning = true;
+              }
               history.push({
                 role: "assistant",
                 content: chunk.message.content,
@@ -555,12 +661,15 @@
           }
         } catch (err) {
           if (!assistantBody.textContent) {
-            assistantBody.parentElement.remove();
+            // No reply content yet (with or without reasoning). Keep any
+            // reasoning UI for context, but drop the unpaired user turn so
+            // follow-ups aren't corrupted by an empty assistant message.
+            if (!sawReasoning) assistantBody.parentElement.remove();
+            else clearPending(assistantBody);
             const userBubble = userBody.parentElement;
             userBubble.classList.add("failed");
             const label = userBubble.querySelector(".label");
             if (label) label.textContent = "user · failed";
-            // Drop the unpaired user turn so the next request isn't invalid.
             history.pop();
           } else {
             clearPending(assistantBody);
