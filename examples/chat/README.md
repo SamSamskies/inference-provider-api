@@ -15,6 +15,6 @@ Minimal single-page chat app that consumes [`window.inference`](../../SPEC.md).
 
 3. Type a message and click **Send**
 
-The extension prompts for permission on first use. The UI shows **Waiting…** until the `accepted` chunk (permission resolved), then **Generating…** until the first `delta` or `done`. Streaming replies append as `delta` chunks; the final `done` chunk shows the model and optional usage.
+The extension prompts for permission on first use. The UI shows **Waiting…** until the `accepted` chunk (permission resolved), then **Generating…** until the first `delta` or `done`. If the provider streams reasoning, the status switches to **Thinking…** and a collapsible **Reasoning** block appears above the reply (optional — many models emit none). Streaming replies append as `delta` chunks; the final `done` chunk shows the model and optional usage.
 
-Prior turns are kept in an in-memory `messages` array and sent with each request so follow-ups keep conversation context. Use **Clear** to reset. Use **Stop** to abort via `AbortSignal` (`aborted` error code).
+Prior turns are kept in an in-memory `messages` array and sent with each request so follow-ups keep conversation context. Reasoning is shown in the UI when present but is not sent back on later turns. Use **Clear** to reset. Use **Stop** to abort via `AbortSignal` (`aborted` error code).
