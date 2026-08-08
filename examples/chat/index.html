@@ -660,13 +660,16 @@
             }
           }
         } catch (err) {
-          if (!assistantBody.textContent && !sawReasoning) {
-            assistantBody.parentElement.remove();
+          if (!assistantBody.textContent) {
+            // No reply content yet (with or without reasoning). Keep any
+            // reasoning UI for context, but drop the unpaired user turn so
+            // follow-ups aren't corrupted by an empty assistant message.
+            if (!sawReasoning) assistantBody.parentElement.remove();
+            else clearPending(assistantBody);
             const userBubble = userBody.parentElement;
             userBubble.classList.add("failed");
             const label = userBubble.querySelector(".label");
             if (label) label.textContent = "user · failed";
-            // Drop the unpaired user turn so the next request isn't invalid.
             history.pop();
           } else {
             clearPending(assistantBody);
