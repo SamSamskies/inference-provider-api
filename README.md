@@ -10,7 +10,7 @@
 
 ### Reference Implementation
 
-- [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) — official Chrome extension that injects `window.inference` and routes to OpenAI, OpenRouter, Ollama, or experimental OpenAI-compatible servers ([source](https://github.com/SamSamskies/inference-bridge))
+- [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) — official Chrome extension that injects `window.inference` and routes to OpenAI, Anthropic, OpenRouter, Ollama, or experimental OpenAI-compatible servers ([source](https://github.com/SamSamskies/inference-bridge))
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd), or for development clone the repository and load it unpacked from `chrome://extensions` (Developer mode → Load unpacked → select the repo root).
 
