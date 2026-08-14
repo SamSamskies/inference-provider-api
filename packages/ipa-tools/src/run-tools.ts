@@ -224,6 +224,14 @@ export async function runTools(
         );
       }
 
+      const id = call && typeof call === "object" ? call.id : undefined;
+      if (typeof id !== "string" || !id) {
+        throw makeInferenceError(
+          "provider_error",
+          "Tool call is missing an id."
+        );
+      }
+
       const executor =
         execute && typeof execute === "object" ? execute[name] : undefined;
       if (typeof executor !== "function") {
@@ -235,7 +243,7 @@ export async function runTools(
 
       const args = parseToolArguments(call.function?.arguments, name);
       if (typeof onToolCall === "function") {
-        onToolCall({ id: call.id, name, arguments: args });
+        onToolCall({ id, name, arguments: args });
       }
       const result = await executor(args);
       if (signal?.aborted) {
@@ -245,7 +253,7 @@ export async function runTools(
         ...messages,
         {
           role: "tool",
-          toolCallId: call.id,
+          toolCallId: id,
           content: serializeToolResult(result),
         },
       ];

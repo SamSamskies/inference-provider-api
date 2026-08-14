@@ -486,6 +486,37 @@ describe("runTools", () => {
     });
   });
 
+  it("throws provider_error when a tool call is missing an id", async () => {
+    const execute = { get_weather: vi.fn(async () => ({ ok: true })) };
+    await expect(
+      runTools({
+        request: fakeRequest([
+          {
+            role: "assistant",
+            content: null,
+            toolCalls: [
+              {
+                id: "",
+                type: "function",
+                function: { name: "get_weather", arguments: "{}" },
+              },
+            ],
+          },
+        ]),
+        messages: [{ role: "user", content: "hi" }],
+        execute,
+        onToolCall: () => {
+          throw new Error("onToolCall should not run");
+        },
+      })
+    ).rejects.toMatchObject({
+      name: "InferenceError",
+      code: "provider_error",
+      message: "Tool call is missing an id.",
+    });
+    expect(execute.get_weather).not.toHaveBeenCalled();
+  });
+
   it("throws invalid_request for non-serializable tool results", async () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
