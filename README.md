@@ -126,6 +126,13 @@ Any multi-round tool loop is application code. Implementations that do not
 advertise `toolCalling` reject `tools` with `invalid_request`. For a ready-made
 loop (plus types and `complete`), see the non-normative
 [`ipa-tools`](./packages/ipa-tools) package (`npm install ipa-tools`).
+
+Inference Bridge has not implemented `getFeatures` yet, so the detect above
+sees no capabilities. Tools are still experimental there and live on
+`experimental.request`, not IPA `request`. Sending `tools` on `request` is
+`invalid_request` until Bridge ships `getFeatures` with `toolCalling: true`.
+For the Bridge-only fallback, see
+[`ipa-tools`](./packages/ipa-tools#inference-bridge-experimentalrequest-fallback).
 The extension prompts the user for permission:
 
 ```text

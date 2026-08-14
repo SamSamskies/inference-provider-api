@@ -110,7 +110,7 @@ Handlers run in the page. The package never talks to providers or API keys.
 
 ### Inference Bridge `experimental.request` fallback
 
-[Inference Bridge](https://github.com/SamSamskies/inference-bridge) currently returns `toolCalling: false` from `getFeatures()`. It exposes tools on `experimental.request` instead:
+[Inference Bridge](https://github.com/SamSamskies/inference-bridge) has not implemented `getFeatures` yet, so `toolCalling` is unset. It exposes tools on `experimental.request` instead:
 
 ```ts
 import { getInference, runTools } from "ipa-tools";
@@ -131,7 +131,7 @@ const request =
 await runTools({ request, messages, tools, execute });
 ```
 
-Once Inference Bridge graduates tools onto `request` and advertises `toolCalling: true`, the default (`window.inference.request`) is enough.
+Once Inference Bridge implements `getFeatures` with `toolCalling: true` and graduates tools onto `request`, the default (`window.inference.request`) is enough.
 
 ## `waitForInference` / `getInference` / `getFeatures` / `isInferenceError`
 
