@@ -20,7 +20,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
 - [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 
-The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API, not extension-specific behavior.
+The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces.
 
 ## Motivation
 
@@ -70,7 +70,7 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is the only injected method. If the app only needs the final message, drain to `done`:
+`request` is required. `getFeatures` reports optional capabilities such as tool calling; implementations that omit it advertise none. If the app only needs the final message, drain to `done`:
 
 ```ts
 async function complete(request) {
@@ -88,6 +88,42 @@ const { model, message, usage } = await complete({
 ```
 
 The helper is application code, not part of `window.inference`. It throws `InferenceError` the same way iterating `request` does.
+
+Feature-detect optional capabilities before sending tools. Missing `getFeatures` means none:
+
+```ts
+const features = window.inference.getFeatures?.() ?? {};
+
+if (features.toolCalling) {
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "get_weather",
+        description: "Get the current weather for a city",
+        parameters: {
+          type: "object",
+          properties: { city: { type: "string" } },
+          required: ["city"],
+        },
+      },
+    },
+  ];
+
+  for await (const chunk of window.inference.request({
+    method: "chat",
+    messages: [{ role: "user", content: "What's the weather in Austin?" }],
+    tools,
+  })) {
+    if (chunk.type === "done" && chunk.message.tool_calls?.length) {
+      // page executes the function, appends role: "tool" results, calls request again
+    }
+  }
+}
+```
+
+Any multi-round tool loop is application code. Implementations that do not
+advertise `toolCalling` reject `tools` with `invalid_request`.
 
 The extension prompts the user for permission:
 
@@ -113,16 +149,19 @@ Allow once, or deny only this request.
 ```
 
 Request preview is optional extension UX for this draft, not part of the API
-contract.
+contract. When the request includes `tools`, the permission UI must list the
+function names; a persistent chat grant does not silently cover a later tools
+request.
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
 persists access for that origin together with the chosen provider and model; Deny
 permanently blocks it. Changing the extension’s global default does not alter
 existing origin grants.
 
-This first draft intentionally supports only text chat. The goal is to make the
-smallest useful API available for experiments, learn from real applications,
-and expand the standard only when those applications demonstrate a need.
+Text chat is required. Tool calling is optional: implementations that support it
+return `{ toolCalling: true }` from `getFeatures` and accept `tools` on
+`request`. The page defines and executes function tools; the extension only
+relays schemas, `tool_calls`, and results. See [SPEC.md](./SPEC.md).
 
 ## Goals
 
@@ -133,6 +172,8 @@ and expand the standard only when those applications demonstrate a need.
 - Per-origin permissions
 - Streaming support
 - Zero backend required
+- Optional capability discovery (`getFeatures`)
+- Optional function tools, executed by the page
 
 ## Non-goals
 
@@ -191,7 +232,7 @@ talking to Ollama.
 
 - A "Grok" button on every social post.
 - AI-powered documentation.
-- Browser-based coding tools.
+- Browser-based coding tools and other page-executed function tools.
 - Translation.
 - Writing assistance.
 - Local-first AI applications.
@@ -203,10 +244,11 @@ Some topics that still need community discussion:
 - Is `window.inference` the right namespace?
 - Which capability constraints, if any, do applications need?
 - Should model selection always remain under user control?
-- Should tool calling be added in a future version?
 - Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
-- Should applications be able to discover available capabilities?
+- Should `getFeatures` grow beyond booleans (for example nested tool kinds), or stay one key per capability?
+- Should hosted / provider-executed tools (web search, MCP) be specified, or remain implementation-specific?
+- Should tool calls stream as their own chunk type, or stay on `done.message.tool_calls` only?
 - Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
 - How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
 - Should applications be encouraged or required to round-trip `message.reasoning` on later turns for providers that benefit from it?
