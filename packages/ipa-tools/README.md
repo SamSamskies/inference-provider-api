@@ -117,7 +117,7 @@ import { getInference, runTools } from "ipa-tools";
 
 const inference = getInference();
 const request =
-  inference.getFeatures?.().toolCalling
+  inference.getFeatures?.()?.toolCalling
     ? inference.request.bind(inference)
     : // Inference Bridge experimental window — not part of IPA types
       (
