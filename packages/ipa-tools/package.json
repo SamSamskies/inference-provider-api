@@ -1,0 +1,50 @@
+{
+  "name": "ipa-tools",
+  "version": "0.1.0",
+  "description": "Application helpers and TypeScript types for the Inference Provider API",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Samskies and contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SamSamskies/inference-provider-api.git",
+    "directory": "packages/ipa-tools"
+  },
+  "homepage": "https://github.com/SamSamskies/inference-provider-api/tree/main/packages/ipa-tools",
+  "bugs": {
+    "url": "https://github.com/SamSamskies/inference-provider-api/issues"
+  },
+  "keywords": [
+    "inference-provider-api",
+    "ipa",
+    "window.inference",
+    "ai",
+    "tools"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": [
+    "./dist/types.js",
+    "./dist/index.js"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
