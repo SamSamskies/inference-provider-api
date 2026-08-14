@@ -242,7 +242,7 @@ if (done.message.role === "assistant" && done.message.toolCalls?.length) {
 }
 ```
 
-The loop above is application code, not part of `window.inference`.
+The loop above is application code, not part of `window.inference`. A non-normative helper library ([`ipa-tools`](./packages/ipa-tools)) provides TypeScript types, a `complete` drain helper, and a `runTools` loop; implementations are not required to ship it.
 
 #### Permission
 
