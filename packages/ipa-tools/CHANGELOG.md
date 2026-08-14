@@ -12,4 +12,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release: SPEC.md TypeScript types with `Window` augmentation.
 - `complete` — drain `window.inference.request` (or an injected `request`) to a `done` chunk.
 - `runTools` — page-executed multi-round function-tool loop (port of Inference Bridge `run-tools.js`).
-- `getInference`, `getFeatures`, `isInferenceError`, and `makeInferenceError`.
+- `waitForInference`, `getInference`, `isInferenceAvailable`, `getFeatures`, `isInferenceError`, and `makeInferenceError`.

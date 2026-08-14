@@ -23,7 +23,13 @@ export type {
 } from "./types.js";
 
 export { isInferenceError, makeInferenceError } from "./errors.js";
-export { getFeatures, getInference } from "./inference.js";
+export {
+  getFeatures,
+  getInference,
+  isInferenceAvailable,
+  waitForInference,
+  type WaitForInferenceOptions,
+} from "./inference.js";
 export { complete, type CompleteOptions } from "./complete.js";
 export {
   parseToolArguments,

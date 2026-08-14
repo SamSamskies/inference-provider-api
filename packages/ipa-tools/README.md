@@ -74,7 +74,7 @@ Optional `options.request` overrides `window.inference.request` (useful in tests
 
 ## `runTools`
 
-Page-executed multi-round function-tool loop (port of Inference Bridge’s `runTools`):
+Page-executed multi-round function-tool loop:
 
 ```ts
 import { runTools } from "ipa-tools";
@@ -108,11 +108,9 @@ const { final, messages } = await runTools({
 
 Handlers run in the page. The package never talks to providers or API keys.
 
-Zod stays in the app (`parameters: z.toJSONSchema(Schema)` and `Schema.parse` inside `execute`). This package does not depend on Zod.
+### Inference Bridge `experimental.request` fallback
 
-### Bridge `experimental.request` fallback
-
-Until an implementation advertises `getFeatures().toolCalling` and accepts tools on stable `request`:
+[Inference Bridge](https://github.com/SamSamskies/inference-bridge) currently returns `toolCalling: false` from `getFeatures()`. It exposes tools on `experimental.request` instead:
 
 ```ts
 import { getInference, runTools } from "ipa-tools";
@@ -121,7 +119,7 @@ const inference = getInference();
 const request =
   inference.getFeatures?.().toolCalling
     ? inference.request.bind(inference)
-    : // Bridge experimental window — not part of IPA types
+    : // Inference Bridge experimental window — not part of IPA types
       (
         inference as typeof inference & {
           experimental?: { request?: typeof inference.request };
@@ -133,15 +131,33 @@ const request =
 await runTools({ request, messages, tools, execute });
 ```
 
-Once Bridge graduates tools onto `request`, the default (`window.inference.request`) is enough.
+Once Inference Bridge graduates tools onto `request` and advertises `toolCalling: true`, the default (`window.inference.request`) is enough.
 
-## `getInference` / `getFeatures` / `isInferenceError`
+## `waitForInference` / `getInference` / `getFeatures` / `isInferenceError`
+
+Check immediately so a missing extension does not delay first paint. Poll in the background only if you want to pick up late injection.
 
 ```ts
-import { getInference, getFeatures, isInferenceError } from "ipa-tools";
+import {
+  waitForInference,
+  getFeatures,
+  isInferenceAvailable,
+  isInferenceError,
+} from "ipa-tools";
 
-const inference = getInference(); // throws unavailable if missing
-const features = getFeatures(); // getInference().getFeatures?.() ?? {}
+if (isInferenceAvailable()) {
+  const features = getFeatures();
+  // enable UI
+} else {
+  // show unavailable now — do not await waitForInference here
+  void waitForInference()
+    .then(() => {
+      // extension appeared; enable UI
+    })
+    .catch(() => {
+      // still missing after timeout; stay unavailable
+    });
+}
 
 try {
   await complete({ method: "chat", messages: […] });
@@ -152,7 +168,7 @@ try {
 }
 ```
 
-Prefer `isInferenceError` over `instanceof` — injectors may reconstruct errors across isolated worlds.
+`getInference()` throws immediately if it is missing. Prefer `isInferenceError` over `instanceof` — injectors may reconstruct errors across isolated worlds.
 
 ## API surface (v1)
 
@@ -162,9 +178,10 @@ Prefer `isInferenceError` over `instanceof` — injectors may reconstruct errors
 | `complete` | Drain `request` to one `done` chunk |
 | `runTools` | Page-executed tool loop |
 | `isInferenceError` | `error.code` check |
-| `getInference` / `getFeatures` | Resolve `window.inference` |
+| `waitForInference` | Background poll until injected (do not await on first paint) |
+| `getInference` / `getFeatures` / `isInferenceAvailable` | Resolve or check `window.inference` |
 
-Out of v1: Zod helpers, UI, injecting onto `window.inference`, hosted/MCP tools, streaming `toolCall` chunks.
+Out of v1: UI, injecting onto `window.inference`, hosted/MCP tools, streaming `toolCall` chunks.
 
 ## License
 
