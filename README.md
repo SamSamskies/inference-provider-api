@@ -70,6 +70,25 @@ for await (const chunk of window.inference.request({
 }
 ```
 
+`request` is the only injected method. If the app only needs the final message, drain to `done`:
+
+```ts
+async function complete(request) {
+  let done;
+  for await (const chunk of window.inference.request(request)) {
+    if (chunk.type === "done") done = chunk;
+  }
+  return done;
+}
+
+const { model, message, usage } = await complete({
+  method: "chat",
+  messages: [{ role: "user", content: "Is this true?:\n\nNostr is dead." }],
+});
+```
+
+The helper is application code, not part of `window.inference`. It throws `InferenceError` the same way iterating `request` does.
+
 The extension prompts the user for permission:
 
 ```text
