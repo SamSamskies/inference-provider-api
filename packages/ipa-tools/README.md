@@ -113,22 +113,24 @@ Handlers run in the page. The package never talks to providers or API keys.
 [Inference Bridge](https://github.com/SamSamskies/inference-bridge) has not implemented `getFeatures` yet, so `toolCalling` is unset. It exposes tools on `experimental.request` instead:
 
 ```ts
-import { getInference, runTools } from "ipa-tools";
+import { getInference, isInferenceAvailable, runTools } from "ipa-tools";
 
-const inference = getInference();
-const request =
-  inference.getFeatures?.()?.toolCalling
-    ? inference.request.bind(inference)
-    : // Inference Bridge experimental window — not part of IPA types
-      (
-        inference as typeof inference & {
-          experimental?: { request?: typeof inference.request };
-        }
-      ).experimental?.request?.bind(
-        (inference as { experimental?: object }).experimental
-      ) ?? inference.request.bind(inference);
+if (isInferenceAvailable()) {
+  const inference = getInference();
+  const request =
+    inference.getFeatures?.()?.toolCalling
+      ? inference.request.bind(inference)
+      : // Inference Bridge experimental window — not part of IPA types
+        (
+          inference as typeof inference & {
+            experimental?: { request?: typeof inference.request };
+          }
+        ).experimental?.request?.bind(
+          (inference as { experimental?: object }).experimental
+        ) ?? inference.request.bind(inference);
 
-await runTools({ request, messages, tools, execute });
+  await runTools({ request, messages, tools, execute });
+}
 ```
 
 Once Inference Bridge implements `getFeatures` with `toolCalling: true` and graduates tools onto `request`, the default (`window.inference.request`) is enough.
