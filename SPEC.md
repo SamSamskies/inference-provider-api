@@ -35,11 +35,11 @@ type Message =
       content: string | null;
       /** Model reasoning / chain-of-thought, when the provider exposes it. */
       reasoning?: string;
-      tool_calls?: ToolCall[];
+      toolCalls?: ToolCall[];
     }
   | {
       role: "tool";
-      tool_call_id: string;
+      toolCallId: string;
       content: string;
     }
 
@@ -132,7 +132,7 @@ for await (const chunk of window.inference.request({
 7. Concatenating every `delta.content` produces `done.message.content` when the assistant reply is text. Reasoning is not included in `content`. On a tool turn with no `delta` chunks, `done.message.content` may be `null` or `""`; applications must treat both as no text reply.
 8. Concatenating every `reasoning_delta.content` produces `done.message.reasoning` when the provider exposed reasoning. If there were no `reasoning_delta` chunks, `done.message.reasoning` is omitted.
 9. Providers or models that do not expose reasoning yield no `reasoning_delta` chunks and omit `message.reasoning`. Applications must treat reasoning as optional.
-10. Providers that do not stream may yield no `reasoning_delta` or `delta` chunks and only a final `done` (with `message.content` and optional `message.reasoning` and/or `message.tool_calls`).
+10. Providers that do not stream may yield no `reasoning_delta` or `delta` chunks and only a final `done` (with `message.content` and optional `message.reasoning` and/or `message.toolCalls`).
 11. When sending prior assistant turns back in `messages`, applications may include `reasoning` if they received it. Implementations map it to the provider when the provider supports round-tripping reasoning; otherwise they may ignore it. Applications must not rely on every provider consuming prior reasoning.
 12. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
@@ -151,29 +151,29 @@ if (features.toolCalling) {
 
 Rules:
 
-1. `toolCalling: true` means `request` accepts `tools`, `toolChoice`, assistant `tool_calls`, and `role: "tool"` messages. It does not mean the selected model can call functions.
+1. `toolCalling: true` means `request` accepts `tools`, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions.
 2. An absent key and `false` both mean unsupported. Applications must ignore unknown keys so later capabilities can be added without breaking callers.
 3. The result must not include provider name, model id, or other user or account identity.
-4. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `tool_calls` with `invalid_request` — including implementations that omit `getFeatures`.
-5. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `tool_calls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
+4. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`.
+5. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
 
 ### Tool calling
 
-Function tools are defined and **executed by the page**. The implementation relays JSON schemas, `tool_calls`, and `role: "tool"` results; it must not run application tool handlers or widen host permissions in order to execute tools.
+Function tools are defined and **executed by the page**. The implementation relays JSON schemas, `toolCalls`, and `role: "tool"` results; it must not run application tool handlers or widen host permissions in order to execute tools.
 
-This draft specifies function tools only. The implementation is not an agent runtime: the page owns any multi-round loop (send tools → receive `tool_calls` → execute → send `role: "tool"` results → repeat).
+This draft specifies function tools only. The implementation is not an agent runtime: the page owns any multi-round loop (send tools → receive `toolCalls` → execute → send `role: "tool"` results → repeat).
 
 #### Request
 
 - `tools`, when present, must be a non-empty array of function tools. `parameters` is a JSON Schema object for the function arguments.
 - `toolChoice`, when omitted and `tools` is present, defaults to `"auto"` (the model may reply in text or call tools). `"none"` suppresses calls; `"required"` asks for at least one call; a function object forces that function.
-- `role: "tool"` messages must include `tool_call_id` (the `id` from the corresponding `ToolCall`) and string `content` (usually JSON text). They must not include `tool_calls` or `reasoning`.
-- Assistant messages may include `tool_calls` (non-empty when present). `content` may be `null` when the turn is tool-only. `tool_calls[].function.arguments` is a JSON string, not a parsed object.
-- `system` and `user` messages must not include `tool_calls` or `tool_call_id`. Their `content` is always a string.
+- `role: "tool"` messages must include `toolCallId` (the `id` from the corresponding `ToolCall`) and string `content` (usually JSON text). They must not include `toolCalls` or `reasoning`.
+- Assistant messages may include `toolCalls` (non-empty when present). `content` may be `null` when the turn is tool-only. `toolCalls[].function.arguments` is a JSON string, not a parsed object.
+- `system` and `user` messages must not include `toolCalls` or `toolCallId`. Their `content` is always a string.
 
-Streaming is unchanged: `accepted` → optional `reasoning_delta` / `delta` → `done`. Tool calls are not streamed as separate chunk types. When the model ends on tools, `done.message` is an assistant message with `tool_calls` (and `content` often `null` or empty).
+Streaming is unchanged: `accepted` → optional `reasoning_delta` / `delta` → `done`. Tool calls are not streamed as separate chunk types. When the model ends on tools, `done.message` is an assistant message with `toolCalls` (and `content` often `null` or empty).
 
-When continuing a tool turn, the application appends that assistant message (including `tool_calls` and `reasoning` if present), then one `role: "tool"` message per call, then calls `request` again.
+When continuing a tool turn, the application appends that assistant message (including `toolCalls` and `reasoning` if present), then one `role: "tool"` message per call, then calls `request` again.
 
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
@@ -209,15 +209,15 @@ for await (const chunk of window.inference.request({
   if (chunk.type === "done") done = chunk;
 }
 
-if (done.message.role === "assistant" && done.message.tool_calls?.length) {
+if (done.message.role === "assistant" && done.message.toolCalls?.length) {
   messages.push({
     role: "assistant",
     content: done.message.content,
-    tool_calls: done.message.tool_calls,
+    toolCalls: done.message.toolCalls,
     ...(done.message.reasoning ? { reasoning: done.message.reasoning } : {}),
   });
 
-  for (const call of done.message.tool_calls) {
+  for (const call of done.message.toolCalls) {
     const args = JSON.parse(call.function.arguments);
     const result =
       call.function.name === "get_weather"
@@ -225,7 +225,7 @@ if (done.message.role === "assistant" && done.message.tool_calls?.length) {
         : { error: "unknown tool" };
     messages.push({
       role: "tool",
-      tool_call_id: call.id,
+      toolCallId: call.id,
       content: JSON.stringify(result),
     });
   }
@@ -250,7 +250,7 @@ A persistent allow grant for text chat does not cover a later request that inclu
 
 When a request includes `tools`, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Request-content preview remains optional (see Security).
 
-Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `tool_calls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant).
+Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant).
 
 ### Security
 
@@ -281,6 +281,6 @@ Function tools run in the page. A site that offers tools can cause the model to 
 
 ### Out of scope for this draft
 
-Images, embeddings, speech, hosted / provider-executed tools (for example web search or MCP), streaming `tool_call` deltas, and an in-API agent loop.
+Images, embeddings, speech, hosted / provider-executed tools (for example web search or MCP), streaming `toolCall` deltas, and an in-API agent loop.
 
 Estimated cost in the permission UI is optional extension UX and is not required by this draft.

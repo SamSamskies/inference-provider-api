@@ -115,7 +115,7 @@ if (features.toolCalling) {
     messages: [{ role: "user", content: "What's the weather in Austin?" }],
     tools,
   })) {
-    if (chunk.type === "done" && chunk.message.tool_calls?.length) {
+    if (chunk.type === "done" && chunk.message.toolCalls?.length) {
       // page executes the function, appends role: "tool" results, calls request again
     }
   }
@@ -161,7 +161,7 @@ existing origin grants.
 Text chat is required. Tool calling is optional: implementations that support it
 return `{ toolCalling: true }` from `getFeatures` and accept `tools` on
 `request`. The page defines and executes function tools; the extension only
-relays schemas, `tool_calls`, and results. See [SPEC.md](./SPEC.md).
+relays schemas, `toolCalls`, and results. See [SPEC.md](./SPEC.md).
 
 ## Goals
 
@@ -248,7 +248,7 @@ Some topics that still need community discussion:
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
 - Should `getFeatures` grow beyond booleans (for example nested tool kinds), or stay one key per capability?
 - Should hosted / provider-executed tools (web search, MCP) be specified, or remain implementation-specific?
-- Should tool calls stream as their own chunk type, or stay on `done.message.tool_calls` only?
+- Should tool calls stream as their own chunk type, or stay on `done.message.toolCalls` only?
 - Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
 - How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
 - Should applications be encouraged or required to round-trip `message.reasoning` on later turns for providers that benefit from it?
