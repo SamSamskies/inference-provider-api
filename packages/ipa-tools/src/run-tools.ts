@@ -173,6 +173,9 @@ export async function runTools(
     }
 
     if (!done) {
+      if (signal?.aborted) {
+        throw makeInferenceError("aborted", "Request aborted");
+      }
       throw makeInferenceError(
         "provider_error",
         "Stream ended without a done chunk."

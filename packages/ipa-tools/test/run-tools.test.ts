@@ -422,6 +422,27 @@ describe("runTools", () => {
     });
   });
 
+  it("rejects with aborted when the stream ends without a done chunk after abort", async () => {
+    const controller = new AbortController();
+    await expect(
+      runTools({
+        request: () => ({
+          async *[Symbol.asyncIterator]() {
+            yield { type: "accepted" as const };
+            yield { type: "delta" as const, content: "partial" };
+            controller.abort();
+          },
+        }),
+        messages: [{ role: "user", content: "hi" }],
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({
+      name: "InferenceError",
+      code: "aborted",
+      message: "Request aborted",
+    });
+  });
+
   it("rejects when AbortSignal is already aborted", async () => {
     const signal = AbortSignal.abort();
     await expect(
