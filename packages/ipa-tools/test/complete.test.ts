@@ -87,6 +87,51 @@ describe("complete", () => {
     });
   });
 
+  it("rejects when AbortSignal is already aborted without calling request", async () => {
+    const signal = AbortSignal.abort();
+    let called = false;
+    await expect(
+      complete(
+        { method: "chat", messages: [{ role: "user", content: "x" }], signal },
+        {
+          request: async function* () {
+            called = true;
+            yield { type: "accepted" as const };
+          },
+        }
+      )
+    ).rejects.toMatchObject({
+      name: "InferenceError",
+      code: "aborted",
+      message: "Request aborted",
+    });
+    expect(called).toBe(false);
+  });
+
+  it("rejects with aborted when the stream ends without a done chunk after abort", async () => {
+    const controller = new AbortController();
+    await expect(
+      complete(
+        {
+          method: "chat",
+          messages: [{ role: "user", content: "x" }],
+          signal: controller.signal,
+        },
+        {
+          request: async function* () {
+            yield { type: "accepted" as const };
+            yield { type: "delta" as const, content: "partial" };
+            controller.abort();
+          },
+        }
+      )
+    ).rejects.toMatchObject({
+      name: "InferenceError",
+      code: "aborted",
+      message: "Request aborted",
+    });
+  });
+
   it("forwards aborted from request", async () => {
     const aborted = Object.assign(new Error("Request aborted"), {
       name: "InferenceError",
