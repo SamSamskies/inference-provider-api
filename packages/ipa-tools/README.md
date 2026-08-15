@@ -108,32 +108,39 @@ const { final, messages } = await runTools({
 
 Handlers run in the page. The package never talks to providers or API keys.
 
-### Inference Bridge `experimental.request` fallback
+### When `toolCalling` is not advertised
 
-[Inference Bridge](https://github.com/SamSamskies/inference-bridge) has not implemented `getFeatures` yet, so `toolCalling` is unset. It exposes tools on `experimental.request` instead:
+`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Prefer `request` when the feature is advertised. Some injectors expose tools on `experimental.request` before that — use that surface only if you intentionally support it:
 
 ```ts
-import { getInference, isInferenceAvailable, runTools } from "ipa-tools";
+import {
+  getFeatures,
+  getInference,
+  isInferenceAvailable,
+  runTools,
+} from "ipa-tools";
 
 if (isInferenceAvailable()) {
   const inference = getInference();
-  const request =
-    inference.getFeatures?.()?.toolCalling
-      ? inference.request.bind(inference)
-      : // Inference Bridge experimental window — not part of IPA types
-        (
-          inference as typeof inference & {
-            experimental?: { request?: typeof inference.request };
-          }
-        ).experimental?.request?.bind(
-          (inference as { experimental?: object }).experimental
-        ) ?? inference.request.bind(inference);
+  let request = inference.request.bind(inference);
+
+  if (!getFeatures().toolCalling) {
+    // experimental window — not part of IPA types
+    const experimental = (
+      inference as typeof inference & {
+        experimental?: { request?: typeof inference.request };
+      }
+    ).experimental;
+    if (experimental?.request) {
+      request = experimental.request.bind(experimental);
+    }
+  }
 
   await runTools({ request, messages, tools, execute });
 }
 ```
 
-Once Inference Bridge implements `getFeatures` with `toolCalling: true` and graduates tools onto `request`, the default (`window.inference.request`) is enough.
+When `getFeatures` reports `toolCalling: true`, the default (`window.inference.request`) is enough.
 
 ## `waitForInference` / `getInference` / `getFeatures` / `isInferenceError`
 
