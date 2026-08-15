@@ -141,13 +141,10 @@ compatibility. For a ready-made loop (plus types and `complete`), see the
 non-normative [`ipa-tools`](./packages/ipa-tools) package
 (`npm install ipa-tools`).
 
-Inference Bridge has not implemented `getFeatures` yet, so the detect above
-sees no capabilities. Tools are still experimental there and live on
-`experimental.request`, not IPA `request`. Sending `tools` on `request` is
-`invalid_request` until Bridge ships `getFeatures` with `toolCalling: true`.
-`options.reasoningEffort` is likewise not wired yet; until Bridge advertises
-it, the field has no effect. For the Bridge-only tools fallback, see
-[`ipa-tools`](./packages/ipa-tools#inference-bridge-experimentalrequest-fallback).
+Some injectors may expose tools on `experimental.request` before advertising
+`toolCalling` via `getFeatures`. Sending `tools` on IPA `request` without
+that advertisement is `invalid_request`. For a detect-and-fallback pattern,
+see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-is-not-advertised).
 The extension prompts the user for permission:
 
 ```text
