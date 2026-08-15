@@ -503,6 +503,7 @@ one book finds my hand</p></div>
     <script type="module">
       import {
         complete,
+        getFeatures,
         isInferenceAvailable,
         isInferenceError,
         waitForInference,
@@ -659,6 +660,7 @@ one book finds my hand</p></div>
         setBusy(true, { language });
 
         try {
+          const features = getFeatures();
           const done = await complete({
             method: "chat",
             messages: [
@@ -666,6 +668,9 @@ one book finds my hand</p></div>
               { role: "user", content: user },
             ],
             signal: activeController.signal,
+            ...(features.options?.reasoningEffort
+              ? { options: { reasoningEffort: "none" } }
+              : {}),
           });
 
           const text =
