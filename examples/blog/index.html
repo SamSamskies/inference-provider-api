@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Translate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --radius: 10px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --serif: "IBM Plex Serif", Georgia, serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+      }
+
+      .shell {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 3rem;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+
+      h1.app-title {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1.app-title span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        margin-left: 0.4rem;
+      }
+
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .source {
+        display: inline-flex;
+        color: var(--muted);
+        line-height: 0;
+        border-radius: 2px;
+      }
+
+      .source svg {
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+
+      .source:hover {
+        color: var(--accent);
+      }
+
+      .source:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+      }
+
+      #status.ready {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: #b7dccf;
+      }
+
+      #status.missing {
+        color: var(--danger);
+        background: var(--danger-soft);
+        border-color: #ebc5c5;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.75rem 0.85rem;
+        margin-bottom: 1.15rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .toolbar label {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      select,
+      button {
+        font: inherit;
+      }
+
+      select {
+        appearance: none;
+        background: var(--surface)
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235c6760' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E")
+          no-repeat right 0.65rem center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.4rem 1.75rem 0.4rem 0.65rem;
+        color: var(--ink);
+        min-width: 9.5rem;
+      }
+
+      select:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      button {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        background: var(--ink);
+        color: #fff;
+      }
+
+      button:hover:not(:disabled) {
+        background: #2a322e;
+      }
+
+      button.secondary {
+        background: var(--surface);
+        color: var(--ink);
+        border-color: var(--line);
+      }
+
+      button.secondary:hover:not(:disabled) {
+        background: #e8eee9;
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .toolbar-spacer {
+        flex: 1;
+        min-width: 0.5rem;
+      }
+
+      .progress-dots {
+        display: inline-flex;
+        gap: 0.2rem;
+        align-items: center;
+      }
+
+      .progress-dots span {
+        width: 0.35rem;
+        height: 0.35rem;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.35;
+        animation: progress-bounce 1.2s ease-in-out infinite;
+      }
+
+      .progress-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+
+      .progress-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes progress-bounce {
+        0%,
+        80%,
+        100% {
+          opacity: 0.35;
+          transform: translateY(0);
+        }
+        40% {
+          opacity: 1;
+          transform: translateY(-2px);
+        }
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.85rem;
+        align-items: stretch;
+      }
+
+      @media (max-width: 640px) {
+        .cards {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card-wrap {
+        position: relative;
+        min-height: 12rem;
+      }
+
+      article.card {
+        height: 100%;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: calc(var(--radius) + 2px);
+        padding: 1.25rem 1.2rem 1.35rem;
+        transition: opacity 0.2s ease;
+      }
+
+      .card-wrap[data-busy="true"] article.card {
+        opacity: 0.38;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .loading-overlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        pointer-events: none;
+      }
+
+      .card-wrap[data-busy="true"] .loading-overlay {
+        display: flex;
+      }
+
+      .loading-card {
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.95rem 1.1rem;
+        box-shadow: 0 10px 28px rgba(26, 31, 28, 0.08);
+        max-width: 15rem;
+      }
+
+      .loading-card strong {
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .loading-card .loading-sub {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .progress-dots span {
+          animation: none;
+          opacity: 0.7;
+        }
+
+        article.card {
+          transition: none;
+        }
+      }
+
+      .byline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem 0.55rem;
+        margin: 0 0 0.85rem;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--muted);
+      }
+
+      .poem-body {
+        font-family: var(--serif);
+        font-size: 1.05rem;
+        line-height: 1.8;
+        white-space: pre-line;
+      }
+
+      .poem-body p {
+        margin: 0;
+      }
+
+      .empty-state {
+        display: none;
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .card-wrap[data-state="empty"] .empty-state {
+        display: block;
+      }
+
+      .card-wrap[data-state="empty"] .poem-body {
+        display: none;
+      }
+
+      .card-wrap[data-state="filled"] .empty-state {
+        display: none;
+      }
+
+      #meta {
+        margin-top: 1rem;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        min-height: 1rem;
+      }
+
+      #error {
+        margin-top: 0.85rem;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--danger);
+        background: var(--danger-soft);
+        border: 1px solid #ebc5c5;
+        border-radius: 8px;
+        padding: 0.65rem 0.75rem;
+        display: none;
+      }
+
+      #error[data-show="true"] {
+        display: block;
+      }
+
+      .hint {
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .hint a {
+        color: var(--accent);
+      }
+
+      .hint code {
+        font-family: var(--mono);
+        font-size: 0.8em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <h1 class="app-title">IPA Translate<span>ipa-tools · complete</span></h1>
+        <div class="header-meta">
+          <a
+            class="source"
+            href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/blog"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Source on GitHub"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"
+              />
+            </svg>
+          </a>
+          <div id="status" class="missing" role="status">checking…</div>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <label for="language">Language</label>
+        <select id="language" disabled>
+          <option value="Spanish">Spanish</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Portuguese">Portuguese</option>
+          <option value="Italian">Italian</option>
+          <option value="Japanese">Japanese</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <button type="button" id="reset" class="secondary" disabled>Clear</button>
+        <button type="button" id="abort" class="secondary" hidden>Stop</button>
+        <button type="button" id="translate" disabled>Translate</button>
+      </div>
+
+      <div class="cards">
+        <div class="card-wrap" data-state="filled">
+          <article class="card">
+            <p class="byline"><span>Original · English</span></p>
+            <div class="poem-body" id="original-body"></div>
+          </article>
+        </div>
+
+        <div class="card-wrap" id="translation-wrap" data-state="empty">
+          <div
+            class="loading-overlay"
+            id="loading-overlay"
+            role="status"
+            aria-live="polite"
+            aria-hidden="true"
+          >
+            <div class="loading-card">
+              <span class="progress-dots" aria-hidden="true"
+                ><span></span><span></span><span></span
+              ></span>
+              <strong id="loading-title">Translating…</strong>
+              <span class="loading-sub" id="loading-sub"
+                >Local models can take a while. You can stop anytime.</span
+              >
+            </div>
+          </div>
+          <article class="card">
+            <p class="byline">
+              <span id="translation-label">Translation</span>
+            </p>
+            <p class="empty-state">
+              Pick a language and click Translate. The original stays on the
+              left.
+            </p>
+            <div class="poem-body" id="translation-body"></div>
+          </article>
+        </div>
+      </div>
+
+      <div id="meta" aria-live="polite"></div>
+      <div id="error" role="alert"></div>
+
+      <p class="hint">
+        Uses
+        <a
+          href="https://github.com/SamSamskies/inference-provider-api/tree/main/packages/ipa-tools"
+          >ipa-tools</a
+        >
+        <code>complete</code>
+        over
+        <code>window.inference</code>. Requires
+        <a
+          href="https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd"
+          >Inference Bridge</a
+        >.
+      </p>
+    </div>
+
+    <script type="module">
+      import {
+        complete,
+        isInferenceAvailable,
+        isInferenceError,
+        waitForInference,
+      } from "https://esm.sh/ipa-tools@0.1.0";
+
+      const ORIGINAL = [
+        "old bookstore window",
+        "rain beads on dusty glass",
+        "one book finds my hand",
+      ];
+
+      const statusEl = document.getElementById("status");
+      const languageEl = document.getElementById("language");
+      const translateBtn = document.getElementById("translate");
+      const resetBtn = document.getElementById("reset");
+      const abortBtn = document.getElementById("abort");
+      const translationWrap = document.getElementById("translation-wrap");
+      const loadingOverlay = document.getElementById("loading-overlay");
+      const loadingTitle = document.getElementById("loading-title");
+      const loadingSub = document.getElementById("loading-sub");
+      const originalBodyEl = document.getElementById("original-body");
+      const translationBodyEl = document.getElementById("translation-body");
+      const translationLabel = document.getElementById("translation-label");
+      const metaEl = document.getElementById("meta");
+      const errorEl = document.getElementById("error");
+
+      /** @type {AbortController | null} */
+      let activeController = null;
+      /** @type {ReturnType<typeof setInterval> | null} */
+      let elapsedTimer = null;
+      let showingTranslation = false;
+
+      /**
+       * Spec: only top-level secure contexts with a tuple origin
+       * (https: or loopback http:). Opaque origins like file: are unsupported.
+       */
+      function isSupportedContext() {
+        return window.isSecureContext && location.origin !== "null";
+      }
+
+      /**
+       * @param {HTMLElement} bodyEl
+       * @param {string} text
+       */
+      function renderPoem(bodyEl, text) {
+        const p = document.createElement("p");
+        p.textContent = text;
+        bodyEl.replaceChildren(p);
+      }
+
+      function clearTranslation() {
+        showingTranslation = false;
+        translationWrap.dataset.state = "empty";
+        translationBodyEl.replaceChildren();
+        translationLabel.textContent = "Translation";
+      }
+
+      function clearError() {
+        errorEl.dataset.show = "false";
+        errorEl.textContent = "";
+      }
+
+      function showError(err) {
+        const code =
+          isInferenceError(err) && err.code
+            ? err.code
+            : err && err.code
+              ? err.code
+              : "unknown";
+        const message =
+          err && err.message ? err.message : String(err ?? "Unknown error");
+        errorEl.textContent = `${code}: ${message}`;
+        errorEl.dataset.show = "true";
+      }
+
+      function stopElapsedTimer() {
+        if (elapsedTimer != null) {
+          clearInterval(elapsedTimer);
+          elapsedTimer = null;
+        }
+      }
+
+      /**
+       * @param {boolean} busy
+       * @param {{ language?: string }} [opts]
+       */
+      function setBusy(busy, opts = {}) {
+        const available = isInferenceAvailable() && isSupportedContext();
+        translateBtn.disabled = busy || !available;
+        languageEl.disabled = busy || !available;
+        resetBtn.disabled = busy || !showingTranslation;
+        abortBtn.hidden = !busy;
+        translationWrap.dataset.busy = busy ? "true" : "false";
+        loadingOverlay.setAttribute("aria-hidden", busy ? "false" : "true");
+
+        if (busy) {
+          const language = opts.language ?? languageEl.value;
+          loadingTitle.textContent = `Translating to ${language}…`;
+          const started = Date.now();
+          const tick = () => {
+            const seconds = Math.floor((Date.now() - started) / 1000);
+            loadingSub.textContent =
+              seconds < 2
+                ? "Local models can take a while. You can stop anytime."
+                : `Still working… ${seconds}s elapsed. You can stop anytime.`;
+          };
+          tick();
+          stopElapsedTimer();
+          elapsedTimer = setInterval(tick, 1000);
+        } else {
+          stopElapsedTimer();
+          activeController = null;
+        }
+      }
+
+      function refreshAvailability() {
+        if (isInferenceAvailable() && isSupportedContext()) {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+          setBusy(false);
+          return true;
+        }
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        translateBtn.disabled = true;
+        languageEl.disabled = true;
+        resetBtn.disabled = !showingTranslation;
+        return false;
+      }
+
+      function clearTranslationCard() {
+        if (activeController) return;
+        clearTranslation();
+        metaEl.textContent = "";
+        clearError();
+        setBusy(false);
+      }
+
+      async function translate() {
+        clearError();
+        metaEl.textContent = "";
+
+        if (!refreshAvailability()) {
+          showError({
+            code: "unavailable",
+            message: isInferenceAvailable()
+              ? "window.inference requires a secure context with a tuple origin (https or localhost)."
+              : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+          });
+          return;
+        }
+
+        const language = languageEl.value;
+        const system = [
+          `Translate the following haiku into ${language}.`,
+          "Keep it three lines. Preserve the spirit; do not add a title, commentary, notes, or markdown fences.",
+          "Reply with ONLY the three translated lines.",
+        ].join("\n");
+        const user = ORIGINAL.join("\n");
+
+        activeController = new AbortController();
+        setBusy(true, { language });
+
+        try {
+          const done = await complete({
+            method: "chat",
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: user },
+            ],
+            signal: activeController.signal,
+          });
+
+          const text =
+            typeof done.message.content === "string"
+              ? done.message.content.replace(/^\uFEFF/, "").trim()
+              : "";
+          if (!text) {
+            throw {
+              code: "provider_error",
+              message:
+                "Empty model reply. Try again or pick another language.",
+            };
+          }
+
+          renderPoem(translationBodyEl, text);
+          translationWrap.dataset.state = "filled";
+          translationLabel.textContent = `Translation · ${language}`;
+          showingTranslation = true;
+
+          const parts = [`model ${done.model}`];
+          if (done.usage) {
+            const { inputTokens, outputTokens } = done.usage;
+            if (inputTokens != null) parts.push(`in ${inputTokens}`);
+            if (outputTokens != null) parts.push(`out ${outputTokens}`);
+          }
+          metaEl.textContent = parts.join(" · ");
+        } catch (err) {
+          showError(err);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      translateBtn.addEventListener("click", () => {
+        if (activeController) return;
+        translate();
+      });
+
+      resetBtn.addEventListener("click", clearTranslationCard);
+
+      abortBtn.addEventListener("click", () => {
+        if (activeController) activeController.abort();
+      });
+
+      renderPoem(originalBodyEl, ORIGINAL.join("\n"));
+
+      if (!refreshAvailability()) {
+        metaEl.textContent = isInferenceAvailable()
+          ? "Unsupported context — open over https or localhost (not file: or plain http)."
+          : "window.inference is missing — install Inference Bridge and reload.";
+        void waitForInference()
+          .then(() => {
+            if (refreshAvailability()) metaEl.textContent = "";
+          })
+          .catch(() => {
+            /* stay unavailable after timeout */
+          });
+      }
+    </script>
+  </body>
+</html>

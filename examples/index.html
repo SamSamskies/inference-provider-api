@@ -221,6 +221,59 @@
         padding: 0.28rem 0.55rem;
       }
 
+      .thumb-blog {
+        background:
+          linear-gradient(180deg, #f7faf7 0%, #eef3ef 100%);
+      }
+
+      .thumb-blog .rule {
+        position: absolute;
+        left: 1.15rem;
+        right: 1.15rem;
+        top: 1.35rem;
+        height: 0.55rem;
+        border-radius: 2px;
+        background: var(--ink);
+        opacity: 0.78;
+        width: 62%;
+      }
+
+      .thumb-blog .line {
+        position: absolute;
+        left: 1.15rem;
+        height: 0.28rem;
+        border-radius: 999px;
+        background: rgba(26, 31, 28, 0.18);
+      }
+
+      .thumb-blog .line.a {
+        top: 2.35rem;
+        width: 78%;
+      }
+
+      .thumb-blog .line.b {
+        top: 3rem;
+        width: 88%;
+      }
+
+      .thumb-blog .line.c {
+        top: 3.65rem;
+        width: 64%;
+      }
+
+      .thumb-blog .select {
+        position: absolute;
+        left: 1.15rem;
+        bottom: 1.25rem;
+        font-family: var(--mono);
+        font-size: 0.55rem;
+        color: var(--muted);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.28rem 0.5rem;
+      }
+
       .card-body {
         padding: 1rem 1.05rem 1.15rem;
         display: flex;
@@ -329,6 +382,24 @@
             <p>
               Read-only post and replies with a Grok-like Ask AI panel that summarizes
               the thread and answers follow-ups.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./blog/">
+          <div class="thumb thumb-blog" aria-hidden="true">
+            <div class="rule"></div>
+            <div class="line a"></div>
+            <div class="line b"></div>
+            <div class="line c"></div>
+            <div class="select">ES · Translate</div>
+          </div>
+          <div class="card-body">
+            <h2>Translate</h2>
+            <p>
+              Short haiku with a language selector. Uses
+              <code>ipa-tools</code> <code>complete</code> to translate the poem.
             </p>
             <span class="cta">Open demo →</span>
           </div>
