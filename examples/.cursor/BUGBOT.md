@@ -9,5 +9,6 @@ Do **not** flag:
 - Runtime dependence on a CDN / npm registry for `ipa-tools` (or similar published helpers) in example HTML
 - GitHub Pages only copying static HTML without bundling `packages/`
 - Suggestions to vendor `dist/`, switch to relative `./ipa-tools/` imports, or rewrite the demo to call `window.inference` directly just to avoid the CDN
+- Demos treating `window.inference` presence as sufficient for readiness (without a separate `isSupportedContext()` / secure-context guard). The bridge only injects on supported origins; dual-checking `file:`, opaque `"null"`, or non-loopback `http:` is optional polish, not a required demo fix.
 
 Do flag real bugs in demo logic (null handling, broken parse paths, incorrect API usage, etc.).
