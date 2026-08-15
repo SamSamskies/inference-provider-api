@@ -703,10 +703,6 @@
         "(a short paragraph or a few bullets), covering the main claim and notable " +
         "agreement or disagreement, then invite follow-up questions.";
 
-      function isSupportedContext() {
-        return window.isSecureContext && location.origin !== "null";
-      }
-
       function authorAvatar(author) {
         const src = author?.avatar;
         if (src) {
@@ -844,7 +840,7 @@
       }
 
       function setBusy(busy) {
-        const available = Boolean(window.inference) && isSupportedContext();
+        const available = Boolean(window.inference);
         sendBtn.disabled = busy || !available;
         input.disabled = busy || !available;
         clearBtn.disabled = busy || (history.length === 0 && !logEl.firstChild);
@@ -936,8 +932,7 @@
       function refreshAvailability() {
         if (
           window.inference &&
-          typeof window.inference.request === "function" &&
-          isSupportedContext()
+          typeof window.inference.request === "function"
         ) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
@@ -967,9 +962,8 @@
         if (!refreshAvailability()) {
           appendError({
             code: "unavailable",
-            message: window.inference
-              ? "window.inference requires a secure context with a tuple origin (https or localhost)."
-              : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
           clearBtn.disabled = false;
           return false;
@@ -1110,9 +1104,7 @@
       async function init() {
         if (!refreshAvailability()) {
           appendMeta(
-            window.inference
-              ? "Unsupported context — open over https or localhost (not file: or plain http)."
-              : "window.inference is missing — install Inference Bridge and reload.",
+            "window.inference is missing — install Inference Bridge and open this page over https or localhost.",
           );
           clearBtn.disabled = false;
         }

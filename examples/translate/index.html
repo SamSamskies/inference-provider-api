@@ -537,14 +537,6 @@ one book finds my hand</p></div>
       let showingTranslation = false;
 
       /**
-       * Spec: only top-level secure contexts with a tuple origin
-       * (https: or loopback http:). Opaque origins like file: are unsupported.
-       */
-      function isSupportedContext() {
-        return window.isSecureContext && location.origin !== "null";
-      }
-
-      /**
        * @param {HTMLElement} bodyEl
        * @param {string} text
        */
@@ -591,7 +583,7 @@ one book finds my hand</p></div>
        * @param {{ language?: string }} [opts]
        */
       function setBusy(busy, opts = {}) {
-        const available = isInferenceAvailable() && isSupportedContext();
+        const available = isInferenceAvailable();
         translateBtn.disabled = busy || !available;
         languageEl.disabled = busy || !available;
         resetBtn.disabled = busy || !showingTranslation;
@@ -620,7 +612,7 @@ one book finds my hand</p></div>
       }
 
       function refreshAvailability() {
-        if (isInferenceAvailable() && isSupportedContext()) {
+        if (isInferenceAvailable()) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
           setBusy(false);
@@ -649,9 +641,8 @@ one book finds my hand</p></div>
         if (!refreshAvailability()) {
           showError({
             code: "unavailable",
-            message: isInferenceAvailable()
-              ? "window.inference requires a secure context with a tuple origin (https or localhost)."
-              : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
           return;
         }
@@ -720,9 +711,8 @@ one book finds my hand</p></div>
       });
 
       if (!refreshAvailability()) {
-        metaEl.textContent = isInferenceAvailable()
-          ? "Unsupported context — open over https or localhost (not file: or plain http)."
-          : "window.inference is missing — install Inference Bridge and reload.";
+        metaEl.textContent =
+          "window.inference is missing — install Inference Bridge and open this page over https or localhost.";
         void waitForInference()
           .then(() => {
             if (refreshAvailability()) metaEl.textContent = "";

@@ -451,16 +451,8 @@
       /** @type {{ role: "user" | "assistant"; content: string }[]} */
       const history = [];
 
-      /**
-       * Spec: only top-level secure contexts with a tuple origin
-       * (https: or loopback http:). Opaque origins like file: are unsupported.
-       */
-      function isSupportedContext() {
-        return window.isSecureContext && location.origin !== "null";
-      }
-
       function setBusy(busy) {
-        const available = Boolean(window.inference) && isSupportedContext();
+        const available = Boolean(window.inference);
         sendBtn.disabled = busy || !available;
         input.disabled = busy || !available;
         clearBtn.disabled =
@@ -583,8 +575,7 @@
       function refreshAvailability() {
         if (
           window.inference &&
-          typeof window.inference.request === "function" &&
-          isSupportedContext()
+          typeof window.inference.request === "function"
         ) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
@@ -604,9 +595,8 @@
         if (!refreshAvailability()) {
           appendError({
             code: "unavailable",
-            message: window.inference
-              ? "window.inference requires a secure context with a tuple origin (https or localhost)."
-              : "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
           clearBtn.disabled = false;
           return;
@@ -712,9 +702,7 @@
 
       if (!refreshAvailability()) {
         appendMeta(
-          window.inference
-            ? "Unsupported context — open over https or localhost (not file: or plain http)."
-            : "window.inference is missing — install Inference Bridge and reload.",
+          "window.inference is missing — install Inference Bridge and open this page over https or localhost.",
         );
         clearBtn.disabled = false;
       }
