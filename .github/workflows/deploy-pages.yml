@@ -29,13 +29,13 @@ jobs:
 
       - name: Prepare site
         run: |
-          mkdir -p _site/chat _site/social/avatars _site/blog
+          mkdir -p _site/chat _site/social/avatars _site/translate
           cp examples/index.html _site/index.html
           cp examples/chat/index.html _site/chat/index.html
           cp examples/social/index.html _site/social/index.html
           cp examples/social/data.json _site/social/data.json
           cp examples/social/avatars/* _site/social/avatars/
-          cp examples/blog/index.html _site/blog/index.html
+          cp examples/translate/index.html _site/translate/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

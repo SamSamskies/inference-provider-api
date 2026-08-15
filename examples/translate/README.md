@@ -6,10 +6,10 @@ Chrome (title, controls, status) stays in English so the UI remains usable after
 
 ## Try it
 
-**Live demo:** [https://samsamskies.github.io/inference-provider-api/blog/](https://samsamskies.github.io/inference-provider-api/blog/)
+**Live demo:** [https://samsamskies.github.io/inference-provider-api/translate/](https://samsamskies.github.io/inference-provider-api/translate/)
 
 1. Install [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) from the Chrome Web Store (or for development, [clone the repo](https://github.com/SamSamskies/inference-bridge) and load it unpacked from `chrome://extensions`)
-2. Open the [live demo](https://samsamskies.github.io/inference-provider-api/blog/), or serve this folder locally over a secure context:
+2. Open the [live demo](https://samsamskies.github.io/inference-provider-api/translate/), or serve this folder locally over a secure context:
 
    ```bash
    npx serve .
