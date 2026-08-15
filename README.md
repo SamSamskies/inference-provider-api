@@ -71,7 +71,7 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is required. `getFeatures` reports optional capabilities such as tool calling; implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
+`request` is required. `getFeatures` reports optional capabilities such as tool calling and request `options` (for example `reasoningEffort`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
 
 ```ts
 async function complete(request) {
@@ -121,18 +121,32 @@ if (features.toolCalling) {
     }
   }
 }
+
+// Prefer less thinking for latency-sensitive tasks when supported
+for await (const chunk of window.inference.request({
+  method: "chat",
+  messages: [{ role: "user", content: "Translate to Spanish: Hello" }],
+  ...(features.options?.reasoningEffort
+    ? { options: { reasoningEffort: "none" } }
+    : {}),
+})) {
+  // ...
+}
 ```
 
 Any multi-round tool loop is application code. Implementations that do not
-advertise `toolCalling` reject `tools` with `invalid_request`. For a ready-made
-loop (plus types and `complete`), see the non-normative
-[`ipa-tools`](./packages/ipa-tools) package (`npm install ipa-tools`).
+advertise `toolCalling` reject `tools` with `invalid_request`. Unsupported
+`options` keys are ignored (not rejected) so apps may send them for forward
+compatibility. For a ready-made loop (plus types and `complete`), see the
+non-normative [`ipa-tools`](./packages/ipa-tools) package
+(`npm install ipa-tools`).
 
 Inference Bridge has not implemented `getFeatures` yet, so the detect above
 sees no capabilities. Tools are still experimental there and live on
 `experimental.request`, not IPA `request`. Sending `tools` on `request` is
 `invalid_request` until Bridge ships `getFeatures` with `toolCalling: true`.
-For the Bridge-only fallback, see
+`options.reasoningEffort` is likewise not wired yet; until Bridge advertises
+it, the field has no effect. For the Bridge-only tools fallback, see
 [`ipa-tools`](./packages/ipa-tools#inference-bridge-experimentalrequest-fallback).
 The extension prompts the user for permission:
 
@@ -170,7 +184,11 @@ existing origin grants.
 Text chat is required. Tool calling is optional: implementations that support it
 return `{ toolCalling: true }` from `getFeatures` and accept `tools` on
 `request`. The page defines and executes function tools; the extension only
-relays schemas, `toolCalls`, and results. See [SPEC.md](./SPEC.md).
+relays schemas, `toolCalls`, and results. Optional `options` (for example
+`options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`) lets
+apps prefer generation settings when the matching `getFeatures().options` key
+is true — not a permission change; an override control on the approval popup is
+optional extension UX. See [SPEC.md](./SPEC.md).
 
 ## Goals
 
@@ -183,6 +201,7 @@ relays schemas, `toolCalls`, and results. See [SPEC.md](./SPEC.md).
 - Zero backend required
 - Optional capability discovery (`getFeatures`)
 - Optional function tools, executed by the page
+- Optional request `options` (for example `reasoningEffort`)
 
 ## Non-goals
 
@@ -251,7 +270,9 @@ talking to Ollama.
 Some topics that still need community discussion:
 
 - Is `window.inference` the right namespace?
-- Which capability constraints, if any, do applications need?
+- Which further capability constraints, if any, do applications need beyond tools and `options`?
+- Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
+- Which further keys belong under `options` (for example `temperature`, `maxTokens`), and should the user or extension be able to clamp them?
 - Should model selection always remain under user control?
 - Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
