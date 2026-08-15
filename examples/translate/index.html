@@ -668,9 +668,9 @@ one book finds my hand</p></div>
               { role: "user", content: user },
             ],
             signal: activeController.signal,
-            ...(features.options?.reasoningEffort
-              ? { options: { reasoningEffort: "none" } }
-              : {}),
+            options: features.options?.reasoningEffort
+              ? { reasoningEffort: "none" }
+              : undefined,
           });
 
           const text =
