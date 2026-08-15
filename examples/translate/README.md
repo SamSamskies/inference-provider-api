@@ -4,6 +4,14 @@ Short fabricated haiku with a language selector. Translates via [`ipa-tools`](..
 
 Chrome (title, controls, status) stays in English so the UI remains usable after translation. A haiku keeps token use and latency low — helpful for local models. The original stays visible beside the translation.
 
+## Recommended model
+
+Any chat model works — the user picks the provider and model in Inference Bridge. If yours offers [TranslateGemma](https://ollama.com/library/translategemma), we recommend it for this demo. Ollama users can install it with:
+
+```bash
+ollama pull translategemma
+```
+
 ## Try it
 
 **Live demo:** [https://samsamskies.github.io/inference-provider-api/translate/](https://samsamskies.github.io/inference-provider-api/translate/)
