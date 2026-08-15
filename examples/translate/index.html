@@ -333,11 +333,11 @@
         font-family: var(--serif);
         font-size: 1.05rem;
         line-height: 1.8;
-        white-space: pre-line;
       }
 
       .poem-body p {
         margin: 0;
+        white-space: pre-line;
       }
 
       .empty-state {
@@ -444,7 +444,9 @@
         <div class="card-wrap" data-state="filled">
           <article class="card">
             <p class="byline"><span>Original · English</span></p>
-            <div class="poem-body" id="original-body"></div>
+            <div class="poem-body" id="original-body"><p>old bookstore window
+rain beads on dusty glass
+one book finds my hand</p></div>
           </article>
         </div>
 
@@ -506,12 +508,6 @@
         waitForInference,
       } from "https://esm.sh/ipa-tools@0.1.0";
 
-      const ORIGINAL = [
-        "old bookstore window",
-        "rain beads on dusty glass",
-        "one book finds my hand",
-      ];
-
       const statusEl = document.getElementById("status");
       const languageEl = document.getElementById("language");
       const translateBtn = document.getElementById("translate");
@@ -526,6 +522,13 @@
       const translationLabel = document.getElementById("translation-label");
       const metaEl = document.getElementById("meta");
       const errorEl = document.getElementById("error");
+
+      /** Lines for Translate; poem itself is static HTML so it paints before this module loads. */
+      const ORIGINAL = (originalBodyEl?.textContent ?? "")
+        .trim()
+        .split(/\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
 
       /** @type {AbortController | null} */
       let activeController = null;
@@ -715,8 +718,6 @@
       abortBtn.addEventListener("click", () => {
         if (activeController) activeController.abort();
       });
-
-      renderPoem(originalBodyEl, ORIGINAL.join("\n"));
 
       if (!refreshAvailability()) {
         metaEl.textContent = isInferenceAvailable()
