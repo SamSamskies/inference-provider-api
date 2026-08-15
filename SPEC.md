@@ -22,8 +22,21 @@ type InferenceRequest = {
   /** Function tools. Only when getFeatures().toolCalling is true. */
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  /** Generation preferences for this request. See Request options. */
+  options?: InferenceOptions;
   signal?: AbortSignal;
 }
+
+type InferenceOptions = {
+  /**
+   * Preferred reasoning / thinking effort.
+   * Distinct from assistant `message.reasoning` (output text).
+   */
+  reasoningEffort?: ReasoningEffort;
+}
+
+/** Omitted or `"auto"` means the implementation / provider default. */
+type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
 
 type Message =
   | {
@@ -60,6 +73,13 @@ type InferenceFeatures = {
    * Absent or false means unsupported.
    */
   toolCalling?: boolean;
+  /**
+   * Which InferenceOptions keys this implementation accepts.
+   * Absent keys (and an absent options object) mean ignore those fields.
+   */
+  options?: {
+    reasoningEffort?: boolean;
+  };
 }
 
 type Tool = {
@@ -100,7 +120,7 @@ type InferenceError = Error & {
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling is optional; implementations advertise it with `getFeatures`.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling and request `options` (for example `reasoningEffort`) are optional; implementations advertise them with `getFeatures`.
 
 ### Example
 
@@ -134,7 +154,8 @@ for await (const chunk of window.inference.request({
 9. Providers or models that do not expose reasoning yield no `reasoning_delta` chunks and omit `message.reasoning`. Applications must treat reasoning as optional.
 10. Providers that do not stream may yield no `reasoning_delta` or `delta` chunks and only a final `done` (with `message.content` and optional `message.reasoning` and/or `message.toolCalls`).
 11. When sending prior assistant turns back in `messages`, applications may include `reasoning` if they received it. Implementations map it to the provider when the provider supports round-tripping reasoning; otherwise they may ignore it. Applications must not rely on every provider consuming prior reasoning.
-12. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
+12. `options` holds generation preferences (see Request options). They do not change the stream shape: applications must still treat `reasoning_delta` and `message.reasoning` as optional.
+13. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
 ### Feature discovery
 
@@ -147,15 +168,43 @@ const features = window.inference.getFeatures?.() ?? {};
 if (features.toolCalling) {
   // request accepts tools / toolChoice / tool messages
 }
+if (features.options?.reasoningEffort) {
+  // request.options.reasoningEffort accepted; implementation will try to map it
+}
 ```
 
 Rules:
 
 1. `toolCalling: true` means `request` accepts `tools`, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions.
-2. An absent key and `false` both mean unsupported. Applications must ignore unknown keys so later capabilities can be added without breaking callers.
-3. The result must not include provider name, model id, or other user or account identity.
-4. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`.
-5. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
+2. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none.
+3. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under `options`) so later capabilities can be added without breaking callers.
+4. The result must not include provider name, model id, or other user or account identity.
+5. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`.
+6. Implementations must **ignore** unsupported `options` keys (must not reject the request solely for including them). Applications may send future keys for forward compatibility; they have no effect until advertised.
+7. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
+8. Advertising an `options` key does not guarantee that the user's provider or model will honor that preference. Implementations map best-effort and must not fail a well-formed request solely because the current model cannot apply the option.
+
+### Request options
+
+`options` is a bag of generation preferences for this call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` only; later drafts may add further keys (for example sampling controls) under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise.
+
+#### `reasoningEffort`
+
+Lets applications prefer less or more model reasoning / chain-of-thought (for example `"none"` or `"low"` for translation or autocomplete; `"high"` for harder multi-step tasks). It controls **generation**, not merely whether the page displays reasoning: omitting UI for `reasoning_delta` does not reduce latency or cost if the model still thinks.
+
+This is distinct from assistant `message.reasoning` / `reasoning_delta`, which are optional **outputs** when a provider exposes chain-of-thought text.
+
+- When omitted, behavior is `"auto"`: the implementation uses its default (typically the provider or model default).
+- `"none"` asks to disable or minimize thinking when the provider supports that.
+- `"low"`, `"medium"`, and `"high"` ask for increasing effort when the provider exposes an effort or budget control. Implementations map these onto provider-specific parameters (for example effort enums or token budgets); exact mapping is implementation-defined.
+- When `getFeatures().options?.reasoningEffort` is true, values outside `ReasoningEffort` are `invalid_request`.
+- When that feature key is absent or false, `options.reasoningEffort` is ignored (see Feature discovery).
+
+Applications that care about latency or cost for simple tasks should pass `"none"` or `"low"` when support is advertised. Applications must not assume reasoning output disappears, or that every model becomes non-thinking, solely because they requested `"none"`.
+
+#### Permission
+
+`options` alone does not require a new permission prompt and does not widen a persistent grant. Implementations **may** let the user override or clamp values such as `reasoningEffort` in extension settings (or optionally in the approval UI). This draft does **not** require an override control on the permission prompt: consent remains origin + provider/model (+ tools when present).
 
 ### Tool calling
 
