@@ -1,4 +1,4 @@
-# IPA Blog Translate Demo
+# IPA Translate Demo
 
 Short fabricated haiku with a language selector. Translates via [`ipa-tools`](../../packages/ipa-tools) `complete` on top of [`window.inference`](../../SPEC.md).
 

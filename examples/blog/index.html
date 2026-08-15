@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>IPA Blog Translate</title>
+    <title>IPA Translate</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -329,15 +329,6 @@
         color: var(--muted);
       }
 
-      .poem-title {
-        margin: 0 0 0.85rem;
-        font-family: var(--serif);
-        font-size: clamp(1.2rem, 3vw, 1.4rem);
-        font-weight: 600;
-        letter-spacing: -0.02em;
-        line-height: 1.25;
-      }
-
       .poem-body {
         font-family: var(--serif);
         font-size: 1.05rem;
@@ -361,7 +352,6 @@
         display: block;
       }
 
-      .card-wrap[data-state="empty"] .poem-title,
       .card-wrap[data-state="empty"] .poem-body {
         display: none;
       }
@@ -414,7 +404,7 @@
   <body>
     <div class="shell">
       <header>
-        <h1 class="app-title">IPA Blog<span>ipa-tools · complete</span></h1>
+        <h1 class="app-title">IPA Translate<span>ipa-tools · complete</span></h1>
         <div class="header-meta">
           <a
             class="source"
@@ -454,7 +444,6 @@
         <div class="card-wrap" data-state="filled">
           <article class="card">
             <p class="byline"><span>Original · English</span></p>
-            <h2 class="poem-title" id="original-title"></h2>
             <div class="poem-body" id="original-body"></div>
           </article>
         </div>
@@ -485,7 +474,6 @@
               Pick a language and click Translate. The original stays on the
               left.
             </p>
-            <h2 class="poem-title" id="translation-title"></h2>
             <div class="poem-body" id="translation-body"></div>
           </article>
         </div>
@@ -518,14 +506,11 @@
         waitForInference,
       } from "https://esm.sh/ipa-tools@0.1.0";
 
-      const ORIGINAL = {
-        title: "Secondhand Rain",
-        lines: [
-          "old bookstore window",
-          "rain beads on dusty glass",
-          "one book finds my hand",
-        ],
-      };
+      const ORIGINAL = [
+        "old bookstore window",
+        "rain beads on dusty glass",
+        "one book finds my hand",
+      ];
 
       const statusEl = document.getElementById("status");
       const languageEl = document.getElementById("language");
@@ -536,9 +521,7 @@
       const loadingOverlay = document.getElementById("loading-overlay");
       const loadingTitle = document.getElementById("loading-title");
       const loadingSub = document.getElementById("loading-sub");
-      const originalTitleEl = document.getElementById("original-title");
       const originalBodyEl = document.getElementById("original-body");
-      const translationTitleEl = document.getElementById("translation-title");
       const translationBodyEl = document.getElementById("translation-body");
       const translationLabel = document.getElementById("translation-label");
       const metaEl = document.getElementById("meta");
@@ -559,22 +542,18 @@
       }
 
       /**
-       * @param {HTMLElement} titleEl
        * @param {HTMLElement} bodyEl
-       * @param {string} title
-       * @param {string[]} lines
+       * @param {string} text
        */
-      function renderPoem(titleEl, bodyEl, title, lines) {
-        titleEl.textContent = title;
+      function renderPoem(bodyEl, text) {
         const p = document.createElement("p");
-        p.textContent = lines.join("\n");
+        p.textContent = text;
         bodyEl.replaceChildren(p);
       }
 
       function clearTranslation() {
         showingTranslation = false;
         translationWrap.dataset.state = "empty";
-        translationTitleEl.textContent = "";
         translationBodyEl.replaceChildren();
         translationLabel.textContent = "Translation";
       }
@@ -660,25 +639,6 @@
         setBusy(false);
       }
 
-      /**
-       * @param {string} text
-       * @returns {{ title: string, lines: string[] } | null}
-       */
-      function parseTranslation(text) {
-        const cleaned = text.replace(/^\uFEFF/, "").trim();
-        const match = cleaned.match(
-          /^TITLE:\s*(.+?)\s*\nBODY:\s*\n?([\s\S]+)$/i,
-        );
-        if (!match) return null;
-        const title = match[1].trim();
-        const lines = match[2]
-          .split(/\n/)
-          .map((line) => line.trim())
-          .filter(Boolean);
-        if (!title || lines.length === 0) return null;
-        return { title, lines };
-      }
-
       async function translate() {
         clearError();
         metaEl.textContent = "";
@@ -696,20 +656,10 @@
         const language = languageEl.value;
         const system = [
           `Translate the following haiku into ${language}.`,
-          "Keep it a three-line poem. Preserve the spirit; do not add commentary, notes, or markdown fences.",
-          "Reply with ONLY this exact format:",
-          "",
-          "TITLE: <translated title>",
-          "BODY:",
-          "<line 1>",
-          "<line 2>",
-          "<line 3>",
+          "Keep it three lines. Preserve the spirit; do not add a title, commentary, notes, or markdown fences.",
+          "Reply with ONLY the three translated lines.",
         ].join("\n");
-        const user = [
-          "TITLE: " + ORIGINAL.title,
-          "BODY:",
-          ...ORIGINAL.lines,
-        ].join("\n");
+        const user = ORIGINAL.join("\n");
 
         activeController = new AbortController();
         setBusy(true, { language });
@@ -724,21 +674,19 @@
             signal: activeController.signal,
           });
 
-          const parsed = parseTranslation(done.message.content);
-          if (!parsed) {
+          const text =
+            typeof done.message.content === "string"
+              ? done.message.content.replace(/^\uFEFF/, "").trim()
+              : "";
+          if (!text) {
             throw {
               code: "provider_error",
               message:
-                "Could not parse the model reply. Try again or pick another language.",
+                "Empty model reply. Try again or pick another language.",
             };
           }
 
-          renderPoem(
-            translationTitleEl,
-            translationBodyEl,
-            parsed.title,
-            parsed.lines,
-          );
+          renderPoem(translationBodyEl, text);
           translationWrap.dataset.state = "filled";
           translationLabel.textContent = `Translation · ${language}`;
           showingTranslation = true;
@@ -768,12 +716,7 @@
         if (activeController) activeController.abort();
       });
 
-      renderPoem(
-        originalTitleEl,
-        originalBodyEl,
-        ORIGINAL.title,
-        ORIGINAL.lines,
-      );
+      renderPoem(originalBodyEl, ORIGINAL.join("\n"));
 
       if (!refreshAvailability()) {
         metaEl.textContent = isInferenceAvailable()
