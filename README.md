@@ -126,9 +126,9 @@ if (features.toolCalling) {
 for await (const chunk of window.inference.request({
   method: "chat",
   messages: [{ role: "user", content: "Translate to Spanish: Hello" }],
-  ...(features.options?.reasoningEffort
-    ? { options: { reasoningEffort: "none" } }
-    : {}),
+  options: features.options?.reasoningEffort
+    ? { reasoningEffort: "none" }
+    : undefined,
 })) {
   // ...
 }
