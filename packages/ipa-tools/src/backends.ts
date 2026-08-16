@@ -381,7 +381,10 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           }
 
           if (needsTools && !supportsTools(inference)) {
+            // Cache so later tools requests skip recreate via cachedFallbackEntry.
             skippedForTools = true;
+            cachedFallback = inference;
+            cachedFallbackEntry = entry;
             continue;
           }
 

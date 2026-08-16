@@ -225,6 +225,60 @@ describe("createInference / resolver", () => {
     expect(created).toBe(false);
   });
 
+  it("caches create() when tools support is only known after create", async () => {
+    let creates = 0;
+    const discoveredNoTools: InferenceBackend = {
+      id: "discovered-no-tools",
+      async probe() {
+        return "available";
+      },
+      // No getFeatures — must create() to learn toolCalling is false.
+      async create() {
+        creates += 1;
+        return fakeInference({
+          id: "discovered-no-tools",
+          toolCalling: false,
+        });
+      },
+    };
+    const inference = createInference({
+      fallbacks: [discoveredNoTools],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
+    });
+    expect(creates).toBe(1);
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
+    });
+    expect(creates).toBe(1);
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:discovered-no-tools");
+    expect(creates).toBe(1);
+  });
+
   it("re-resolves past a cached no-tools fallback when tools are required", async () => {
     let creates = 0;
     const inference = createInference({
