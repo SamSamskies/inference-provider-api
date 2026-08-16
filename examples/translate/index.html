@@ -675,9 +675,12 @@ one book finds my hand</p></div>
               { role: "user", content: user },
             ],
             signal: activeController.signal,
-            options: features.options?.reasoningEffort
-              ? { reasoningEffort: "none" }
-              : undefined,
+            options: {
+              reasoningEffort: features.options?.reasoningEffort
+                ? "none"
+                : undefined,
+              temperature: features.options?.temperature ? 0.2 : undefined,
+            },
           });
 
           const text =

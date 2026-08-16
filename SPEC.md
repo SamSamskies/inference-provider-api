@@ -33,6 +33,11 @@ type InferenceOptions = {
    * Distinct from assistant `message.reasoning` (output text).
    */
   reasoningEffort?: ReasoningEffort;
+  /**
+   * Sampling temperature in `[0, 2]`.
+   * Omitted means the implementation / provider default.
+   */
+  temperature?: number;
 }
 
 /** Omitted or `"auto"` means the implementation / provider default. */
@@ -79,6 +84,7 @@ type InferenceFeatures = {
    */
   options?: {
     reasoningEffort?: boolean;
+    temperature?: boolean;
   };
 }
 
@@ -120,7 +126,7 @@ type InferenceError = Error & {
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling and request `options` (for example `reasoningEffort`) are optional; implementations advertise them with `getFeatures`.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`.
 
 ### Example
 
@@ -171,12 +177,15 @@ if (features.toolCalling) {
 if (features.options?.reasoningEffort) {
   // request.options.reasoningEffort accepted; implementation will try to map it
 }
+if (features.options?.temperature) {
+  // request.options.temperature accepted; implementation will try to map it
+}
 ```
 
 Rules:
 
 1. `toolCalling: true` means `request` accepts `tools`, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions.
-2. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none.
+2. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none. The same per-key rule applies to `options.temperature` and any later `options` keys.
 3. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under `options`) so later capabilities can be added without breaking callers.
 4. The result must not include provider name, model id, or other user or account identity.
 5. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`.
@@ -186,7 +195,7 @@ Rules:
 
 ### Request options
 
-`options` is a bag of generation preferences for this call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` only; later drafts may add further keys (for example sampling controls) under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise.
+`options` is a bag of generation preferences for this call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` and `temperature`; later drafts may add further keys under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise.
 
 #### `reasoningEffort`
 
@@ -202,9 +211,20 @@ This is distinct from assistant `message.reasoning` / `reasoning_delta`, which a
 
 Applications that care about latency or cost for simple tasks should pass `"none"` or `"low"` when support is advertised. Applications must not assume reasoning output disappears, or that every model becomes non-thinking, solely because they requested `"none"`.
 
+#### `temperature`
+
+Lets applications prefer less or more sampling randomness (for example low values for translation or extraction; higher values for brainstorming). Orthogonal to `reasoningEffort`: temperature affects token sampling; reasoning effort affects thinking budget / chain-of-thought.
+
+- When omitted, the implementation uses its default (typically the provider or model default).
+- When present, the value must be a finite number in the closed interval `[0, 2]` (OpenAI-style scale). Implementations map or clamp onto provider-specific ranges when a provider uses a different scale (for example `[0, 1]`).
+- When `getFeatures().options?.temperature` is true, non-finite values or values outside `[0, 2]` are `invalid_request`.
+- When that feature key is absent or false, `options.temperature` is ignored (see Feature discovery).
+
+Applications must not assume every model honors temperature exactly; advertising means the implementation will attempt to pass it through.
+
 #### Permission
 
-`options` alone does not require a new permission prompt and does not widen a persistent grant. Implementations **may** let the user override or clamp values such as `reasoningEffort` in extension settings (or optionally in the approval UI). This draft does **not** require an override control on the permission prompt: consent remains origin + provider/model (+ tools when present).
+`options` alone does not require a new permission prompt and does not widen a persistent grant. Implementations **may** let the user override or clamp values such as `reasoningEffort` or `temperature` in extension settings (or optionally in the approval UI). Override and clamp controls are **optional** extension UX — this draft does **not** require them on the permission prompt or elsewhere. Consent remains origin + provider/model (+ tools when present).
 
 ### Tool calling
 

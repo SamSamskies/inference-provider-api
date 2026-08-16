@@ -71,7 +71,7 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is required. `getFeatures` reports optional capabilities such as tool calling and request `options` (for example `reasoningEffort`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
+`request` is required. `getFeatures` reports optional capabilities such as tool calling and request `options` (for example `reasoningEffort`, `temperature`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
 
 ```ts
 async function complete(request) {
@@ -122,13 +122,14 @@ if (features.toolCalling) {
   }
 }
 
-// Prefer less thinking for latency-sensitive tasks when supported
+// Prefer less thinking / lower temperature for translation when supported
 for await (const chunk of window.inference.request({
   method: "chat",
   messages: [{ role: "user", content: "Translate to Spanish: Hello" }],
-  options: features.options?.reasoningEffort
-    ? { reasoningEffort: "none" }
-    : undefined,
+  options: {
+    reasoningEffort: features.options?.reasoningEffort ? "none" : undefined,
+    temperature: features.options?.temperature ? 0.2 : undefined,
+  },
 })) {
   // ...
 }
@@ -182,10 +183,11 @@ Text chat is required. Tool calling is optional: implementations that support it
 return `{ toolCalling: true }` from `getFeatures` and accept `tools` on
 `request`. The page defines and executes function tools; the extension only
 relays schemas, `toolCalls`, and results. Optional `options` (for example
-`options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`) lets
-apps prefer generation settings when the matching `getFeatures().options` key
-is true — not a permission change; an override control on the approval popup is
-optional extension UX. See [SPEC.md](./SPEC.md).
+`options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`,
+`options.temperature`: number in `[0, 2]`) lets apps prefer generation settings
+when the matching `getFeatures().options` key is true — not a permission change;
+user override or clamp controls are optional extension UX. See
+[SPEC.md](./SPEC.md).
 
 ## Goals
 
@@ -198,7 +200,7 @@ optional extension UX. See [SPEC.md](./SPEC.md).
 - Zero backend required
 - Optional capability discovery (`getFeatures`)
 - Optional function tools, executed by the page
-- Optional request `options` (for example `reasoningEffort`)
+- Optional request `options` (for example `reasoningEffort`, `temperature`)
 
 ## Non-goals
 
@@ -269,7 +271,7 @@ Some topics that still need community discussion:
 - Is `window.inference` the right namespace?
 - Which further capability constraints, if any, do applications need beyond tools and `options`?
 - Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
-- Which further keys belong under `options` (for example `temperature`, `maxTokens`), and should the user or extension be able to clamp them?
+- Which further keys belong under `options` (for example `maxTokens`), and should clamp/override UX stay optional?
 - Should model selection always remain under user control?
 - Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
