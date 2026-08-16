@@ -92,14 +92,17 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
       });
     },
 
-    runTools(runOptions) {
+    async runTools(runOptions) {
+      // Resolve once for the whole tool loop (same as one-shot runTools
+      // with fallbacks). Re-resolving each round could switch providers
+      // mid-conversation after a late IPA injection.
+      const inference = await resolver.resolve({
+        needsTools: requestNeedsTools(runOptions),
+        signal: runOptions.signal,
+      });
       return runTools({
         ...runOptions,
-        request: (req) =>
-          requestWithResolver(resolver, req, {
-            needsTools:
-              requestNeedsTools(runOptions) || requestNeedsTools(req),
-          }),
+        request: inference.request.bind(inference) as Inference["request"],
       });
     },
   };

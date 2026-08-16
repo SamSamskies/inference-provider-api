@@ -584,6 +584,70 @@ describe("createInference / resolver", () => {
 
     expect(chunks.map((c) => c.type)).toEqual(["accepted", "done"]);
   });
+
+  it("keeps the same backend across runTools rounds after late IPA injection", async () => {
+    let round = 0;
+    const models: string[] = [];
+    const backend: InferenceBackend = {
+      id: "tools-fallback",
+      async probe() {
+        return "available";
+      },
+      getFeatures: () => ({ toolCalling: true }),
+      async create(): Promise<Inference> {
+        return {
+          getFeatures: () => ({ toolCalling: true }),
+          request: async function* () {
+            round += 1;
+            if (round === 1) {
+              // IPA appears between rounds; the bound request must ignore it.
+              stubInference(
+                fakeInference({ id: "ipa", message: "from:ipa" })
+              );
+              const message: Message = {
+                role: "assistant",
+                content: null,
+                toolCalls: [
+                  {
+                    id: "1",
+                    type: "function",
+                    function: { name: "noop", arguments: "{}" },
+                  },
+                ],
+              };
+              yield {
+                type: "done" as const,
+                model: "tools-fallback",
+                message,
+              };
+              return;
+            }
+            models.push("tools-fallback");
+            yield {
+              type: "done" as const,
+              model: "tools-fallback",
+              message: { role: "assistant", content: "from:fallback" },
+            };
+          },
+        };
+      },
+    };
+
+    const client = createInference({ fallbacks: [backend] });
+    const result = await client.runTools({
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", function: { name: "noop" } }],
+      execute: { noop: () => "ok" },
+    });
+
+    expect(isInferenceAvailable()).toBe(true);
+    expect(models).toEqual(["tools-fallback"]);
+    expect(result.final.message).toEqual({
+      role: "assistant",
+      content: "from:fallback",
+    });
+    expect(result.final.model).toBe("tools-fallback");
+  });
 });
 
 describe("complete / runTools fallbacks option", () => {
