@@ -87,6 +87,20 @@ describe("normalizeFallbacks", () => {
     );
   });
 
+  it("rejects more than one entry", () => {
+    expect(() =>
+      normalizeFallbacks([
+        "promptApi",
+        fakeBackend({ id: "custom" }),
+      ])
+    ).toThrow(
+      expect.objectContaining({
+        code: "invalid_request",
+        message: expect.stringContaining("at most 1 entry"),
+      })
+    );
+  });
+
   it("accepts promptApi and backend objects", () => {
     const backend = fakeBackend({ id: "custom" });
     expect(normalizeFallbacks(["promptApi"])).toEqual(["promptApi"]);
@@ -118,13 +132,9 @@ describe("createInference / resolver", () => {
     expect(created).toBe(false);
   });
 
-  it("walks fallbacks in order after IPA is unavailable", async () => {
+  it("uses the configured fallback when IPA is unavailable", async () => {
     const inference = createInference({
-      fallbacks: [
-        fakeBackend({ id: "a", availability: "unavailable" }),
-        fakeBackend({ id: "b" }),
-        fakeBackend({ id: "c" }),
-      ],
+      fallbacks: [fakeBackend({ id: "b" })],
     });
 
     const done = await inference.complete({
@@ -177,28 +187,26 @@ describe("createInference / resolver", () => {
     expect(creates).toBe(0);
   });
 
-  it("skips fallbacks without toolCalling when the call includes tools", async () => {
+  it("throws when the fallback lacks toolCalling and tools are required", async () => {
     const inference = createInference({
-      fallbacks: [
-        fakeBackend({ id: "no-tools", toolCalling: false }),
-        fakeBackend({ id: "with-tools", toolCalling: true }),
-      ],
+      fallbacks: [fakeBackend({ id: "no-tools", toolCalling: false })],
     });
 
-    const done = await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-      tools: [
-        {
-          type: "function",
-          function: { name: "ping" },
-        },
-      ],
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [
+          {
+            type: "function",
+            function: { name: "ping" },
+          },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
-
-    expect(
-      done.message.role === "assistant" ? done.message.content : null
-    ).toBe("from:with-tools");
   });
 
   it("does not call create on a backend that advertises no toolCalling", async () => {
@@ -212,14 +220,18 @@ describe("createInference / resolver", () => {
             created = true;
           },
         }),
-        fakeBackend({ id: "with-tools", toolCalling: true }),
       ],
     });
 
-    await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-      tools: [{ type: "function", function: { name: "ping" } }],
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
 
     expect(created).toBe(false);
@@ -279,20 +291,13 @@ describe("createInference / resolver", () => {
     expect(creates).toBe(1);
   });
 
-  it("re-resolves past a cached no-tools fallback when tools are required", async () => {
+  it("rejects a tools request after caching a no-tools fallback", async () => {
     let creates = 0;
     const inference = createInference({
       fallbacks: [
         fakeBackend({
           id: "no-tools",
           toolCalling: false,
-          onCreate: () => {
-            creates += 1;
-          },
-        }),
-        fakeBackend({
-          id: "with-tools",
-          toolCalling: true,
           onCreate: () => {
             creates += 1;
           },
@@ -306,19 +311,20 @@ describe("createInference / resolver", () => {
     });
     expect(creates).toBe(1);
 
-    const done = await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-      tools: [{ type: "function", function: { name: "ping" } }],
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
-
-    expect(
-      done.message.role === "assistant" ? done.message.content : null
-    ).toBe("from:with-tools");
-    expect(creates).toBe(2); // first complete + with-tools (cached no-tools skipped)
+    expect(creates).toBe(1);
   });
 
-  it("keys the no-tools cache skip on the fallback entry, not InferenceBackend.id", async () => {
+  it("does not recreate a cached no-tools promptApi peer on a tools request", async () => {
     let creates = 0;
     vi.doMock("ipa-prompt-api-fallback", () => ({
       backend: {
@@ -343,16 +349,7 @@ describe("createInference / resolver", () => {
     );
 
     const client = createInferenceFresh({
-      fallbacks: [
-        "promptApi",
-        fakeBackend({
-          id: "tools",
-          toolCalling: true,
-          onCreate: () => {
-            creates += 1;
-          },
-        }),
-      ],
+      fallbacks: ["promptApi"],
     });
 
     await client.complete({
@@ -361,55 +358,21 @@ describe("createInference / resolver", () => {
     });
     expect(creates).toBe(1);
 
-    await client.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "b" }],
-      tools: [{ type: "function", function: { name: "ping" } }],
+    await expect(
+      client.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "b" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
     // Skip is keyed on the FallbackEntry ("promptApi"), not the loaded
     // backend.id ("promptApi-impl"), so the peer is not re-created.
-    expect(creates).toBe(2);
-
-    vi.doUnmock("ipa-prompt-api-fallback");
-  });
-
-  it("still tries a later backend when it shares an id with a cached no-tools entry", async () => {
-    let creates = 0;
-    const inference = createInference({
-      fallbacks: [
-        fakeBackend({
-          id: "shared",
-          toolCalling: false,
-          onCreate: () => {
-            creates += 1;
-          },
-        }),
-        fakeBackend({
-          id: "shared",
-          toolCalling: true,
-          onCreate: () => {
-            creates += 1;
-          },
-        }),
-      ],
-    });
-
-    await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-    });
     expect(creates).toBe(1);
 
-    const done = await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-      tools: [{ type: "function", function: { name: "ping" } }],
-    });
-
-    expect(
-      done.message.role === "assistant" ? done.message.content : null
-    ).toBe("from:shared");
-    expect(creates).toBe(2);
+    vi.doUnmock("ipa-prompt-api-fallback");
   });
 
   it("prefers IPA again if it appears after a fallback was cached", async () => {
@@ -513,7 +476,7 @@ describe("createInference / resolver", () => {
     });
   });
 
-  it("surfaces create() errors even when an earlier backend was skipped for tools", async () => {
+  it("surfaces create() errors from a tools-capable fallback", async () => {
     const failingTools: InferenceBackend = {
       id: "tools-capable",
       async probe() {
@@ -525,10 +488,7 @@ describe("createInference / resolver", () => {
       },
     };
     const inference = createInference({
-      fallbacks: [
-        fakeBackend({ id: "no-tools", toolCalling: false }),
-        failingTools,
-      ],
+      fallbacks: [failingTools],
     });
 
     await expect(
@@ -585,52 +545,7 @@ describe("createInference / resolver", () => {
     vi.doUnmock("ipa-prompt-api-fallback");
   });
 
-  it("continues past a missing promptApi peer to later fallbacks", async () => {
-    const inference = createInference({
-      fallbacks: ["promptApi", fakeBackend({ id: "custom" })],
-    });
-
-    await expect(inference.probe()).resolves.toEqual({
-      ipa: "unavailable",
-      promptApi: "unavailable",
-      custom: "available",
-    });
-
-    const done = await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-    });
-
-    expect(
-      done.message.role === "assistant" ? done.message.content : null
-    ).toBe("from:custom");
-  });
-
-  it("continues past a create() failure to later fallbacks", async () => {
-    const failing: InferenceBackend = {
-      id: "failing",
-      async probe() {
-        return "available";
-      },
-      async create() {
-        throw new Error("download failed");
-      },
-    };
-    const inference = createInference({
-      fallbacks: [failing, fakeBackend({ id: "custom" })],
-    });
-
-    const done = await inference.complete({
-      method: "chat",
-      messages: [{ role: "user", content: "hi" }],
-    });
-
-    expect(
-      done.message.role === "assistant" ? done.message.content : null
-    ).toBe("from:custom");
-  });
-
-  it("surfaces the create() error when every fallback fails create", async () => {
+  it("surfaces the create() error when the fallback fails create", async () => {
     const failing: InferenceBackend = {
       id: "failing",
       async probe() {
@@ -765,7 +680,7 @@ describe("complete / runTools fallbacks option", () => {
     expect(created).toBe(false);
   });
 
-  it("runTools skips non-tool backends via fallbacks", async () => {
+  it("runTools uses a tools-capable fallback", async () => {
     const result = await runTools({
       messages: [{ role: "user", content: "hi" }],
       tools: [{ type: "function", function: { name: "noop" } }],
@@ -773,7 +688,6 @@ describe("complete / runTools fallbacks option", () => {
         noop: () => "ok",
       },
       fallbacks: [
-        fakeBackend({ id: "no-tools", toolCalling: false }),
         {
           id: "tools",
           async probe() {
@@ -822,6 +736,22 @@ describe("complete / runTools fallbacks option", () => {
     expect(result.final.message).toEqual({
       role: "assistant",
       content: "done",
+    });
+  });
+
+  it("runTools rejects a no-tools fallback", async () => {
+    await expect(
+      runTools({
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "noop" } }],
+        execute: {
+          noop: () => "ok",
+        },
+        fallbacks: [fakeBackend({ id: "no-tools", toolCalling: false })],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
   });
 });

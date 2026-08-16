@@ -51,7 +51,7 @@ export type ResolveOptions = {
   fallbacks?: FallbackInput[];
   onDownloadProgress?: (loaded: number) => void;
   signal?: AbortSignal;
-  /** When true, skip fallbacks whose `getFeatures().toolCalling` is not true. */
+  /** When true, skip a fallback whose `getFeatures().toolCalling` is not true. */
   needsTools?: boolean;
 };
 
@@ -60,6 +60,12 @@ export type ProbeStatus = {
 } & Record<string, BackendAvailability | "available" | "unavailable">;
 
 const BUILTIN_FALLBACKS = new Set<string>(["promptApi"]);
+
+/**
+ * Maximum entries allowed in `fallbacks`. Kept as an array so this can rise
+ * later without an API rename; start at one for a simpler mental model.
+ */
+export const MAX_FALLBACKS = 1;
 
 const MISSING_PEER_MESSAGE =
   'Install "ipa-prompt-api-fallback" to use fallbacks: ["promptApi"].';
@@ -77,7 +83,8 @@ function isBackendObject(value: unknown): value is InferenceBackend {
 
 /**
  * Validate `fallbacks` shape. Throws `invalid_request` for `"ipa"`, unknown
- * strings, or malformed objects. Does not load peer packages.
+ * strings, malformed objects, or more than {@link MAX_FALLBACKS} entries.
+ * Does not load peer packages.
  */
 export function normalizeFallbacks(
   fallbacks: readonly FallbackInput[] | undefined
@@ -87,6 +94,14 @@ export function normalizeFallbacks(
     throw makeInferenceError(
       "invalid_request",
       "fallbacks must be an array."
+    );
+  }
+  if (fallbacks.length > MAX_FALLBACKS) {
+    throw makeInferenceError(
+      "invalid_request",
+      `fallbacks accepts at most ${MAX_FALLBACKS} entr${
+        MAX_FALLBACKS === 1 ? "y" : "ies"
+      } (got ${fallbacks.length}).`
     );
   }
 

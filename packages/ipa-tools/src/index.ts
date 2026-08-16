@@ -46,11 +46,12 @@ export {
   type CreateInferenceOptions,
   type InferenceClient,
 } from "./create-inference.js";
-export type {
-  BackendAvailability,
-  BuiltinFallbackId,
-  FallbackEntry,
-  FallbackInput,
-  InferenceBackend,
-  ProbeStatus,
+export {
+  MAX_FALLBACKS,
+  type BackendAvailability,
+  type BuiltinFallbackId,
+  type FallbackEntry,
+  type FallbackInput,
+  type InferenceBackend,
+  type ProbeStatus,
 } from "./backends.js";

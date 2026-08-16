@@ -22,7 +22,9 @@ import type {
 
 export type CreateInferenceOptions = {
   /**
-   * Backends tried only after IPA is unavailable, in order.
+   * Optional page-side backend tried only after IPA is unavailable.
+   * At most one entry today (`MAX_FALLBACKS`); the array shape is reserved
+   * so the limit can rise later without an API rename.
    * Built-in: `"promptApi"` (optional peer `ipa-prompt-api-fallback`).
    * Custom `InferenceBackend` objects are an escape hatch (tests / third-party).
    * Omit or `[]` for IPA only.
