@@ -1,3 +1,8 @@
+import {
+  createResolver,
+  requestNeedsTools,
+  type FallbackInput,
+} from "./backends.js";
 import { makeInferenceError } from "./errors.js";
 import { getInference } from "./inference.js";
 import type {
@@ -30,6 +35,13 @@ export type RunToolsOptions = {
   method?: "chat";
   /** Defaults to `window.inference.request`. */
   request?: Inference["request"];
+  /**
+   * Tried only after IPA is unavailable. Prefer `createInference` when sending
+   * more than once (caches the resolved backend).
+   */
+  fallbacks?: FallbackInput[];
+  /** Forwarded to fallback `create()` when resolving via `fallbacks`. */
+  onDownloadProgress?: (loaded: number) => void;
 };
 
 export type RunToolsResult = {
@@ -106,8 +118,20 @@ export async function runTools(
 
   let request = options.request;
   if (!request) {
-    const inference = getInference();
-    request = inference.request.bind(inference);
+    if (options.fallbacks != null || options.onDownloadProgress != null) {
+      const resolver = createResolver({
+        fallbacks: options.fallbacks,
+        onDownloadProgress: options.onDownloadProgress,
+      });
+      const inference = await resolver.resolve({
+        needsTools: requestNeedsTools(options),
+        signal,
+      });
+      request = inference.request.bind(inference);
+    } else {
+      const inference = getInference();
+      request = inference.request.bind(inference);
+    }
   }
 
   if (typeof request !== "function") {

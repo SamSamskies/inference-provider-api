@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `createInference({ fallbacks, onDownloadProgress })` — IPA-first client with optional page-side fallbacks, lazy resolve, caching, `probe()`, and tools feature-gating ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20) phase 1).
+- `fallbacks` / `onDownloadProgress` on one-shot `complete` and `runTools` (prefer `createInference` for repeated sends).
+- Types: `InferenceBackend`, `BackendAvailability`, `FallbackInput`, `ProbeStatus`.
+
 ## [0.2.0] - 2026-08-16
 
 ### Added

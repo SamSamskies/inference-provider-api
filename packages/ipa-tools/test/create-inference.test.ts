@@ -1,0 +1,459 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createResolver,
+  normalizeFallbacks,
+  probeFallbacks,
+  type InferenceBackend,
+} from "../src/backends.js";
+import { complete } from "../src/complete.js";
+import { createInference } from "../src/create-inference.js";
+import { isInferenceAvailable } from "../src/inference.js";
+import { runTools } from "../src/run-tools.js";
+import type { Inference, InferenceChunk, Message } from "../src/types.js";
+
+function stubInference(inference: Inference) {
+  (globalThis as { window: { inference: Inference } }).window = {
+    inference,
+  };
+}
+
+function fakeInference(options?: {
+  id?: string;
+  toolCalling?: boolean;
+  message?: string;
+}): Inference {
+  const content = options?.message ?? `from:${options?.id ?? "ipa"}`;
+  return {
+    request: async function* (): AsyncIterable<InferenceChunk> {
+      yield { type: "accepted" };
+      yield {
+        type: "done",
+        model: options?.id ?? "test",
+        message: { role: "assistant", content },
+      };
+    },
+    getFeatures:
+      options?.toolCalling === undefined
+        ? undefined
+        : () => ({ toolCalling: options.toolCalling }),
+  };
+}
+
+function fakeBackend(options: {
+  id: string;
+  availability?: "unavailable" | "downloadable" | "downloading" | "available";
+  toolCalling?: boolean;
+  onCreate?: () => void;
+}): InferenceBackend {
+  const availability = options.availability ?? "available";
+  return {
+    id: options.id,
+    async probe() {
+      return availability;
+    },
+    async create() {
+      options.onCreate?.();
+      return fakeInference({
+        id: options.id,
+        toolCalling: options.toolCalling,
+        message: `from:${options.id}`,
+      });
+    },
+  };
+}
+
+afterEach(() => {
+  delete (globalThis as { window?: unknown }).window;
+  delete (globalThis as { inference?: unknown }).inference;
+});
+
+describe("normalizeFallbacks", () => {
+  it("rejects ipa string and unknown strings", () => {
+    expect(() => normalizeFallbacks(["ipa"] as never)).toThrow(
+      expect.objectContaining({
+        code: "invalid_request",
+        message: expect.stringContaining('"ipa" is not a fallback'),
+      })
+    );
+    expect(() => normalizeFallbacks(["transformers"] as never)).toThrow(
+      expect.objectContaining({
+        code: "invalid_request",
+        message: expect.stringContaining('Unknown fallback "transformers"'),
+      })
+    );
+  });
+
+  it("accepts promptApi and backend objects", () => {
+    const backend = fakeBackend({ id: "custom" });
+    expect(normalizeFallbacks(["promptApi"])).toEqual(["promptApi"]);
+    expect(normalizeFallbacks([backend])).toEqual([backend]);
+  });
+});
+
+describe("createInference / resolver", () => {
+  it("uses IPA first when available and does not create fallbacks", async () => {
+    stubInference(fakeInference({ id: "ipa", message: "from:ipa" }));
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "nano",
+          onCreate: () => {
+            created = true;
+          },
+        }),
+      ],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(done.message).toEqual({ role: "assistant", content: "from:ipa" });
+    expect(created).toBe(false);
+  });
+
+  it("walks fallbacks in order after IPA is unavailable", async () => {
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({ id: "a", availability: "unavailable" }),
+        fakeBackend({ id: "b" }),
+        fakeBackend({ id: "c" }),
+      ],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:b");
+  });
+
+  it("caches the resolved fallback across calls", async () => {
+    let creates = 0;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "cached",
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "1" }],
+    });
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "2" }],
+    });
+
+    expect(creates).toBe(1);
+  });
+
+  it("resolves lazily (no create until first use)", async () => {
+    let creates = 0;
+    createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "lazy",
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+    expect(creates).toBe(0);
+  });
+
+  it("skips fallbacks without toolCalling when the call includes tools", async () => {
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({ id: "no-tools", toolCalling: false }),
+        fakeBackend({ id: "with-tools", toolCalling: true }),
+      ],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [
+        {
+          type: "function",
+          function: { name: "ping" },
+        },
+      ],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:with-tools");
+  });
+
+  it("re-resolves past a cached no-tools fallback when tools are required", async () => {
+    let creates = 0;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "no-tools",
+          toolCalling: false,
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+        fakeBackend({
+          id: "with-tools",
+          toolCalling: true,
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(creates).toBe(1);
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", function: { name: "ping" } }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:with-tools");
+    expect(creates).toBe(2); // first complete + with-tools (cached no-tools skipped)
+  });
+
+  it("prefers IPA again if it appears after a fallback was cached", async () => {
+    const inference = createInference({
+      fallbacks: [fakeBackend({ id: "fallback" })],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "1" }],
+    });
+
+    stubInference(fakeInference({ id: "ipa", message: "from:ipa" }));
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "2" }],
+    });
+
+    expect(done.message).toEqual({ role: "assistant", content: "from:ipa" });
+  });
+
+  it("does not mutate window.inference on the fallback path", async () => {
+    const inference = createInference({
+      fallbacks: [fakeBackend({ id: "nano" })],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect((globalThis as { window?: { inference?: unknown } }).window).toBe(
+      undefined
+    );
+    expect(isInferenceAvailable()).toBe(false);
+  });
+
+  it("probe reports ipa and fallback fields without creating", async () => {
+    let creates = 0;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "promptApi",
+          availability: "downloadable",
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+
+    await expect(inference.probe()).resolves.toEqual({
+      ipa: "unavailable",
+      promptApi: "downloadable",
+    });
+    expect(creates).toBe(0);
+
+    stubInference(fakeInference({ id: "ipa" }));
+    await expect(inference.probe()).resolves.toEqual({
+      ipa: "available",
+      promptApi: "downloadable",
+    });
+  });
+
+  it("throws unavailable when IPA and all fallbacks are unavailable", async () => {
+    const inference = createInference({
+      fallbacks: [fakeBackend({ id: "x", availability: "unavailable" })],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+      })
+    ).rejects.toMatchObject({
+      code: "unavailable",
+      message: "No inference backend is available.",
+    });
+  });
+
+  it("throws a clear missing-peer error for promptApi without the package", async () => {
+    const inference = createInference({ fallbacks: ["promptApi"] });
+
+    await expect(inference.probe()).resolves.toEqual({
+      ipa: "unavailable",
+      promptApi: "unavailable",
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+      })
+    ).rejects.toMatchObject({
+      code: "unavailable",
+      message: expect.stringContaining("ipa-prompt-api-fallback"),
+    });
+  });
+
+  it("streams via request() on a fallback backend", async () => {
+    const inference = createInference({
+      fallbacks: [fakeBackend({ id: "stream" })],
+    });
+
+    const chunks: InferenceChunk[] = [];
+    for await (const chunk of inference.request({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.map((c) => c.type)).toEqual(["accepted", "done"]);
+  });
+});
+
+describe("complete / runTools fallbacks option", () => {
+  it("one-shot complete accepts fallbacks", async () => {
+    const done = await complete(
+      { method: "chat", messages: [{ role: "user", content: "hi" }] },
+      { fallbacks: [fakeBackend({ id: "one-shot" })] }
+    );
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:one-shot");
+  });
+
+  it("runTools skips non-tool backends via fallbacks", async () => {
+    const result = await runTools({
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", function: { name: "noop" } }],
+      execute: {
+        noop: () => "ok",
+      },
+      fallbacks: [
+        fakeBackend({ id: "no-tools", toolCalling: false }),
+        {
+          id: "tools",
+          async probe() {
+            return "available" as const;
+          },
+          async create(): Promise<Inference> {
+            let round = 0;
+            return {
+              getFeatures: () => ({ toolCalling: true }),
+              request: async function* () {
+                round += 1;
+                if (round === 1) {
+                  const message: Message = {
+                    role: "assistant",
+                    content: null,
+                    toolCalls: [
+                      {
+                        id: "1",
+                        type: "function",
+                        function: {
+                          name: "noop",
+                          arguments: "{}",
+                        },
+                      },
+                    ],
+                  };
+                  yield {
+                    type: "done" as const,
+                    model: "tools",
+                    message,
+                  };
+                  return;
+                }
+                yield {
+                  type: "done" as const,
+                  model: "tools",
+                  message: { role: "assistant", content: "done" },
+                };
+              },
+            };
+          },
+        },
+      ],
+    });
+
+    expect(result.final.message).toEqual({
+      role: "assistant",
+      content: "done",
+    });
+  });
+});
+
+describe("createResolver", () => {
+  it("forwards onDownloadProgress to backend create", async () => {
+    const progress = vi.fn();
+    let seen: ((n: number) => void) | undefined;
+    const backend: InferenceBackend = {
+      id: "progress",
+      async probe() {
+        return "downloadable";
+      },
+      async create(createOptions) {
+        seen = createOptions.onDownloadProgress;
+        createOptions.onDownloadProgress?.(0.5);
+        return fakeInference({ id: "progress" });
+      },
+    };
+
+    const resolver = createResolver({
+      fallbacks: [backend],
+      onDownloadProgress: progress,
+    });
+    await resolver.resolve();
+
+    expect(seen).toBe(progress);
+    expect(progress).toHaveBeenCalledWith(0.5);
+  });
+});
+
+describe("probeFallbacks", () => {
+  it("returns only ipa when fallbacks are omitted", async () => {
+    await expect(probeFallbacks()).resolves.toEqual({ ipa: "unavailable" });
+    stubInference(fakeInference({ id: "ipa" }));
+    await expect(probeFallbacks()).resolves.toEqual({ ipa: "available" });
+  });
+});
