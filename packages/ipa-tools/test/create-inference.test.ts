@@ -576,6 +576,38 @@ describe("createResolver", () => {
     expect(seen).toBe(progress);
     expect(progress).toHaveBeenCalledWith(0.5);
   });
+
+  it("deduplicates concurrent resolve creates onto one backend session", async () => {
+    let creates = 0;
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    const backend: InferenceBackend = {
+      id: "slow",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        creates += 1;
+        await createGate;
+        return fakeInference({ id: "slow" });
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    const first = resolver.resolve();
+    const second = resolver.resolve();
+
+    await vi.waitFor(() => {
+      expect(creates).toBe(1);
+    });
+    releaseCreate();
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toBe(b);
+    expect(creates).toBe(1);
+  });
 });
 
 describe("probeFallbacks", () => {

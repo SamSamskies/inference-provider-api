@@ -266,6 +266,8 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
   const onDownloadProgress = options?.onDownloadProgress;
   let cachedFallback: Inference | undefined;
   let cachedFallbackId: string | undefined;
+  /** Serialize resolve() so concurrent callers share one create()/cache fill. */
+  let resolveMutex: Promise<void> = Promise.resolve();
 
   return {
     probe() {
@@ -273,91 +275,102 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     },
 
     async resolve(resolveOptions) {
-      const needsTools = resolveOptions?.needsTools === true;
-      const signal = resolveOptions?.signal ?? options?.signal;
+      let release!: () => void;
+      const previous = resolveMutex;
+      resolveMutex = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await previous;
 
-      if (signal?.aborted) {
-        throw makeInferenceError("aborted", "Request aborted");
-      }
+      try {
+        const needsTools = resolveOptions?.needsTools === true;
+        const signal = resolveOptions?.signal ?? options?.signal;
 
-      if (isInferenceAvailable()) {
-        return getInference();
-      }
-
-      if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
-        return cachedFallback;
-      }
-
-      let skippedForTools = false;
-
-      for (const entry of fallbacks) {
         if (signal?.aborted) {
           throw makeInferenceError("aborted", "Request aborted");
         }
 
-        const entryId = typeof entry === "string" ? entry : entry.id;
-        if (
-          needsTools &&
-          cachedFallback &&
-          cachedFallbackId === entryId &&
-          !supportsTools(cachedFallback)
-        ) {
-          // Already resolved this backend; it lacks toolCalling.
-          skippedForTools = true;
-          continue;
+        if (isInferenceAvailable()) {
+          return getInference();
         }
 
-        let backend: InferenceBackend;
-        try {
-          backend = await resolveBackendEntry(entry);
-        } catch (error) {
-          // Missing peer / load failure: only throw when the app asked to use it.
-          throw error;
+        if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
+          return cachedFallback;
         }
 
-        let availability: BackendAvailability;
-        try {
-          availability = await backend.probe();
-        } catch {
-          continue;
+        let skippedForTools = false;
+
+        for (const entry of fallbacks) {
+          if (signal?.aborted) {
+            throw makeInferenceError("aborted", "Request aborted");
+          }
+
+          const entryId = typeof entry === "string" ? entry : entry.id;
+          if (
+            needsTools &&
+            cachedFallback &&
+            cachedFallbackId === entryId &&
+            !supportsTools(cachedFallback)
+          ) {
+            // Already resolved this backend; it lacks toolCalling.
+            skippedForTools = true;
+            continue;
+          }
+
+          let backend: InferenceBackend;
+          try {
+            backend = await resolveBackendEntry(entry);
+          } catch (error) {
+            // Missing peer / load failure: only throw when the app asked to use it.
+            throw error;
+          }
+
+          let availability: BackendAvailability;
+          try {
+            availability = await backend.probe();
+          } catch {
+            continue;
+          }
+          if (availability === "unavailable") {
+            continue;
+          }
+
+          if (needsTools && backendSupportsTools(backend) === false) {
+            skippedForTools = true;
+            continue;
+          }
+
+          const inference = await backend.create({
+            onDownloadProgress,
+            signal,
+          });
+
+          if (needsTools && !supportsTools(inference)) {
+            skippedForTools = true;
+            continue;
+          }
+
+          cachedFallback = inference;
+          cachedFallbackId = entryId;
+          return inference;
         }
-        if (availability === "unavailable") {
-          continue;
+
+        if (needsTools && skippedForTools) {
+          throw makeInferenceError(
+            "invalid_request",
+            "No configured backend supports tool calling."
+          );
         }
 
-        if (needsTools && backendSupportsTools(backend) === false) {
-          skippedForTools = true;
-          continue;
-        }
-
-        const inference = await backend.create({
-          onDownloadProgress,
-          signal,
-        });
-
-        if (needsTools && !supportsTools(inference)) {
-          skippedForTools = true;
-          continue;
-        }
-
-        cachedFallback = inference;
-        cachedFallbackId = entryId;
-        return inference;
-      }
-
-      if (needsTools && skippedForTools) {
         throw makeInferenceError(
-          "invalid_request",
-          "No configured backend supports tool calling."
+          "unavailable",
+          fallbacks.length === 0
+            ? "window.inference is not available."
+            : "No inference backend is available."
         );
+      } finally {
+        release();
       }
-
-      throw makeInferenceError(
-        "unavailable",
-        fallbacks.length === 0
-          ? "window.inference is not available."
-          : "No inference backend is available."
-      );
     },
   };
 }
