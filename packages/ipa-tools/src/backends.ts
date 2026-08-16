@@ -70,6 +70,10 @@ export const MAX_FALLBACKS = 1;
 const MISSING_PEER_MESSAGE =
   'Install "ipa-prompt-api-fallback" to use fallbacks: ["promptApi"].';
 
+/** Thrown when every fallback was skipped for lacking toolCalling. */
+const NO_TOOLS_BACKEND_MESSAGE =
+  "No configured backend supports tool calling.";
+
 function isBackendObject(value: unknown): value is InferenceBackend {
   return (
     value != null &&
@@ -418,10 +422,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     }
 
     if (needsTools && skippedForTools) {
-      throw makeInferenceError(
-        "invalid_request",
-        "No configured backend supports tool calling."
-      );
+      throw makeInferenceError("invalid_request", NO_TOOLS_BACKEND_MESSAGE);
     }
 
     throw makeInferenceError(
@@ -482,10 +483,14 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           }
         } catch (error) {
           throwIfAborted();
+          // Only retry for the tools-capability rejection from a concurrent
+          // needsTools resolve — not create()/validation invalid_request,
+          // which would loop forever when no backend succeeds.
           if (
             !needsTools &&
             isInferenceError(error) &&
-            error.code === "invalid_request"
+            error.code === "invalid_request" &&
+            error.message === NO_TOOLS_BACKEND_MESSAGE
           ) {
             continue;
           }

@@ -849,6 +849,27 @@ describe("createResolver", () => {
     expect(creates).toBe(1);
   });
 
+  it("does not retry forever when create() throws invalid_request", async () => {
+    let creates = 0;
+    const createError = Object.assign(new Error("bad create options"), {
+      code: "invalid_request",
+    });
+    const backend: InferenceBackend = {
+      id: "fail-invalid",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        creates += 1;
+        throw createError;
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    await expect(resolver.resolve()).rejects.toBe(createError);
+    expect(creates).toBe(1);
+  });
+
   it("does not share tools invalid_request with a concurrent plain resolve", async () => {
     let creates = 0;
     let releaseCreate!: () => void;
