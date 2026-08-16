@@ -266,7 +266,8 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
   const fallbacks = normalizeFallbacks(options?.fallbacks);
   const onDownloadProgress = options?.onDownloadProgress;
   let cachedFallback: Inference | undefined;
-  let cachedFallbackId: string | undefined;
+  /** The FallbackEntry that produced `cachedFallback` (identity, not id string). */
+  let cachedFallbackEntry: FallbackEntry | undefined;
   /** Serialize resolve() so concurrent callers share one create()/cache fill. */
   let resolveMutex: Promise<void> = Promise.resolve();
 
@@ -309,14 +310,13 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         for (const entry of fallbacks) {
           throwIfAborted();
 
-          const entryId = typeof entry === "string" ? entry : entry.id;
           if (
             needsTools &&
             cachedFallback &&
-            cachedFallbackId === entryId &&
+            entry === cachedFallbackEntry &&
             !supportsTools(cachedFallback)
           ) {
-            // Already resolved this backend; it lacks toolCalling.
+            // Already resolved this exact entry; it lacks toolCalling.
             skippedForTools = true;
             continue;
           }
@@ -384,7 +384,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           }
 
           cachedFallback = inference;
-          cachedFallbackId = entryId;
+          cachedFallbackEntry = entry;
           return inference;
         }
 

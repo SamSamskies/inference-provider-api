@@ -264,7 +264,7 @@ describe("createInference / resolver", () => {
     expect(creates).toBe(2); // first complete + with-tools (cached no-tools skipped)
   });
 
-  it("keys the no-tools cache skip on the fallback entry id, not InferenceBackend.id", async () => {
+  it("keys the no-tools cache skip on the fallback entry, not InferenceBackend.id", async () => {
     let creates = 0;
     vi.doMock("ipa-prompt-api-fallback", () => ({
       backend: {
@@ -312,11 +312,50 @@ describe("createInference / resolver", () => {
       messages: [{ role: "user", content: "b" }],
       tools: [{ type: "function", function: { name: "ping" } }],
     });
-    // Cache keyed on backend.id ("promptApi-impl") would miss the skip and
-    // re-create the no-tools peer (creates === 3).
+    // Skip is keyed on the FallbackEntry ("promptApi"), not the loaded
+    // backend.id ("promptApi-impl"), so the peer is not re-created.
     expect(creates).toBe(2);
 
     vi.doUnmock("ipa-prompt-api-fallback");
+  });
+
+  it("still tries a later backend when it shares an id with a cached no-tools entry", async () => {
+    let creates = 0;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "shared",
+          toolCalling: false,
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+        fakeBackend({
+          id: "shared",
+          toolCalling: true,
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(creates).toBe(1);
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", function: { name: "ping" } }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:shared");
+    expect(creates).toBe(2);
   });
 
   it("prefers IPA again if it appears after a fallback was cached", async () => {
