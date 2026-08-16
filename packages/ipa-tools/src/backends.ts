@@ -1,4 +1,4 @@
-import { makeInferenceError } from "./errors.js";
+import { isInferenceError, makeInferenceError } from "./errors.js";
 import { getInference, isInferenceAvailable } from "./inference.js";
 import type {
   Inference,
@@ -456,8 +456,10 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         return cachedFallback;
       }
 
-      // Join or start a single in-flight attempt. Loop only when a concurrent
-      // non-tools resolve succeeded with a backend that lacks toolCalling.
+      // Join or start a single in-flight attempt. Loop when:
+      // - a concurrent non-tools resolve succeeded with a no-tools backend, or
+      // - a concurrent tools resolve rejected with tools invalid_request while
+      //   this caller only needs plain chat (may succeed against the same chain).
       for (;;) {
         throwIfAborted();
         if (!resolveInFlight) {
@@ -480,6 +482,13 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           }
         } catch (error) {
           throwIfAborted();
+          if (
+            !needsTools &&
+            isInferenceError(error) &&
+            error.code === "invalid_request"
+          ) {
+            continue;
+          }
           // Share create/unavailable failures with concurrent waiters.
           throw error;
         }

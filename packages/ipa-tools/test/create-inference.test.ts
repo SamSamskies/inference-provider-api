@@ -849,6 +849,43 @@ describe("createResolver", () => {
     expect(creates).toBe(1);
   });
 
+  it("does not share tools invalid_request with a concurrent plain resolve", async () => {
+    let creates = 0;
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    // No getFeatures — tools resolve must create() before learning toolCalling is false.
+    const backend: InferenceBackend = {
+      id: "no-tools",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        creates += 1;
+        await createGate;
+        return fakeInference({ id: "no-tools", toolCalling: false });
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    const toolsResolve = resolver.resolve({ needsTools: true });
+    const plainResolve = resolver.resolve();
+
+    await vi.waitFor(() => {
+      expect(creates).toBe(1);
+    });
+    releaseCreate();
+
+    await expect(toolsResolve).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
+    });
+    const plain = await plainResolve;
+    expect(plain.getFeatures?.()).toEqual({ toolCalling: false });
+    expect(creates).toBe(1);
+  });
+
   it("prefers IPA injected during fallback create over the fallback", async () => {
     let creates = 0;
     let releaseCreate!: () => void;
