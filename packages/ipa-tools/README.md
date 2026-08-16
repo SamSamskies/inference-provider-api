@@ -72,7 +72,26 @@ const { model, message, usage } = await complete({
 });
 ```
 
-Optional `options.request` overrides `window.inference.request` (useful in tests). If the stream ends without `done`, throws `provider_error` (`Stream ended without a done chunk.`). Errors from `request` are re-thrown as-is.
+In tests, pass a mock via the second argument to override `window.inference.request`:
+
+```ts
+const mockRequest = async function* () {
+  yield {
+    type: "done",
+    model: "test",
+    message: { role: "assistant", content: "Hi" },
+  };
+};
+
+const options = { request: mockRequest };
+
+const done = await complete(
+  { method: "chat", messages: [{ role: "user", content: "Hello" }] },
+  options
+);
+```
+
+If the stream ends without `done`, throws `provider_error` (`Stream ended without a done chunk.`). Errors from `request` are re-thrown as-is.
 
 ## `runTools`
 
