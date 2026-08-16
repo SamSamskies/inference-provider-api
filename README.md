@@ -121,14 +121,18 @@ if (features.toolCalling) {
     }
   }
 }
+```
 
-// Prefer less thinking / lower temperature for translation when supported
+Request `options` can be sent without feature detection — unsupported keys are ignored:
+
+```ts
+// Prefer less thinking / lower temperature for translation
 for await (const chunk of window.inference.request({
   method: "chat",
   messages: [{ role: "user", content: "Translate to Spanish: Hello" }],
   options: {
-    reasoningEffort: features.options?.reasoningEffort ? "none" : undefined,
-    temperature: features.options?.temperature ? 0.2 : undefined,
+    reasoningEffort: "none",
+    temperature: 0.2,
   },
 })) {
   // ...
