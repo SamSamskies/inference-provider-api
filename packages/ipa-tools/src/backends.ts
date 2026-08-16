@@ -302,6 +302,8 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         }
 
         let skippedForTools = false;
+        let resolveLoadFailures = 0;
+        let lastResolveError: unknown;
 
         for (const entry of fallbacks) {
           throwIfAborted();
@@ -322,8 +324,11 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           try {
             backend = await resolveBackendEntry(entry);
           } catch (error) {
-            // Missing peer / load failure: only throw when the app asked to use it.
-            throw error;
+            // Missing peer / load failure: try later entries (probe treats these
+            // as "unavailable"). Rethrow only if every entry failed to load.
+            resolveLoadFailures++;
+            lastResolveError = error;
+            continue;
           }
           throwIfAborted();
 
@@ -366,6 +371,14 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
             "invalid_request",
             "No configured backend supports tool calling."
           );
+        }
+
+        if (
+          fallbacks.length > 0 &&
+          resolveLoadFailures === fallbacks.length &&
+          lastResolveError != null
+        ) {
+          throw lastResolveError;
         }
 
         throw makeInferenceError(

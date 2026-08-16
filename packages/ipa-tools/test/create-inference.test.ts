@@ -439,6 +439,27 @@ describe("createInference / resolver", () => {
     });
   });
 
+  it("continues past a missing promptApi peer to later fallbacks", async () => {
+    const inference = createInference({
+      fallbacks: ["promptApi", fakeBackend({ id: "custom" })],
+    });
+
+    await expect(inference.probe()).resolves.toEqual({
+      ipa: "unavailable",
+      promptApi: "unavailable",
+      custom: "available",
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:custom");
+  });
+
   it("streams via request() on a fallback backend", async () => {
     const inference = createInference({
       fallbacks: [fakeBackend({ id: "stream" })],
