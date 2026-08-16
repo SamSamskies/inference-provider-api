@@ -112,37 +112,7 @@ Handlers run in the page. The package never talks to providers or API keys.
 
 ### When `toolCalling` is not advertised
 
-`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Prefer `request` when the feature is advertised. Some injectors expose tools on `experimental.request` before that — use that surface only if you intentionally support it:
-
-```ts
-import {
-  getFeatures,
-  getInference,
-  isInferenceAvailable,
-  runTools,
-} from "ipa-tools";
-
-if (isInferenceAvailable()) {
-  const inference = getInference();
-  let request = inference.request.bind(inference);
-
-  if (!getFeatures().toolCalling) {
-    // experimental window — not part of IPA types
-    const experimental = (
-      inference as typeof inference & {
-        experimental?: { request?: typeof inference.request };
-      }
-    ).experimental;
-    if (experimental?.request) {
-      request = experimental.request.bind(experimental);
-    }
-  }
-
-  await runTools({ request, messages, tools, execute });
-}
-```
-
-When `getFeatures` reports `toolCalling: true`, the default (`window.inference.request`) is enough.
+`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Call `runTools` only when `getFeatures().toolCalling` is true — otherwise the injector must reject `tools` with `invalid_request`. Do not rely on experimental injector surfaces for production apps.
 
 ## `waitForInference` / `getInference` / `getFeatures` / `isInferenceError`
 

@@ -146,9 +146,8 @@ compatibility. For a ready-made loop (plus types and `complete`), see the
 non-normative [`ipa-tools`](./packages/ipa-tools) package
 (`npm install ipa-tools`).
 
-Some injectors may expose tools on `experimental.request` before advertising
-`toolCalling` via `getFeatures`. Sending `tools` on IPA `request` without
-that advertisement is `invalid_request`. For a detect-and-fallback pattern,
+Sending `tools` on IPA `request` without a `toolCalling` advertisement is
+`invalid_request`. Prefer `getFeatures().toolCalling` before enabling tools;
 see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-is-not-advertised).
 The extension prompts the user for permission:
 
