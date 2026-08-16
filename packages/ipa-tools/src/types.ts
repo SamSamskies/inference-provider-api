@@ -9,8 +9,26 @@ export type InferenceRequest = {
   /** Function tools. Only when getFeatures().toolCalling is true. */
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  /** Generation preferences for this request. See InferenceOptions. */
+  options?: InferenceOptions;
   signal?: AbortSignal;
 };
+
+export type InferenceOptions = {
+  /**
+   * Preferred reasoning / thinking effort.
+   * Distinct from assistant `message.reasoning` (output text).
+   */
+  reasoningEffort?: ReasoningEffort;
+  /**
+   * Sampling temperature in `[0, 2]`.
+   * Omitted means the implementation / provider default.
+   */
+  temperature?: number;
+};
+
+/** Omitted or `"auto"` means the implementation / provider default. */
+export type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
 
 export type Message =
   | {
@@ -47,6 +65,14 @@ export type InferenceFeatures = {
    * Absent or false means unsupported.
    */
   toolCalling?: boolean;
+  /**
+   * Which InferenceOptions keys this implementation accepts.
+   * Absent keys (and an absent options object) mean ignore those fields.
+   */
+  options?: {
+    reasoningEffort?: boolean;
+    temperature?: boolean;
+  };
 };
 
 export type Tool = {
