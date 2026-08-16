@@ -89,7 +89,7 @@ sendButton.addEventListener("click", async () => {
 - Omit `fallbacks` (or pass `[]`) for IPA only — same `unavailable` when no extension is installed.
 - IPA is always first. Do not put `"ipa"` in `fallbacks`.
 - `probe()` does not start downloads. Missing optional peers report `"unavailable"`; `complete` / `request` / `runTools` throw a clear install error if you asked for `"promptApi"` without the peer.
-- `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay “real injector present” only.
+- `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay “real injector present” only. A tools call on a no-tools fallback throws `invalid_request` (catch with `isInferenceError`).
 
 One-shot (no cached client):
 

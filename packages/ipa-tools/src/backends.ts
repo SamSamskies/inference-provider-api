@@ -1,6 +1,10 @@
 import { makeInferenceError } from "./errors.js";
 import { getInference, isInferenceAvailable } from "./inference.js";
-import type { Inference, InferenceRequest } from "./types.js";
+import type {
+  Inference,
+  InferenceFeatures,
+  InferenceRequest,
+} from "./types.js";
 
 /**
  * Availability for a non-IPA backend (and for probe() fallback fields).
@@ -24,6 +28,11 @@ export type InferenceBackend = {
     onDownloadProgress?: (loaded: number) => void;
     signal?: AbortSignal;
   }): Promise<Inference>;
+  /**
+   * Optional feature snapshot used to skip `create()` when the call needs
+   * tools and `toolCalling` is not true (avoids download / session side effects).
+   */
+  getFeatures?(): InferenceFeatures;
 };
 
 /** Built-in fallback aliases resolved via optional peer packages. */
@@ -200,6 +209,12 @@ function supportsTools(inference: Inference): boolean {
   return inference.getFeatures?.().toolCalling === true;
 }
 
+/** Prefer backend-advertised features so we can skip `create()` for tools. */
+function backendSupportsTools(backend: InferenceBackend): boolean | undefined {
+  if (typeof backend.getFeatures !== "function") return undefined;
+  return backend.getFeatures().toolCalling === true;
+}
+
 /**
  * Probe IPA plus each configured fallback. Does not create sessions or start
  * downloads. Missing optional peers report `"unavailable"` (no throw).
@@ -235,7 +250,10 @@ export async function probeFallbacks(
 
 export type InferenceResolver = {
   probe(): Promise<ProbeStatus>;
-  resolve(options?: { needsTools?: boolean; signal?: AbortSignal }): Promise<Inference>;
+  resolve(options?: {
+    needsTools?: boolean;
+    signal?: AbortSignal;
+  }): Promise<Inference>;
 };
 
 /**
@@ -270,6 +288,8 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         return cachedFallback;
       }
 
+      let skippedForTools = false;
+
       for (const entry of fallbacks) {
         if (signal?.aborted) {
           throw makeInferenceError("aborted", "Request aborted");
@@ -283,6 +303,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           !supportsTools(cachedFallback)
         ) {
           // Already resolved this backend; it lacks toolCalling.
+          skippedForTools = true;
           continue;
         }
 
@@ -304,18 +325,31 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           continue;
         }
 
+        if (needsTools && backendSupportsTools(backend) === false) {
+          skippedForTools = true;
+          continue;
+        }
+
         const inference = await backend.create({
           onDownloadProgress,
           signal,
         });
 
         if (needsTools && !supportsTools(inference)) {
+          skippedForTools = true;
           continue;
         }
 
         cachedFallback = inference;
         cachedFallbackId = backend.id;
         return inference;
+      }
+
+      if (needsTools && skippedForTools) {
+        throw makeInferenceError(
+          "invalid_request",
+          "No configured backend supports tool calling."
+        );
       }
 
       throw makeInferenceError(

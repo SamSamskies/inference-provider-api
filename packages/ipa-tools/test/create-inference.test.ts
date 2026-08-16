@@ -51,6 +51,10 @@ function fakeBackend(options: {
     async probe() {
       return availability;
     },
+    getFeatures:
+      options.toolCalling === undefined
+        ? undefined
+        : () => ({ toolCalling: options.toolCalling }),
     async create() {
       options.onCreate?.();
       return fakeInference({
@@ -197,6 +201,30 @@ describe("createInference / resolver", () => {
     ).toBe("from:with-tools");
   });
 
+  it("does not call create on a backend that advertises no toolCalling", async () => {
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "no-tools",
+          toolCalling: false,
+          onCreate: () => {
+            created = true;
+          },
+        }),
+        fakeBackend({ id: "with-tools", toolCalling: true }),
+      ],
+    });
+
+    await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", function: { name: "ping" } }],
+    });
+
+    expect(created).toBe(false);
+  });
+
   it("re-resolves past a cached no-tools fallback when tools are required", async () => {
     let creates = 0;
     const inference = createInference({
@@ -312,6 +340,28 @@ describe("createInference / resolver", () => {
     ).rejects.toMatchObject({
       code: "unavailable",
       message: "No inference backend is available.",
+    });
+  });
+
+  it("throws a tools-specific error when backends exist but lack toolCalling", async () => {
+    const inference = createInference({
+      fallbacks: [fakeBackend({ id: "promptApi", toolCalling: false })],
+    });
+
+    await expect(inference.probe()).resolves.toMatchObject({
+      ipa: "unavailable",
+      promptApi: "available",
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling.",
     });
   });
 
