@@ -439,6 +439,32 @@ describe("createInference / resolver", () => {
     });
   });
 
+  it("surfaces real peer init failures instead of the missing-peer install prompt", async () => {
+    vi.doMock("ipa-prompt-api-fallback", () => ({
+      get backend() {
+        throw new Error(
+          "ipa-prompt-api-fallback failed to initialize: unexpected token"
+        );
+      },
+    }));
+
+    const { createInference: createInferenceFresh } = await import(
+      "../src/create-inference.js"
+    );
+    const inference = createInferenceFresh({ fallbacks: ["promptApi"] });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+      })
+    ).rejects.toThrow(
+      "ipa-prompt-api-fallback failed to initialize: unexpected token"
+    );
+
+    vi.doUnmock("ipa-prompt-api-fallback");
+  });
+
   it("continues past a missing promptApi peer to later fallbacks", async () => {
     const inference = createInference({
       fallbacks: ["promptApi", fakeBackend({ id: "custom" })],

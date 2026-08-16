@@ -138,11 +138,12 @@ function isMissingModuleError(error: unknown): boolean {
       : typeof (error as { message?: unknown }).message === "string"
         ? (error as { message: string }).message
         : "";
+  // Match resolver wording only — do not treat any message that merely names
+  // the peer package as missing (that masks real import/init failures).
   return (
     message.includes("Cannot find module") ||
     message.includes("Failed to resolve") ||
-    message.includes("Cannot find package") ||
-    /ipa-prompt-api-fallback/.test(message)
+    message.includes("Cannot find package")
   );
 }
 
