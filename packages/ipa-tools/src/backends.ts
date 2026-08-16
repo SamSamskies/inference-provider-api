@@ -355,6 +355,12 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           });
           throwIfAborted();
 
+          // Re-check after create(): a late injector (e.g. during a long
+          // download) must still win over the fallback for this request.
+          if (isInferenceAvailable()) {
+            return getInference();
+          }
+
           if (needsTools && !supportsTools(inference)) {
             skippedForTools = true;
             continue;
