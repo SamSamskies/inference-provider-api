@@ -285,10 +285,13 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       try {
         const needsTools = resolveOptions?.needsTools === true;
         const signal = resolveOptions?.signal ?? options?.signal;
+        const throwIfAborted = () => {
+          if (signal?.aborted) {
+            throw makeInferenceError("aborted", "Request aborted");
+          }
+        };
 
-        if (signal?.aborted) {
-          throw makeInferenceError("aborted", "Request aborted");
-        }
+        throwIfAborted();
 
         if (isInferenceAvailable()) {
           return getInference();
@@ -301,9 +304,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         let skippedForTools = false;
 
         for (const entry of fallbacks) {
-          if (signal?.aborted) {
-            throw makeInferenceError("aborted", "Request aborted");
-          }
+          throwIfAborted();
 
           const entryId = typeof entry === "string" ? entry : entry.id;
           if (
@@ -324,6 +325,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
             // Missing peer / load failure: only throw when the app asked to use it.
             throw error;
           }
+          throwIfAborted();
 
           let availability: BackendAvailability;
           try {
@@ -331,6 +333,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           } catch {
             continue;
           }
+          throwIfAborted();
           if (availability === "unavailable") {
             continue;
           }
@@ -344,6 +347,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
             onDownloadProgress,
             signal,
           });
+          throwIfAborted();
 
           if (needsTools && !supportsTools(inference)) {
             skippedForTools = true;
@@ -354,6 +358,8 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           cachedFallbackId = entryId;
           return inference;
         }
+
+        throwIfAborted();
 
         if (needsTools && skippedForTools) {
           throw makeInferenceError(

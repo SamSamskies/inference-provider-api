@@ -608,6 +608,62 @@ describe("createResolver", () => {
     expect(a).toBe(b);
     expect(creates).toBe(1);
   });
+
+  it("throws aborted after create returns if the signal aborted during create", async () => {
+    const controller = new AbortController();
+    const backend: InferenceBackend = {
+      id: "create-abort",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        controller.abort();
+        return fakeInference({ id: "create-abort" });
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    await expect(
+      resolver.resolve({ signal: controller.signal })
+    ).rejects.toMatchObject({
+      code: "aborted",
+      message: "Request aborted",
+    });
+  });
+
+  it("prefers aborted over invalid_request when aborted during tools skip", async () => {
+    const controller = new AbortController();
+    const backend: InferenceBackend = {
+      id: "no-tools",
+      async probe() {
+        return "available";
+      },
+      getFeatures: () => ({ toolCalling: false }),
+      async create() {
+        return fakeInference({ id: "no-tools", toolCalling: false });
+      },
+    };
+
+    // Abort after probe so the tools gate continue can reach loop end.
+    let probed = false;
+    const probingBackend: InferenceBackend = {
+      ...backend,
+      async probe() {
+        if (probed) return "available";
+        probed = true;
+        controller.abort();
+        return "available";
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [probingBackend] });
+    await expect(
+      resolver.resolve({ needsTools: true, signal: controller.signal })
+    ).rejects.toMatchObject({
+      code: "aborted",
+      message: "Request aborted",
+    });
+  });
 });
 
 describe("probeFallbacks", () => {
