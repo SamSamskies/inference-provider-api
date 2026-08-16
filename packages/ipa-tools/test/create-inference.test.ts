@@ -264,6 +264,61 @@ describe("createInference / resolver", () => {
     expect(creates).toBe(2); // first complete + with-tools (cached no-tools skipped)
   });
 
+  it("keys the no-tools cache skip on the fallback entry id, not InferenceBackend.id", async () => {
+    let creates = 0;
+    vi.doMock("ipa-prompt-api-fallback", () => ({
+      backend: {
+        id: "promptApi-impl",
+        async probe() {
+          return "available" as const;
+        },
+        getFeatures: () => ({ toolCalling: false }),
+        async create() {
+          creates += 1;
+          return fakeInference({
+            id: "promptApi-impl",
+            toolCalling: false,
+          });
+        },
+      } satisfies InferenceBackend,
+    }));
+
+    // Fresh module so createResolver picks up the mock via dynamic import.
+    const { createInference: createInferenceFresh } = await import(
+      "../src/create-inference.js"
+    );
+
+    const client = createInferenceFresh({
+      fallbacks: [
+        "promptApi",
+        fakeBackend({
+          id: "tools",
+          toolCalling: true,
+          onCreate: () => {
+            creates += 1;
+          },
+        }),
+      ],
+    });
+
+    await client.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "a" }],
+    });
+    expect(creates).toBe(1);
+
+    await client.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "b" }],
+      tools: [{ type: "function", function: { name: "ping" } }],
+    });
+    // Cache keyed on backend.id ("promptApi-impl") would miss the skip and
+    // re-create the no-tools peer (creates === 3).
+    expect(creates).toBe(2);
+
+    vi.doUnmock("ipa-prompt-api-fallback");
+  });
+
   it("prefers IPA again if it appears after a fallback was cached", async () => {
     const inference = createInference({
       fallbacks: [fakeBackend({ id: "fallback" })],

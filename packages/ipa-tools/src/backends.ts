@@ -341,7 +341,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         }
 
         cachedFallback = inference;
-        cachedFallbackId = backend.id;
+        cachedFallbackId = entryId;
         return inference;
       }
 
