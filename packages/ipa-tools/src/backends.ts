@@ -306,6 +306,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         let skippedForTools = false;
         let resolveLoadFailures = 0;
         let lastResolveError: unknown;
+        let lastCreateError: unknown;
 
         for (const entry of fallbacks) {
           throwIfAborted();
@@ -368,6 +369,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
             ) {
               throw error;
             }
+            lastCreateError = error;
             continue;
           }
           throwIfAborted();
@@ -403,6 +405,11 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           lastResolveError != null
         ) {
           throw lastResolveError;
+        }
+
+        // Prefer the real download/init error over a generic unavailable.
+        if (lastCreateError != null) {
+          throw lastCreateError;
         }
 
         throw makeInferenceError(

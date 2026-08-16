@@ -549,6 +549,26 @@ describe("createInference / resolver", () => {
     ).toBe("from:custom");
   });
 
+  it("surfaces the create() error when every fallback fails create", async () => {
+    const failing: InferenceBackend = {
+      id: "failing",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        throw new Error("download failed");
+      },
+    };
+    const inference = createInference({ fallbacks: [failing] });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+      })
+    ).rejects.toThrow("download failed");
+  });
+
   it("streams via request() on a fallback backend", async () => {
     const inference = createInference({
       fallbacks: [fakeBackend({ id: "stream" })],
