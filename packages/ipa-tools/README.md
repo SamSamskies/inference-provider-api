@@ -112,33 +112,45 @@ Handlers run in the page. The package never talks to providers or API keys.
 
 ### When `toolCalling` is not advertised
 
-`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Prefer `request` when the feature is advertised. Some injectors expose tools on `experimental.request` before that — use that surface only if you intentionally support it:
+`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Prefer `request` when the feature is advertised. Some injectors expose tools on `experimental.request` before that — that surface is not part of IPA types, and it may still reject `tools`. Only call `runTools` on a candidate, and catch `invalid_request` if it does:
 
 ```ts
 import {
   getFeatures,
   getInference,
   isInferenceAvailable,
+  isInferenceError,
   runTools,
 } from "ipa-tools";
 
-if (isInferenceAvailable()) {
+function experimentalRequest() {
   const inference = getInference();
-  let request = inference.request.bind(inference);
+  const experimental = (
+    inference as typeof inference & {
+      experimental?: { request?: typeof inference.request };
+    }
+  ).experimental;
+  return experimental?.request?.bind(experimental);
+}
 
-  if (!getFeatures().toolCalling) {
-    // experimental window — not part of IPA types
-    const experimental = (
-      inference as typeof inference & {
-        experimental?: { request?: typeof inference.request };
+if (isInferenceAvailable()) {
+  if (getFeatures().toolCalling) {
+    await runTools({ messages, tools, execute });
+  } else {
+    const request = experimentalRequest();
+    if (!request) {
+      // injector does not expose a tools surface
+    } else {
+      try {
+        await runTools({ request, messages, tools, execute });
+      } catch (error) {
+        if (!isInferenceError(error) || error.code !== "invalid_request") {
+          throw error;
+        }
+        // experimental.request rejected tools
       }
-    ).experimental;
-    if (experimental?.request) {
-      request = experimental.request.bind(experimental);
     }
   }
-
-  await runTools({ request, messages, tools, execute });
 }
 ```
 
