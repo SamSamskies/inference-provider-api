@@ -939,6 +939,41 @@ describe("createResolver", () => {
     await expect(pending).resolves.toBe(ipa);
   });
 
+  it("prefers IPA injected during fallback probe without calling create", async () => {
+    let creates = 0;
+    let probing = false;
+    let releaseProbe!: () => void;
+    const probeGate = new Promise<void>((resolve) => {
+      releaseProbe = resolve;
+    });
+    const backend: InferenceBackend = {
+      id: "slow-probe",
+      async probe() {
+        probing = true;
+        await probeGate;
+        return "downloadable";
+      },
+      async create() {
+        creates += 1;
+        return fakeInference({ id: "slow-probe" });
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    const pending = resolver.resolve();
+
+    await vi.waitFor(() => {
+      expect(probing).toBe(true);
+    });
+
+    const ipa = fakeInference({ id: "ipa", message: "from:ipa" });
+    stubInference(ipa);
+    releaseProbe();
+
+    await expect(pending).resolves.toBe(ipa);
+    expect(creates).toBe(0);
+  });
+
   it("throws aborted after create returns if the signal aborted during create", async () => {
     const controller = new AbortController();
     const backend: InferenceBackend = {

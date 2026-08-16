@@ -362,6 +362,12 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         continue;
       }
 
+      // Re-check before create(): an injector that appeared during probe/load
+      // must win without starting a fallback download.
+      if (isInferenceAvailable()) {
+        return getInference();
+      }
+
       let inference: Inference;
       try {
         inference = await backend.create({
