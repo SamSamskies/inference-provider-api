@@ -392,13 +392,6 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
 
         throwIfAborted();
 
-        if (needsTools && skippedForTools) {
-          throw makeInferenceError(
-            "invalid_request",
-            "No configured backend supports tool calling."
-          );
-        }
-
         if (
           fallbacks.length > 0 &&
           resolveLoadFailures === fallbacks.length &&
@@ -407,9 +400,17 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           throw lastResolveError;
         }
 
-        // Prefer the real download/init error over a generic unavailable.
+        // Prefer the real download/init error over tools-capability / unavailable.
+        // A tools skip earlier in the chain must not mask a later create() failure.
         if (lastCreateError != null) {
           throw lastCreateError;
+        }
+
+        if (needsTools && skippedForTools) {
+          throw makeInferenceError(
+            "invalid_request",
+            "No configured backend supports tool calling."
+          );
         }
 
         throw makeInferenceError(

@@ -459,6 +459,33 @@ describe("createInference / resolver", () => {
     });
   });
 
+  it("surfaces create() errors even when an earlier backend was skipped for tools", async () => {
+    const failingTools: InferenceBackend = {
+      id: "tools-capable",
+      async probe() {
+        return "available";
+      },
+      getFeatures: () => ({ toolCalling: true }),
+      async create() {
+        throw new Error("download failed");
+      },
+    };
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({ id: "no-tools", toolCalling: false }),
+        failingTools,
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).rejects.toThrow("download failed");
+  });
+
   it("throws a clear missing-peer error for promptApi without the package", async () => {
     const inference = createInference({ fallbacks: ["promptApi"] });
 
