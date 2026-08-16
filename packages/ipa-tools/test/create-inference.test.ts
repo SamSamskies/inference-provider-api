@@ -814,6 +814,41 @@ describe("createResolver", () => {
     expect(creates).toBe(1);
   });
 
+  it("shares create() failure across concurrent resolve callers", async () => {
+    let creates = 0;
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    const createError = Object.assign(new Error("download failed"), {
+      code: "unavailable",
+    });
+    const backend: InferenceBackend = {
+      id: "fail-create",
+      async probe() {
+        return "downloadable";
+      },
+      async create() {
+        creates += 1;
+        await createGate;
+        throw createError;
+      },
+    };
+
+    const resolver = createResolver({ fallbacks: [backend] });
+    const first = resolver.resolve();
+    const second = resolver.resolve();
+
+    await vi.waitFor(() => {
+      expect(creates).toBe(1);
+    });
+    releaseCreate();
+
+    await expect(first).rejects.toBe(createError);
+    await expect(second).rejects.toBe(createError);
+    expect(creates).toBe(1);
+  });
+
   it("prefers IPA injected during fallback create over the fallback", async () => {
     let creates = 0;
     let releaseCreate!: () => void;

@@ -283,8 +283,154 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
   let cachedFallback: Inference | undefined;
   /** The FallbackEntry that produced `cachedFallback` (identity, not id string). */
   let cachedFallbackEntry: FallbackEntry | undefined;
-  /** Serialize resolve() so concurrent callers share one create()/cache fill. */
-  let resolveMutex: Promise<void> = Promise.resolve();
+  /**
+   * Single-flight resolve so concurrent callers share one create()/cache fill
+   * and the same success or failure (no duplicate downloads on create error).
+   */
+  let resolveInFlight: Promise<Inference> | undefined;
+
+  async function resolveOnce(resolveOptions?: {
+    needsTools?: boolean;
+    signal?: AbortSignal;
+  }): Promise<Inference> {
+    const needsTools = resolveOptions?.needsTools === true;
+    const signal = resolveOptions?.signal ?? options?.signal;
+    const throwIfAborted = () => {
+      if (signal?.aborted) {
+        throw makeInferenceError("aborted", "Request aborted");
+      }
+    };
+
+    throwIfAborted();
+
+    if (isInferenceAvailable()) {
+      return getInference();
+    }
+
+    if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
+      return cachedFallback;
+    }
+
+    let skippedForTools = false;
+    let resolveLoadFailures = 0;
+    let lastResolveError: unknown;
+    let lastCreateError: unknown;
+
+    for (const entry of fallbacks) {
+      throwIfAborted();
+
+      if (
+        needsTools &&
+        cachedFallback &&
+        entry === cachedFallbackEntry &&
+        !supportsTools(cachedFallback)
+      ) {
+        // Already resolved this exact entry; it lacks toolCalling.
+        skippedForTools = true;
+        continue;
+      }
+
+      let backend: InferenceBackend;
+      try {
+        backend = await resolveBackendEntry(entry);
+      } catch (error) {
+        // Missing peer / load failure: try later entries (probe treats these
+        // as "unavailable"). Rethrow only if every entry failed to load.
+        resolveLoadFailures++;
+        lastResolveError = error;
+        continue;
+      }
+      throwIfAborted();
+
+      let availability: BackendAvailability;
+      try {
+        availability = await backend.probe();
+      } catch {
+        continue;
+      }
+      throwIfAborted();
+      if (availability === "unavailable") {
+        continue;
+      }
+
+      if (needsTools && backendSupportsTools(backend) === false) {
+        skippedForTools = true;
+        continue;
+      }
+
+      let inference: Inference;
+      try {
+        inference = await backend.create({
+          onDownloadProgress,
+          signal,
+        });
+      } catch (error) {
+        // create() failure (download/init): try later entries, same as probe.
+        // Still honor abort so cancel does not keep walking the chain.
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+        if (
+          error != null &&
+          typeof error === "object" &&
+          (error as { code?: unknown }).code === "aborted"
+        ) {
+          throw error;
+        }
+        lastCreateError = error;
+        continue;
+      }
+      throwIfAborted();
+
+      // Re-check after create(): a late injector (e.g. during a long
+      // download) must still win over the fallback for this request.
+      if (isInferenceAvailable()) {
+        return getInference();
+      }
+
+      if (needsTools && !supportsTools(inference)) {
+        // Cache so later tools requests skip recreate via cachedFallbackEntry.
+        skippedForTools = true;
+        cachedFallback = inference;
+        cachedFallbackEntry = entry;
+        continue;
+      }
+
+      cachedFallback = inference;
+      cachedFallbackEntry = entry;
+      return inference;
+    }
+
+    throwIfAborted();
+
+    if (
+      fallbacks.length > 0 &&
+      resolveLoadFailures === fallbacks.length &&
+      lastResolveError != null
+    ) {
+      throw lastResolveError;
+    }
+
+    // Prefer the real download/init error over tools-capability / unavailable.
+    // A tools skip earlier in the chain must not mask a later create() failure.
+    if (lastCreateError != null) {
+      throw lastCreateError;
+    }
+
+    if (needsTools && skippedForTools) {
+      throw makeInferenceError(
+        "invalid_request",
+        "No configured backend supports tool calling."
+      );
+    }
+
+    throw makeInferenceError(
+      "unavailable",
+      fallbacks.length === 0
+        ? "window.inference is not available."
+        : "No inference backend is available."
+    );
+  }
 
   return {
     probe() {
@@ -292,153 +438,51 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     },
 
     async resolve(resolveOptions) {
-      let release!: () => void;
-      const previous = resolveMutex;
-      resolveMutex = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      await previous;
+      const needsTools = resolveOptions?.needsTools === true;
+      const signal = resolveOptions?.signal ?? options?.signal;
+      const throwIfAborted = () => {
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+      };
 
-      try {
-        const needsTools = resolveOptions?.needsTools === true;
-        const signal = resolveOptions?.signal ?? options?.signal;
-        const throwIfAborted = () => {
-          if (signal?.aborted) {
-            throw makeInferenceError("aborted", "Request aborted");
-          }
-        };
+      // Fast paths: avoid joining an in-flight download when we already have
+      // a usable Inference (IPA or compatible cache).
+      throwIfAborted();
+      if (isInferenceAvailable()) {
+        return getInference();
+      }
+      if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
+        return cachedFallback;
+      }
 
+      // Join or start a single in-flight attempt. Loop only when a concurrent
+      // non-tools resolve succeeded with a backend that lacks toolCalling.
+      for (;;) {
         throwIfAborted();
-
-        if (isInferenceAvailable()) {
-          return getInference();
+        if (!resolveInFlight) {
+          const pending = resolveOnce(resolveOptions).finally(() => {
+            if (resolveInFlight === pending) {
+              resolveInFlight = undefined;
+            }
+          });
+          resolveInFlight = pending;
         }
 
-        if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
-          return cachedFallback;
-        }
-
-        let skippedForTools = false;
-        let resolveLoadFailures = 0;
-        let lastResolveError: unknown;
-        let lastCreateError: unknown;
-
-        for (const entry of fallbacks) {
+        try {
+          const shared = await resolveInFlight;
           throwIfAborted();
-
-          if (
-            needsTools &&
-            cachedFallback &&
-            entry === cachedFallbackEntry &&
-            !supportsTools(cachedFallback)
-          ) {
-            // Already resolved this exact entry; it lacks toolCalling.
-            skippedForTools = true;
-            continue;
-          }
-
-          let backend: InferenceBackend;
-          try {
-            backend = await resolveBackendEntry(entry);
-          } catch (error) {
-            // Missing peer / load failure: try later entries (probe treats these
-            // as "unavailable"). Rethrow only if every entry failed to load.
-            resolveLoadFailures++;
-            lastResolveError = error;
-            continue;
-          }
-          throwIfAborted();
-
-          let availability: BackendAvailability;
-          try {
-            availability = await backend.probe();
-          } catch {
-            continue;
-          }
-          throwIfAborted();
-          if (availability === "unavailable") {
-            continue;
-          }
-
-          if (needsTools && backendSupportsTools(backend) === false) {
-            skippedForTools = true;
-            continue;
-          }
-
-          let inference: Inference;
-          try {
-            inference = await backend.create({
-              onDownloadProgress,
-              signal,
-            });
-          } catch (error) {
-            // create() failure (download/init): try later entries, same as probe.
-            // Still honor abort so cancel does not keep walking the chain.
-            if (signal?.aborted) {
-              throw makeInferenceError("aborted", "Request aborted");
-            }
-            if (
-              error != null &&
-              typeof error === "object" &&
-              (error as { code?: unknown }).code === "aborted"
-            ) {
-              throw error;
-            }
-            lastCreateError = error;
-            continue;
-          }
-          throwIfAborted();
-
-          // Re-check after create(): a late injector (e.g. during a long
-          // download) must still win over the fallback for this request.
           if (isInferenceAvailable()) {
             return getInference();
           }
-
-          if (needsTools && !supportsTools(inference)) {
-            // Cache so later tools requests skip recreate via cachedFallbackEntry.
-            skippedForTools = true;
-            cachedFallback = inference;
-            cachedFallbackEntry = entry;
-            continue;
+          if (!needsTools || supportsTools(shared)) {
+            return shared;
           }
-
-          cachedFallback = inference;
-          cachedFallbackEntry = entry;
-          return inference;
+        } catch (error) {
+          throwIfAborted();
+          // Share create/unavailable failures with concurrent waiters.
+          throw error;
         }
-
-        throwIfAborted();
-
-        if (
-          fallbacks.length > 0 &&
-          resolveLoadFailures === fallbacks.length &&
-          lastResolveError != null
-        ) {
-          throw lastResolveError;
-        }
-
-        // Prefer the real download/init error over tools-capability / unavailable.
-        // A tools skip earlier in the chain must not mask a later create() failure.
-        if (lastCreateError != null) {
-          throw lastCreateError;
-        }
-
-        if (needsTools && skippedForTools) {
-          throw makeInferenceError(
-            "invalid_request",
-            "No configured backend supports tool calling."
-          );
-        }
-
-        throw makeInferenceError(
-          "unavailable",
-          fallbacks.length === 0
-            ? "window.inference is not available."
-            : "No inference backend is available."
-        );
-      } finally {
-        release();
       }
     },
   };
