@@ -467,6 +467,29 @@ describe("complete / runTools fallbacks option", () => {
     ).toBe("from:one-shot");
   });
 
+  it("runTools validates options before creating a fallback backend", async () => {
+    let created = false;
+    await expect(
+      runTools({
+        messages: [{ role: "user", content: "hi" }],
+        maxRounds: 0,
+        fallbacks: [
+          fakeBackend({
+            id: "should-not-create",
+            toolCalling: true,
+            onCreate: () => {
+              created = true;
+            },
+          }),
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "maxRounds must be a positive number.",
+    });
+    expect(created).toBe(false);
+  });
+
   it("runTools skips non-tool backends via fallbacks", async () => {
     const result = await runTools({
       messages: [{ role: "user", content: "hi" }],

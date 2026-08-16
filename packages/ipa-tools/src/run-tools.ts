@@ -116,6 +116,23 @@ export async function runTools(
     method = "chat",
   } = options;
 
+  if (!Array.isArray(options.messages)) {
+    throw makeInferenceError(
+      "invalid_request",
+      "runTools requires a messages array."
+    );
+  }
+  if (
+    typeof maxRounds !== "number" ||
+    !Number.isFinite(maxRounds) ||
+    maxRounds < 1
+  ) {
+    throw makeInferenceError(
+      "invalid_request",
+      "maxRounds must be a positive number."
+    );
+  }
+
   let request = options.request;
   if (!request) {
     if (options.fallbacks != null || options.onDownloadProgress != null) {
@@ -138,22 +155,6 @@ export async function runTools(
     throw makeInferenceError(
       "invalid_request",
       "runTools requires a request function."
-    );
-  }
-  if (!Array.isArray(options.messages)) {
-    throw makeInferenceError(
-      "invalid_request",
-      "runTools requires a messages array."
-    );
-  }
-  if (
-    typeof maxRounds !== "number" ||
-    !Number.isFinite(maxRounds) ||
-    maxRounds < 1
-  ) {
-    throw makeInferenceError(
-      "invalid_request",
-      "maxRounds must be a positive number."
     );
   }
 
