@@ -349,10 +349,27 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
             continue;
           }
 
-          const inference = await backend.create({
-            onDownloadProgress,
-            signal,
-          });
+          let inference: Inference;
+          try {
+            inference = await backend.create({
+              onDownloadProgress,
+              signal,
+            });
+          } catch (error) {
+            // create() failure (download/init): try later entries, same as probe.
+            // Still honor abort so cancel does not keep walking the chain.
+            if (signal?.aborted) {
+              throw makeInferenceError("aborted", "Request aborted");
+            }
+            if (
+              error != null &&
+              typeof error === "object" &&
+              (error as { code?: unknown }).code === "aborted"
+            ) {
+              throw error;
+            }
+            continue;
+          }
           throwIfAborted();
 
           // Re-check after create(): a late injector (e.g. during a long

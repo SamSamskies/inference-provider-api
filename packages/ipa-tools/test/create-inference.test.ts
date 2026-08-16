@@ -486,6 +486,30 @@ describe("createInference / resolver", () => {
     ).toBe("from:custom");
   });
 
+  it("continues past a create() failure to later fallbacks", async () => {
+    const failing: InferenceBackend = {
+      id: "failing",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        throw new Error("download failed");
+      },
+    };
+    const inference = createInference({
+      fallbacks: [failing, fakeBackend({ id: "custom" })],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:custom");
+  });
+
   it("streams via request() on a fallback backend", async () => {
     const inference = createInference({
       fallbacks: [fakeBackend({ id: "stream" })],
