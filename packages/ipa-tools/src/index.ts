@@ -49,7 +49,6 @@ export {
 export {
   MAX_FALLBACKS,
   type BackendAvailability,
-  type BuiltinFallbackId,
   type FallbackEntry,
   type FallbackInput,
   type InferenceBackend,

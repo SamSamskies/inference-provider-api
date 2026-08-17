@@ -39,7 +39,7 @@ export type CreateInferenceOptions = {
 export type InferenceClient = {
   /**
    * Async probe of IPA plus configured fallbacks.
-   * Does not start downloads. Missing peers report `"unavailable"`.
+   * Does not start downloads. Probe failures report `"unavailable"`.
    */
   probe(): Promise<ProbeStatus>;
   request(request: InferenceRequest): AsyncIterable<InferenceChunk>;

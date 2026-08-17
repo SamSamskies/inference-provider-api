@@ -79,6 +79,12 @@ describe("normalizeFallbacks", () => {
         message: expect.stringContaining('"ipa" is not a fallback'),
       })
     );
+    expect(() => normalizeFallbacks(["promptApi"] as never)).toThrow(
+      expect.objectContaining({
+        code: "invalid_request",
+        message: expect.stringContaining('Unknown fallback "promptApi"'),
+      })
+    );
     expect(() => normalizeFallbacks(["transformers"] as never)).toThrow(
       expect.objectContaining({
         code: "invalid_request",
@@ -90,8 +96,8 @@ describe("normalizeFallbacks", () => {
   it("rejects more than one entry", () => {
     expect(() =>
       normalizeFallbacks([
-        "promptApi",
-        fakeBackend({ id: "custom" }),
+        fakeBackend({ id: "a" }),
+        fakeBackend({ id: "b" }),
       ])
     ).toThrow(
       expect.objectContaining({
@@ -101,9 +107,8 @@ describe("normalizeFallbacks", () => {
     );
   });
 
-  it("accepts promptApi and backend objects", () => {
+  it("accepts backend objects", () => {
     const backend = fakeBackend({ id: "custom" });
-    expect(normalizeFallbacks(["promptApi"])).toEqual(["promptApi"]);
     expect(normalizeFallbacks([backend])).toEqual([backend]);
   });
 });
@@ -324,32 +329,18 @@ describe("createInference / resolver", () => {
     expect(creates).toBe(1);
   });
 
-  it("does not recreate a cached no-tools promptApi peer on a tools request", async () => {
+  it("does not recreate a cached no-tools backend on a tools request", async () => {
     let creates = 0;
-    vi.doMock("ipa-prompt-api-fallback", () => ({
-      backend: {
-        id: "promptApi-impl",
-        async probe() {
-          return "available" as const;
-        },
-        getFeatures: () => ({ toolCalling: false }),
-        async create() {
-          creates += 1;
-          return fakeInference({
-            id: "promptApi-impl",
-            toolCalling: false,
-          });
-        },
-      } satisfies InferenceBackend,
-    }));
+    const backend = fakeBackend({
+      id: "no-tools-impl",
+      toolCalling: false,
+      onCreate: () => {
+        creates += 1;
+      },
+    });
 
-    // Fresh module so createResolver picks up the mock via dynamic import.
-    const { createInference: createInferenceFresh } = await import(
-      "../src/create-inference.js"
-    );
-
-    const client = createInferenceFresh({
-      fallbacks: ["promptApi"],
+    const client = createInference({
+      fallbacks: [backend],
     });
 
     await client.complete({
@@ -368,11 +359,9 @@ describe("createInference / resolver", () => {
       code: "invalid_request",
       message: "No configured backend supports tool calling.",
     });
-    // Skip is keyed on the FallbackEntry ("promptApi"), not the loaded
-    // backend.id ("promptApi-impl"), so the peer is not re-created.
+    // Skip is keyed on the FallbackEntry identity, so the backend is not
+    // re-created.
     expect(creates).toBe(1);
-
-    vi.doUnmock("ipa-prompt-api-fallback");
   });
 
   it("prefers IPA again if it appears after a fallback was cached", async () => {
@@ -498,51 +487,6 @@ describe("createInference / resolver", () => {
         tools: [{ type: "function", function: { name: "ping" } }],
       })
     ).rejects.toThrow("download failed");
-  });
-
-  it("throws a clear missing-peer error for promptApi without the package", async () => {
-    const inference = createInference({ fallbacks: ["promptApi"] });
-
-    await expect(inference.probe()).resolves.toEqual({
-      ipa: "unavailable",
-      promptApi: "unavailable",
-    });
-
-    await expect(
-      inference.complete({
-        method: "chat",
-        messages: [{ role: "user", content: "hi" }],
-      })
-    ).rejects.toMatchObject({
-      code: "unavailable",
-      message: expect.stringContaining("ipa-prompt-api-fallback"),
-    });
-  });
-
-  it("surfaces real peer init failures instead of the missing-peer install prompt", async () => {
-    vi.doMock("ipa-prompt-api-fallback", () => ({
-      get backend() {
-        throw new Error(
-          "ipa-prompt-api-fallback failed to initialize: unexpected token"
-        );
-      },
-    }));
-
-    const { createInference: createInferenceFresh } = await import(
-      "../src/create-inference.js"
-    );
-    const inference = createInferenceFresh({ fallbacks: ["promptApi"] });
-
-    await expect(
-      inference.complete({
-        method: "chat",
-        messages: [{ role: "user", content: "hi" }],
-      })
-    ).rejects.toThrow(
-      "ipa-prompt-api-fallback failed to initialize: unexpected token"
-    );
-
-    vi.doUnmock("ipa-prompt-api-fallback");
   });
 
   it("surfaces the create() error when the fallback fails create", async () => {
