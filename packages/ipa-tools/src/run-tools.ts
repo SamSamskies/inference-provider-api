@@ -1,3 +1,8 @@
+import {
+  createResolver,
+  requestNeedsTools,
+  type FallbackInput,
+} from "./backends.js";
 import { makeInferenceError } from "./errors.js";
 import { getInference } from "./inference.js";
 import type {
@@ -30,6 +35,14 @@ export type RunToolsOptions = {
   method?: "chat";
   /** Defaults to `window.inference.request`. */
   request?: Inference["request"];
+  /**
+   * Tried only after IPA is unavailable (at most one entry; see `MAX_FALLBACKS`).
+   * Prefer `createInference` when sending more than once (caches the resolved
+   * backend).
+   */
+  fallbacks?: FallbackInput[];
+  /** Forwarded to fallback `create()` when resolving via `fallbacks`. */
+  onDownloadProgress?: (loaded: number) => void;
 };
 
 export type RunToolsResult = {
@@ -104,18 +117,6 @@ export async function runTools(
     method = "chat",
   } = options;
 
-  let request = options.request;
-  if (!request) {
-    const inference = getInference();
-    request = inference.request.bind(inference);
-  }
-
-  if (typeof request !== "function") {
-    throw makeInferenceError(
-      "invalid_request",
-      "runTools requires a request function."
-    );
-  }
   if (!Array.isArray(options.messages)) {
     throw makeInferenceError(
       "invalid_request",
@@ -130,6 +131,31 @@ export async function runTools(
     throw makeInferenceError(
       "invalid_request",
       "maxRounds must be a positive number."
+    );
+  }
+
+  let request = options.request;
+  if (!request) {
+    if (options.fallbacks != null || options.onDownloadProgress != null) {
+      const resolver = createResolver({
+        fallbacks: options.fallbacks,
+        onDownloadProgress: options.onDownloadProgress,
+      });
+      const inference = await resolver.resolve({
+        needsTools: requestNeedsTools(options),
+        signal,
+      });
+      request = inference.request.bind(inference);
+    } else {
+      const inference = getInference();
+      request = inference.request.bind(inference);
+    }
+  }
+
+  if (typeof request !== "function") {
+    throw makeInferenceError(
+      "invalid_request",
+      "runTools requires a request function."
     );
   }
 

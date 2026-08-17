@@ -59,6 +59,26 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
+## `createInference`
+
+IPA-first client with `complete` / `request` / `runTools` / `probe()`. Omit options for IPA only (same `unavailable` when no extension is installed). Does not mutate `window.inference`.
+
+```ts
+import { createInference } from "ipa-tools";
+
+const inference = createInference();
+
+sendButton.addEventListener("click", async () => {
+  const { message } = await inference.complete({
+    method: "chat",
+    messages: [{ role: "user", content: input.value }],
+  });
+  reply.textContent = message.content ?? "";
+});
+```
+
+Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
+
 ## `complete`
 
 Drain a stream to one `done` chunk:
@@ -177,6 +197,7 @@ try {
 | Types | SPEC.md types + `Window` augmentation |
 | `complete` | Drain `request` to one `done` chunk |
 | `runTools` | Page-executed tool loop |
+| `createInference` | IPA-first client (`complete` / `request` / `runTools` / `probe()`) |
 | `isInferenceError` | `error.code` check |
 | `waitForInference` | Background poll until injected (do not await on first paint) |
 | `getInference` / `getFeatures` / `isInferenceAvailable` | Resolve or check `window.inference` |

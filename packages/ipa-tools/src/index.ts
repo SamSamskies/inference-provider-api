@@ -41,3 +41,17 @@ export {
   type RunToolsResult,
   type ToolExecutor,
 } from "./run-tools.js";
+export {
+  createInference,
+  type CreateInferenceOptions,
+  type InferenceClient,
+} from "./create-inference.js";
+export {
+  MAX_FALLBACKS,
+  type BackendAvailability,
+  type BuiltinFallbackId,
+  type FallbackEntry,
+  type FallbackInput,
+  type InferenceBackend,
+  type ProbeStatus,
+} from "./backends.js";
