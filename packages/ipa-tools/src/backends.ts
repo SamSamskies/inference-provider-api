@@ -35,17 +35,18 @@ export type InferenceBackend = {
   getFeatures?(): InferenceFeatures;
 };
 
-/** Built-in fallback aliases resolved via optional peer packages. */
-export type BuiltinFallbackId = "promptApi";
-
 /**
- * A fallback entry: a built-in alias string, or a custom backend object
- * (escape hatch / tests). `"ipa"` is invalid — IPA is always tried first.
+ * A fallback entry: a custom backend object (tests / hosted API / third-party).
+ * `"ipa"` is invalid — IPA is always tried first.
+ *
+ * Built-in string aliases (e.g. `"promptApi"` → optional peer) are deferred
+ * until those packages ship — a dynamic `import()` of a missing peer makes
+ * Vite/Rollup warn or fail even when callers never request a fallback.
  */
-export type FallbackEntry = BuiltinFallbackId | InferenceBackend;
+export type FallbackEntry = InferenceBackend;
 
 /** Input accepted by `fallbacks` options (validated by `normalizeFallbacks`). */
-export type FallbackInput = string | InferenceBackend;
+export type FallbackInput = InferenceBackend;
 
 export type ResolveOptions = {
   fallbacks?: FallbackInput[];
@@ -59,16 +60,11 @@ export type ProbeStatus = {
   ipa: "available" | "unavailable";
 } & Record<string, BackendAvailability | "available" | "unavailable">;
 
-const BUILTIN_FALLBACKS = new Set<string>(["promptApi"]);
-
 /**
  * Maximum entries allowed in `fallbacks`. Kept as an array so this can rise
  * later without an API rename; start at one for a simpler mental model.
  */
 export const MAX_FALLBACKS = 1;
-
-const MISSING_PEER_MESSAGE =
-  'Install "ipa-prompt-api-fallback" to use fallbacks: ["promptApi"].';
 
 /** Thrown when every fallback was skipped for lacking toolCalling. */
 const NO_TOOLS_BACKEND_MESSAGE =
@@ -86,12 +82,11 @@ function isBackendObject(value: unknown): value is InferenceBackend {
 }
 
 /**
- * Validate `fallbacks` shape. Throws `invalid_request` for `"ipa"`, unknown
- * strings, malformed objects, or more than {@link MAX_FALLBACKS} entries.
- * Does not load peer packages.
+ * Validate `fallbacks` shape. Throws `invalid_request` for `"ipa"`, strings,
+ * malformed objects, or more than {@link MAX_FALLBACKS} entries.
  */
 export function normalizeFallbacks(
-  fallbacks: readonly FallbackInput[] | undefined
+  fallbacks: readonly unknown[] | undefined
 ): FallbackEntry[] {
   if (fallbacks == null) return [];
   if (!Array.isArray(fallbacks)) {
@@ -118,14 +113,10 @@ export function normalizeFallbacks(
           '"ipa" is not a fallback; IPA is always tried first.'
         );
       }
-      if (!BUILTIN_FALLBACKS.has(entry)) {
-        throw makeInferenceError(
-          "invalid_request",
-          `Unknown fallback "${entry}".`
-        );
-      }
-      normalized.push(entry as BuiltinFallbackId);
-      continue;
+      throw makeInferenceError(
+        "invalid_request",
+        `Unknown fallback "${entry}". Pass an InferenceBackend object.`
+      );
     }
     if (isBackendObject(entry)) {
       if (entry.id === "ipa") {
@@ -139,90 +130,10 @@ export function normalizeFallbacks(
     }
     throw makeInferenceError(
       "invalid_request",
-      "fallbacks entries must be a known string or an InferenceBackend object."
+      "fallbacks entries must be an InferenceBackend object."
     );
   }
   return normalized;
-}
-
-function isMissingModuleError(error: unknown): boolean {
-  if (error == null || typeof error !== "object") return false;
-  const code = (error as { code?: unknown }).code;
-  if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") {
-    return true;
-  }
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof (error as { message?: unknown }).message === "string"
-        ? (error as { message: string }).message
-        : "";
-  // Match resolver wording only — do not treat any message that merely names
-  // the peer package as missing (that masks real import/init failures).
-  return (
-    message.includes("Cannot find module") ||
-    message.includes("Failed to resolve") ||
-    message.includes("Cannot find package")
-  );
-}
-
-async function loadBuiltinBackend(
-  id: BuiltinFallbackId
-): Promise<InferenceBackend> {
-  if (id === "promptApi") {
-    try {
-      // Optional peer — resolved at runtime only when requested.
-      const specifier = "ipa-prompt-api-fallback";
-      const mod = (await import(specifier)) as {
-        backend?: InferenceBackend;
-        default?: InferenceBackend;
-      };
-      const backend = mod.backend ?? mod.default;
-      if (!isBackendObject(backend)) {
-        throw makeInferenceError(
-          "unavailable",
-          'Package "ipa-prompt-api-fallback" does not export a valid InferenceBackend.'
-        );
-      }
-      return backend;
-    } catch (error) {
-      if (
-        isInferenceErrorUnavailable(error) &&
-        error.message.includes("ipa-prompt-api-fallback")
-      ) {
-        throw error;
-      }
-      if (isMissingModuleError(error)) {
-        throw makeInferenceError("unavailable", MISSING_PEER_MESSAGE);
-      }
-      throw error;
-    }
-  }
-  throw makeInferenceError("invalid_request", `Unknown fallback "${id}".`);
-}
-
-function isInferenceErrorUnavailable(
-  error: unknown
-): error is Error & { code: string } {
-  return (
-    error != null &&
-    typeof error === "object" &&
-    (error as { code?: unknown }).code === "unavailable" &&
-    error instanceof Error
-  );
-}
-
-async function resolveBackendEntry(
-  entry: FallbackEntry
-): Promise<InferenceBackend> {
-  if (typeof entry === "string") {
-    return loadBuiltinBackend(entry);
-  }
-  return entry;
-}
-
-function fallbackProbeKey(entry: FallbackEntry): string {
-  return typeof entry === "string" ? entry : entry.id;
 }
 
 function supportsTools(inference: Inference): boolean {
@@ -237,7 +148,7 @@ function backendSupportsTools(backend: InferenceBackend): boolean | undefined {
 
 /**
  * Probe IPA plus each configured fallback. Does not create sessions or start
- * downloads. Missing optional peers report `"unavailable"` (no throw).
+ * downloads. Probe failures report `"unavailable"` (no throw).
  */
 export async function probeFallbacks(
   fallbacks?: readonly FallbackInput[]
@@ -248,20 +159,10 @@ export async function probeFallbacks(
   };
 
   for (const entry of entries) {
-    const key = fallbackProbeKey(entry);
-    if (typeof entry !== "string") {
-      try {
-        status[key] = await entry.probe();
-      } catch {
-        status[key] = "unavailable";
-      }
-      continue;
-    }
     try {
-      const backend = await resolveBackendEntry(entry);
-      status[key] = await backend.probe();
+      status[entry.id] = await entry.probe();
     } catch {
-      status[key] = "unavailable";
+      status[entry.id] = "unavailable";
     }
   }
 
@@ -316,8 +217,6 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     }
 
     let skippedForTools = false;
-    let resolveLoadFailures = 0;
-    let lastResolveError: unknown;
     let lastCreateError: unknown;
 
     for (const entry of fallbacks) {
@@ -334,16 +233,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         continue;
       }
 
-      let backend: InferenceBackend;
-      try {
-        backend = await resolveBackendEntry(entry);
-      } catch (error) {
-        // Missing peer / load failure: try later entries (probe treats these
-        // as "unavailable"). Rethrow only if every entry failed to load.
-        resolveLoadFailures++;
-        lastResolveError = error;
-        continue;
-      }
+      const backend = entry;
       throwIfAborted();
 
       let availability: BackendAvailability;
@@ -362,7 +252,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         continue;
       }
 
-      // Re-check before create(): an injector that appeared during probe/load
+      // Re-check before create(): an injector that appeared during probe
       // must win without starting a fallback download.
       if (isInferenceAvailable()) {
         return getInference();
@@ -412,14 +302,6 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     }
 
     throwIfAborted();
-
-    if (
-      fallbacks.length > 0 &&
-      resolveLoadFailures === fallbacks.length &&
-      lastResolveError != null
-    ) {
-      throw lastResolveError;
-    }
 
     // Prefer the real download/init error over tools-capability / unavailable.
     // A tools skip earlier in the chain must not mask a later create() failure.
