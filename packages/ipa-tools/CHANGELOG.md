@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-17
+
 ### Added
 
 - `createInference({ fallbacks, onDownloadProgress })` — IPA-first client with optional page-side fallbacks (at most one via `MAX_FALLBACKS`), lazy resolve, caching, `probe()`, and tools feature-gating ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20) phase 1).
