@@ -2,7 +2,7 @@
 
 ## CDN imports of published packages are intentional
 
-Demos under `examples/` should load published packages the way real consumers do (pinned CDN ESM imports such as `https://esm.sh/ipa-tools@0.3.0`, jsDelivr, or an import map to the same). That is the point of the demo: show the public package API, not a vendored copy of `packages/*/dist`.
+Demos under `examples/` should load published packages the way real consumers do (pinned CDN ESM imports such as `https://esm.sh/ipa-tools@0.3.1`, jsDelivr, or an import map to the same). That is the point of the demo: show the public package API, not a vendored copy of `packages/*/dist`.
 
 Do **not** flag:
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-17
+
 ### Fixed
 
 - Removed built-in `fallbacks: ["promptApi"]` string alias (and its dynamic `import("ipa-prompt-api-fallback")`) until that peer package exists. Vite/Rollup were analyzing the import for every consumer, even when no fallback was configured. Pass a custom `InferenceBackend` object instead.
