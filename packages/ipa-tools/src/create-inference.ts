@@ -23,14 +23,11 @@ import type {
 export type CreateInferenceOptions = {
   /**
    * Optional page-side backend tried only after IPA is unavailable.
-   * At most one entry today (`MAX_FALLBACKS`); the array shape is reserved
-   * so the limit can rise later without an API rename.
-   * Built-in: `"promptApi"` (optional peer `ipa-prompt-api-fallback`).
-   * Custom `InferenceBackend` objects are an escape hatch (tests / third-party).
+   * At most one entry today (`MAX_FALLBACKS`).
    * Omit or `[]` for IPA only.
    */
   fallbacks?: FallbackInput[];
-  /** Forwarded to fallback `create()` (e.g. Prompt API model download). */
+  /** Forwarded to fallback `create()` when the backend supports downloads. */
   onDownloadProgress?: (loaded: number) => void;
 };
 
@@ -60,8 +57,7 @@ export type InferenceClient = {
  *
  * @example
  * ```ts
- * const inference = createInference({ fallbacks: ["promptApi"] });
- * const status = await inference.probe();
+ * const inference = createInference();
  * const { message } = await inference.complete({
  *   method: "chat",
  *   messages: [{ role: "user", content: "Hello" }],

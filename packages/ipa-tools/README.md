@@ -59,25 +59,16 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
-## `createInference` (optional fallbacks)
+## `createInference`
 
-Resolve `window.inference` first, then optional page-side backends (Chrome Prompt API via a peer package later). This is **not** IPA: fallbacks do not implement the spec, must not be assigned to `window.inference`, and do not make `isInferenceAvailable()` return true.
+IPA-first client with `complete` / `request` / `runTools` / `probe()`. Omit options for IPA only (same `unavailable` when no extension is installed). Does not mutate `window.inference`.
 
 ```ts
 import { createInference } from "ipa-tools";
 
-const inference = createInference({
-  fallbacks: ["promptApi"], // requires optional peer ipa-prompt-api-fallback (phase 2)
-  onDownloadProgress(loaded) {
-    status.textContent = `Downloading on-device model… ${Math.round(loaded * 100)}%`;
-  },
-});
-
-const status = await inference.probe();
-// { ipa: "available" | "unavailable", promptApi?: "unavailable" | "downloadable" | … }
+const inference = createInference();
 
 sendButton.addEventListener("click", async () => {
-  // Resolve lazily inside the gesture (IPA permission / Prompt API create).
   const { message } = await inference.complete({
     method: "chat",
     messages: [{ role: "user", content: input.value }],
@@ -86,44 +77,7 @@ sendButton.addEventListener("click", async () => {
 });
 ```
 
-- Omit `fallbacks` (or pass `[]`) for IPA only — same `unavailable` when no extension is installed.
-- IPA is always first. Do not put `"ipa"` in `fallbacks`.
-- At most **one** fallback entry today (`MAX_FALLBACKS`). The option stays an array so the limit can rise later without renaming the API.
-- `probe()` does not start downloads. Missing optional peers report `"unavailable"`; `complete` / `request` / `runTools` throw a clear install error if you asked for `"promptApi"` without the peer.
-- `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay “real injector present” only. A tools call on a no-tools fallback throws `invalid_request` (catch with `isInferenceError`).
-
-One-shot (no cached client):
-
-```ts
-await complete(
-  { method: "chat", messages },
-  { fallbacks: ["promptApi"] }
-);
-```
-
-Custom backend objects in `fallbacks` are an escape hatch for tests or third-party adapters that implement `InferenceBackend`.
-
-Optional app-level consent before a non-IPA backend (page UI, not an IPA grant):
-
-```ts
-const inference = createInference({ fallbacks: ["promptApi"] });
-const status = await inference.probe();
-
-sendButton.addEventListener("click", async () => {
-  if (status.ipa === "unavailable" && status.promptApi !== "unavailable") {
-    const ok = await confirm(
-      status.promptApi === "downloadable" || status.promptApi === "downloading"
-        ? "No inference extension found. Chrome can use an on-device model (a few GB download). Continue?"
-        : "No inference extension found. Use Chrome’s on-device model on this device?"
-    );
-    if (!ok) return;
-  }
-  await inference.complete({
-    method: "chat",
-    messages: [{ role: "user", content: input.value }],
-  });
-});
-```
+Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
 
 ## `complete`
 
@@ -243,7 +197,7 @@ try {
 | Types | SPEC.md types + `Window` augmentation |
 | `complete` | Drain `request` to one `done` chunk |
 | `runTools` | Page-executed tool loop |
-| `createInference` | IPA-first client with optional `fallbacks` / `probe()` |
+| `createInference` | IPA-first client (`complete` / `request` / `runTools` / `probe()`) |
 | `isInferenceError` | `error.code` check |
 | `waitForInference` | Background poll until injected (do not await on first paint) |
 | `getInference` / `getFeatures` / `isInferenceAvailable` | Resolve or check `window.inference` |
