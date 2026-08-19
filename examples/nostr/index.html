@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Nostr Feed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --signal: #0a6d7c;
+        --ember: #e14a28;
+        --ember-deep: #c43b1d;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
+        --radius: 14px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+      }
+
+      .shell {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 3rem;
+      }
+
+      header.app-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.85rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1 span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        margin-left: 0.4rem;
+      }
+
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .source {
+        display: inline-flex;
+        color: var(--muted);
+        line-height: 0;
+        border-radius: 2px;
+      }
+
+      .source svg {
+        width: 1.15rem;
+        height: 1.15rem;
+      }
+
+      .source:hover {
+        color: var(--accent);
+      }
+
+      .source:focus-visible,
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      #status.ready {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: transparent;
+      }
+
+      #status.missing {
+        color: var(--warn);
+        background: var(--warn-soft);
+        border-color: transparent;
+      }
+
+      .lede {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .lede a {
+        color: var(--accent);
+      }
+
+      .callout {
+        margin: 0 0 1.1rem;
+        padding: 0.75rem 0.9rem;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: var(--warn);
+        background: var(--warn-soft);
+        border-radius: 10px;
+      }
+
+      .search {
+        margin-bottom: 0.35rem;
+      }
+
+      .search-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+      }
+
+      .search-field {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+      }
+
+      #query {
+        width: 100%;
+        font: inherit;
+        font-size: 0.95rem;
+        padding: 0.7rem 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .search-field:has(.field-icon:not([hidden])) #query {
+        padding-right: 2.55rem;
+      }
+
+      #query:read-only {
+        color: var(--muted);
+      }
+
+      .field-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.35rem;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.95rem;
+        height: 1.95rem;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .field-icon[hidden] {
+        display: none;
+      }
+
+      .field-icon svg {
+        display: block;
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+
+      .field-icon:hover {
+        color: var(--ink);
+        background: var(--surface);
+      }
+
+      #abort:hover {
+        color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      .primary,
+      .secondary {
+        font: inherit;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 0.7rem 0.95rem;
+        cursor: pointer;
+        min-height: 2.6rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .primary {
+        border: none;
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .primary:hover:not(:disabled) {
+        background: #111612;
+      }
+
+      .secondary {
+        background: transparent;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .secondary:hover:not(:disabled) {
+        background: var(--surface);
+      }
+
+      .primary:disabled,
+      .secondary:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .samples {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 0.65rem 0 0;
+      }
+
+      .sample {
+        font: inherit;
+        font-size: 0.78rem;
+        line-height: 1.3;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .sample:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--ink);
+      }
+
+      .sample:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .feed-meta {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 1rem 0 0.65rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .feed-meta strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .run-meta {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-align: right;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .model-panel {
+        margin: 0 0 1rem;
+        padding: 0.75rem 0.9rem 0.85rem;
+        background: var(--accent-soft);
+        border: 1px solid #9dccbb;
+        border-radius: 10px;
+      }
+
+      .model-panel[hidden] {
+        display: none;
+      }
+
+      .model-kicker {
+        margin: 0 0 0.45rem;
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .model-panel-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .model-phase {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      .model-spin {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        border: 2px solid #b7d9cc;
+        border-top-color: var(--accent);
+        animation: model-spin 0.7s linear infinite;
+        flex: none;
+      }
+
+      .model-elapsed {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      .model-sub {
+        margin: 0.35rem 0 0;
+        color: #3d5a50;
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+
+      .model-log {
+        margin: 0.65rem 0 0;
+        padding: 0.5rem 0.6rem;
+        list-style: none;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: #3d5a50;
+        display: flex;
+        flex-direction: column;
+        gap: 0.28rem;
+        background: rgba(255, 255, 255, 0.45);
+        border-radius: 6px;
+      }
+
+      .model-log li[data-current="true"] {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      @keyframes model-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .model-spin {
+          animation: none;
+          border-top-color: var(--accent);
+        }
+      }
+
+      #error {
+        display: none;
+        margin: 0.65rem 0;
+        padding: 0.7rem 0.85rem;
+        background: var(--danger-soft);
+        color: var(--danger);
+        border-radius: 10px;
+        font-size: 0.88rem;
+        line-height: 1.4;
+      }
+
+      #error[data-show="true"] {
+        display: block;
+      }
+
+      .results {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+
+      .note.skeleton {
+        pointer-events: none;
+      }
+
+      .skel {
+        display: block;
+        background: var(--line);
+        border-radius: 6px;
+        animation: skel-pulse 1.1s ease-in-out infinite;
+      }
+
+      .skel.avatar {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        flex: none;
+        border: none;
+      }
+
+      .skel.line {
+        height: 0.65rem;
+        width: 100%;
+        margin: 0.4rem 0 0;
+      }
+
+      .note-author-copy .skel.line:first-child {
+        margin-top: 0.15rem;
+      }
+
+      .skel.w1 {
+        width: 38%;
+      }
+
+      .skel.w2 {
+        width: 56%;
+      }
+
+      .skel.w3 {
+        width: 74%;
+      }
+
+      @keyframes skel-pulse {
+        50% {
+          opacity: 0.42;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .skel {
+          animation: none;
+        }
+      }
+
+      .note {
+        position: relative;
+        padding: 1.05rem 4.7rem 1.05rem 1.15rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--signal);
+        border-radius: var(--radius);
+      }
+
+      .note-author {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        min-width: 0;
+        margin: 0 0 0.7rem;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .avatar,
+      .avatar-empty {
+        flex: none;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--surface);
+      }
+
+      .avatar-empty {
+        border: 1px solid var(--line);
+      }
+
+      .note-author-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+      }
+
+      .note-author-line {
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        min-width: 0;
+      }
+
+      .note-author-name {
+        font-weight: 600;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .note-via {
+        flex: none;
+        font-weight: 400;
+        font-size: 0.78rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .note-author:hover .note-author-name {
+        text-decoration: underline;
+      }
+
+      .note time {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .note-body {
+        overflow-wrap: anywhere;
+        line-height: 1.5;
+      }
+
+      .note-body a,
+      .note-nevent {
+        color: var(--signal);
+      }
+
+      .note-nevent {
+        display: inline-block;
+        margin-top: 0.75rem;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        text-decoration: none;
+      }
+
+      .note-nevent:hover {
+        text-decoration: underline;
+      }
+
+      .note-actions {
+        position: absolute;
+        top: 0.4rem;
+        right: 0.35rem;
+        display: flex;
+        align-items: center;
+      }
+
+      .note-menu {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.15rem;
+        height: 2.15rem;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .note-menu:hover {
+        color: var(--ink);
+        background: rgba(26, 31, 28, 0.06);
+      }
+
+      .note-menu-icon {
+        display: block;
+        width: 1.15rem;
+        height: 1.15rem;
+      }
+
+      .empty {
+        margin: 1.5rem 0;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .open-in-dialog {
+        width: min(22rem, calc(100vw - 2rem));
+        max-height: min(36rem, calc(100vh - 2rem));
+        overflow: auto;
+        margin: auto;
+        padding: 1.25rem 1.15rem 1.1rem;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 20px 48px rgba(26, 31, 28, 0.12);
+      }
+
+      .open-in-dialog::backdrop {
+        background: rgba(26, 31, 28, 0.48);
+      }
+
+      .open-in-title {
+        margin: 0 0 1rem;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.35rem;
+        letter-spacing: -0.03em;
+      }
+
+      .open-in-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+
+      a.open-in-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        text-decoration: none;
+        box-sizing: border-box;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 0.75rem 1.05rem;
+        min-height: 2.7rem;
+      }
+
+      a.open-in-link.primary {
+        border: none;
+        background: var(--ember);
+        color: #fff;
+      }
+
+      a.open-in-link.primary:hover {
+        background: var(--ember-deep);
+      }
+
+      a.open-in-link.secondary {
+        background: transparent;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      a.open-in-link.secondary:hover {
+        background: var(--surface);
+      }
+
+      .open-in-cancel {
+        display: block;
+        width: 100%;
+        margin: 0.85rem 0 0;
+        padding: 0.45rem;
+        border: none;
+        background: none;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .open-in-cancel:hover {
+        color: var(--ink);
+      }
+
+      .event-dialog {
+        width: min(36rem, calc(100vw - 2rem));
+      }
+
+      .event-dialog-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 0 0 0.85rem;
+      }
+
+      .event-dialog-head .open-in-title {
+        margin: 0;
+        text-align: left;
+        font-size: 1.15rem;
+      }
+
+      .event-copy {
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: none;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+        cursor: pointer;
+      }
+
+      .event-copy:hover {
+        color: var(--ink);
+      }
+
+      .event-json {
+        margin: 0;
+        padding: 0.75rem 0.8rem;
+        max-height: min(24rem, calc(100vh - 12rem));
+        overflow: auto;
+        background: var(--surface);
+        border-radius: 10px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        line-height: 1.45;
+        color: var(--ink);
+        white-space: pre;
+      }
+
+      @media (max-width: 560px) {
+        .search-row {
+          flex-direction: column;
+        }
+
+        .primary {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="app-header">
+        <h1>Nostr feed <span>kind 1</span></h1>
+        <div class="header-meta">
+          <span id="status" class="missing">unavailable</span>
+          <a
+            class="source"
+            href="https://github.com/SamSamskies/inference-provider-api"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Source on GitHub"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"
+              />
+            </svg>
+          </a>
+        </div>
+      </header>
+
+      <p class="lede">
+        Filter with a model through IPA — then open a note in your usual client.
+      </p>
+
+      <p class="callout">
+        Tool calling is still experimental on Inference Bridge
+        (<code>window.inference.experimental.request</code>). Other IPA injectors will not
+        work for Filter until tools graduate onto stable <code>request</code>.
+      </p>
+
+      <form class="search" id="search-form">
+        <div class="search-row">
+          <div class="search-field">
+            <input
+              id="query"
+              type="text"
+              name="query"
+              autocomplete="off"
+              required
+              aria-label="Filter query"
+            />
+            <button
+              type="button"
+              class="field-icon"
+              id="abort"
+              hidden
+              aria-label="Stop"
+              title="Stop"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="field-icon"
+              id="clear"
+              hidden
+              aria-label="Clear filter"
+              title="Clear filter"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  d="M6 6l12 12M18 6L6 18"
+                />
+              </svg>
+            </button>
+          </div>
+          <button type="submit" class="primary" id="filter">Filter</button>
+        </div>
+        <div class="samples" id="samples"></div>
+      </form>
+
+      <div class="feed-meta">
+        <span id="feed-status">Loading snapshot…</span>
+        <span class="run-meta" id="run-meta"></span>
+      </div>
+      <div class="model-panel" id="model-panel" hidden>
+        <p class="model-kicker">Model run</p>
+        <div class="model-panel-head">
+          <p class="model-phase">
+            <span class="model-spin" aria-hidden="true"></span>
+            <span id="model-phase">Waiting for permission…</span>
+          </p>
+          <span class="model-elapsed" id="model-elapsed"></span>
+        </div>
+        <p class="model-sub" id="model-sub">
+          Approve the request in Inference Bridge if a prompt appears.
+        </p>
+        <ol class="model-log" id="model-log"></ol>
+      </div>
+      <div id="error" role="alert" data-show="false"></div>
+      <ol class="results" id="results" aria-busy="true" aria-live="polite">
+        <li class="note skeleton" aria-hidden="true">
+          <div class="note-author">
+            <span class="skel avatar"></span>
+            <span class="note-author-copy">
+              <span class="skel line w2"></span>
+              <span class="skel line w1"></span>
+            </span>
+          </div>
+          <div class="note-body">
+            <span class="skel line"></span>
+            <span class="skel line w3"></span>
+          </div>
+        </li>
+        <li class="note skeleton" aria-hidden="true">
+          <div class="note-author">
+            <span class="skel avatar"></span>
+            <span class="note-author-copy">
+              <span class="skel line w2"></span>
+              <span class="skel line w1"></span>
+            </span>
+          </div>
+          <div class="note-body">
+            <span class="skel line"></span>
+            <span class="skel line w3"></span>
+            <span class="skel line w1"></span>
+          </div>
+        </li>
+        <li class="note skeleton" aria-hidden="true">
+          <div class="note-author">
+            <span class="skel avatar"></span>
+            <span class="note-author-copy">
+              <span class="skel line w2"></span>
+              <span class="skel line w1"></span>
+            </span>
+          </div>
+          <div class="note-body">
+            <span class="skel line w3"></span>
+            <span class="skel line"></span>
+          </div>
+        </li>
+      </ol>
+      <p class="empty" id="empty" hidden>No notes to show.</p>
+    </div>
+
+    <dialog class="open-in-dialog" id="open-in" aria-labelledby="open-in-title">
+      <h2 id="open-in-title" class="open-in-title">Open in</h2>
+      <div class="open-in-list" id="open-in-list"></div>
+      <button type="button" class="open-in-cancel" id="open-in-cancel">Cancel</button>
+    </dialog>
+
+    <dialog
+      class="open-in-dialog event-dialog"
+      id="event-json"
+      aria-labelledby="event-json-title"
+    >
+      <div class="event-dialog-head">
+        <h2 id="event-json-title" class="open-in-title">Kind 1 event</h2>
+        <button type="button" class="event-copy" id="event-json-copy">Copy</button>
+      </div>
+      <pre class="event-json" id="event-json-pre"></pre>
+      <button type="button" class="open-in-cancel" id="event-json-close">
+        Close
+      </button>
+    </dialog>
+
+    <script type="module">
+      import {
+        isInferenceAvailable,
+        isInferenceError,
+        runTools,
+        waitForInference,
+      } from "https://esm.sh/ipa-tools@0.4.0";
+      import { nip19 } from "https://esm.sh/nostr-tools@2.24.2";
+
+      const TRENDING_RELAY = "wss://trending.relays.land";
+      const CONTENT_MAX = 480;
+      const MAX_RELAY_HINTS = 3;
+      const IB_ONLY =
+        "This demo's tool calling currently works only with Inference Bridge.";
+
+      const SAMPLE_QUERIES = [
+        "asking a question",
+        "good morning notes",
+        "wisp",
+      ];
+
+      const NOSTR_CLIENTS = [
+        {
+          id: "native",
+          name: "Your default app",
+          platform: "native",
+          url: "nostr:{code}",
+        },
+        { id: "damus", name: "Damus", platform: "ios", url: "damus:{code}" },
+        { id: "nos", name: "Nos", platform: "ios", url: "nos:{code}" },
+        {
+          id: "nostur",
+          name: "Nostur",
+          platform: "ios",
+          url: "nostur:{code}",
+        },
+        {
+          id: "primal-ios",
+          name: "Primal",
+          platform: "ios",
+          url: "primal:{code}",
+        },
+        {
+          id: "amethyst",
+          name: "Amethyst",
+          platform: "android",
+          url: "intent:{code}#Intent;scheme=nostr;package=com.vitorpamplona.amethyst;end;",
+        },
+        {
+          id: "primal-android",
+          name: "Primal",
+          platform: "android",
+          url: "intent:{code}#Intent;scheme=nostr;package=net.primal.android;end;",
+        },
+        {
+          id: "voyage",
+          name: "Voyage",
+          platform: "android",
+          url: "intent:{code}#Intent;scheme=nostr;package=com.dluvian.voyage;end;",
+        },
+        {
+          id: "jumble",
+          name: "Jumble",
+          platform: "web",
+          url: "https://jumble.social/{code}",
+        },
+        {
+          id: "primal-web",
+          name: "Primal",
+          platform: "web",
+          url: "https://primal.net/e/{code}",
+          profileUrl: "https://primal.net/p/{code}",
+        },
+        {
+          id: "coracle",
+          name: "Coracle",
+          platform: "web",
+          url: "https://coracle.social/{code}",
+        },
+        {
+          id: "fevela",
+          name: "Fevela",
+          platform: "web",
+          url: "https://fevela.me/{code}",
+        },
+        {
+          id: "yakihonne",
+          name: "YakiHonne",
+          platform: "web",
+          url: "https://yakihonne.com/{code}",
+        },
+        {
+          id: "njump",
+          name: "njump",
+          platform: "web",
+          url: "https://njump.me/{code}",
+        },
+      ];
+
+      function tokenRegex() {
+        return /((?:nostr:)?n(?:pub|profile|event|ote)1[02-9ac-hj-np-z]+|https?:\/\/[^\s<]+)/gi;
+      }
+
+      const statusEl = document.getElementById("status");
+      const queryEl = document.getElementById("query");
+      const filterBtn = document.getElementById("filter");
+      const clearBtn = document.getElementById("clear");
+      const abortBtn = document.getElementById("abort");
+      const samplesEl = document.getElementById("samples");
+      const feedStatusEl = document.getElementById("feed-status");
+      const runMetaEl = document.getElementById("run-meta");
+      const modelPanelEl = document.getElementById("model-panel");
+      const modelPhaseEl = document.getElementById("model-phase");
+      const modelSubEl = document.getElementById("model-sub");
+      const modelElapsedEl = document.getElementById("model-elapsed");
+      const modelLogEl = document.getElementById("model-log");
+      const errorEl = document.getElementById("error");
+      const resultsEl = document.getElementById("results");
+      const emptyEl = document.getElementById("empty");
+      const formEl = document.getElementById("search-form");
+      const dialogEl = document.getElementById("open-in");
+      const dialogListEl = document.getElementById("open-in-list");
+      const eventDialogEl = document.getElementById("event-json");
+      const eventJsonEl = document.getElementById("event-json-pre");
+      const eventCopyBtn = document.getElementById("event-json-copy");
+
+      /** @type {Array<Record<string, unknown>>} */
+      let notes = [];
+      /** @type {Record<string, { displayName?: string, picture?: string }>} */
+      let profiles = {};
+      /** @type {string[] | null} */
+      let visibleIds = null;
+      /** @type {AbortController | null} */
+      let activeController = null;
+      /** @type {ReturnType<typeof setInterval> | null} */
+      let elapsedTimer = null;
+      let filterStartedAt = 0;
+      let lastLogLine = "";
+      /** @type {{ model: string, inputTokens: number, outputTokens: number, sawInput: boolean, sawOutput: boolean }} */
+      let runStats = {
+        model: "",
+        inputTokens: 0,
+        outputTokens: 0,
+        sawInput: false,
+        sawOutput: false,
+      };
+      let appliedFilter = false;
+      let copyResetTimer = 0;
+
+      /**
+       * Tool calling is not on stable IPA `request` yet (Inference Bridge
+       * advertises getFeatures().toolCalling === false). Until it graduates,
+       * pass `window.inference.experimental.request` into `runTools`.
+       *
+       * Bind so `this` stays the experimental namespace. If another injector
+       * ships a different experimental shape, the TypeError / non-iterable
+       * path shows IB_ONLY.
+       */
+      function getExperimentalRequest() {
+        const experimental = window.inference?.experimental;
+        if (typeof experimental?.request !== "function") {
+          const err = new Error(
+            "window.inference.experimental.request is missing. " + IB_ONLY
+          );
+          err.code = "unavailable";
+          err.ipaExperimental = true;
+          throw err;
+        }
+        return experimental.request.bind(experimental);
+      }
+
+      function isExperimentalSurfaceError(err) {
+        if (err && err.ipaExperimental) return true;
+        if (err instanceof TypeError) return true;
+        const message = err && typeof err.message === "string" ? err.message : "";
+        return /is not async iterable|experimental\.request|is not a function/i.test(
+          message
+        );
+      }
+
+      function detectClientPlatform(userAgent = navigator.userAgent) {
+        if (/android/i.test(userAgent)) return "android";
+        if (/iPad|iPhone|iPod/i.test(userAgent)) return "ios";
+        return "web";
+      }
+
+      function clientsForPlatform(platform) {
+        const eligible = NOSTR_CLIENTS.filter(
+          (client) =>
+            client.platform === "native" ||
+            client.platform === "web" ||
+            client.platform === platform
+        );
+        const seen = new Set();
+        const clients = [];
+        for (const client of eligible) {
+          if (seen.has(client.name)) continue;
+          seen.add(client.name);
+          clients.push(client);
+        }
+        return clients;
+      }
+
+      function clientHref(client, code, kind) {
+        const template =
+          kind === "profile" ? (client.profileUrl ?? client.url) : client.url;
+        return template.replaceAll("{code}", code);
+      }
+
+      function isWebClientHref(href) {
+        return href.startsWith("https://") || href.startsWith("http://");
+      }
+
+      function isUnmodifiedLeftClick(event) {
+        return (
+          event.button === 0 &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.shiftKey &&
+          !event.altKey
+        );
+      }
+
+      function isSafeHttpUrl(value) {
+        try {
+          const url = new URL(value);
+          return url.protocol === "https:" || url.protocol === "http:";
+        } catch {
+          return false;
+        }
+      }
+
+      function encodeNevent(note) {
+        return nip19.neventEncode({
+          id: note.id,
+          author: note.pubkey,
+          kind: note.kind,
+          relays: [TRENDING_RELAY].slice(0, MAX_RELAY_HINTS),
+        });
+      }
+
+      function encodeNpub(pubkey) {
+        try {
+          return nip19.npubEncode(pubkey);
+        } catch {
+          return "";
+        }
+      }
+
+      function profileLabel(pubkey, displayName) {
+        if (displayName) return displayName;
+        if (!pubkey) return "unknown";
+        try {
+          return `${nip19.npubEncode(pubkey).slice(0, 16)}…`;
+        } catch {
+          return `${pubkey.slice(0, 12)}…`;
+        }
+      }
+
+      function clientName(tags) {
+        if (!Array.isArray(tags)) return "";
+        const tag = tags.find(
+          (entry) =>
+            Array.isArray(entry) &&
+            entry[0] === "client" &&
+            typeof entry[1] === "string" &&
+            entry[1].trim()
+        );
+        return tag ? tag[1].trim() : "";
+      }
+
+      function formatCreatedAt(unixTimestamp) {
+        const date = new Date(unixTimestamp * 1000);
+        const formattedDate = date.toLocaleDateString([], {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+        const formattedTime = date.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        return `${formattedDate} @ ${formattedTime}`;
+      }
+
+      function truncate(text, max) {
+        if (typeof text !== "string") return "";
+        if (text.length <= max) return text;
+        return `${text.slice(0, max)}…`;
+      }
+
+      const HEX64 = /^[0-9a-f]{64}$/i;
+
+      function compactTags(tags) {
+        if (!Array.isArray(tags)) return [];
+        const out = [];
+        for (const tag of tags.slice(0, 24)) {
+          if (!Array.isArray(tag) || tag.length < 2) continue;
+          const kind = String(tag[0]);
+          if (kind === "p") {
+            const name = profiles[tag[1]]?.displayName;
+            if (name) out.push(["p", name]);
+            continue;
+          }
+          if (
+            kind === "e" ||
+            kind === "q" ||
+            kind === "r" ||
+            kind === "imeta" ||
+            kind === "nonce"
+          ) {
+            continue;
+          }
+          const values = tag
+            .slice(1, 4)
+            .map((value) => String(value).slice(0, 80))
+            .filter((value) => value && !HEX64.test(value));
+          if (!values.length) continue;
+          out.push([kind, ...values]);
+        }
+        return out;
+      }
+
+      function notesForModel() {
+        return notes.map((note, index) => ({
+          n: index + 1,
+          name: profiles[note.pubkey]?.displayName,
+          content: truncate(note.content, CONTENT_MAX),
+          tags: compactTags(note.tags),
+          created_at: note.created_at,
+        }));
+      }
+
+      function visibleNotes() {
+        if (!visibleIds) return notes;
+        const allowed = new Set(visibleIds);
+        return notes.filter((note) => allowed.has(note.id));
+      }
+
+      function clearError() {
+        errorEl.dataset.show = "false";
+        errorEl.textContent = "";
+      }
+
+      function showError(err) {
+        if (isExperimentalSurfaceError(err)) {
+          errorEl.textContent = IB_ONLY;
+          errorEl.dataset.show = "true";
+          return;
+        }
+        const code =
+          isInferenceError(err) && err.code
+            ? err.code
+            : err && err.code
+              ? err.code
+              : "unknown";
+        const message =
+          err && err.message ? err.message : String(err ?? "Unknown error");
+        errorEl.textContent = `${code}: ${message}`;
+        errorEl.dataset.show = "true";
+      }
+
+      function hasExperimentalRequest() {
+        return typeof window.inference?.experimental?.request === "function";
+      }
+
+      function refreshAvailability() {
+        if (isInferenceAvailable() && hasExperimentalRequest()) {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+          return true;
+        }
+        if (isInferenceAvailable()) {
+          statusEl.textContent = "no tools";
+          statusEl.className = "missing";
+          return false;
+        }
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        return false;
+      }
+
+      function setBusy(busy) {
+        filterBtn.disabled = busy;
+        queryEl.readOnly = busy;
+        abortBtn.hidden = !busy;
+        clearBtn.hidden = busy || !appliedFilter;
+        modelPanelEl.hidden = !busy;
+        for (const btn of samplesEl.querySelectorAll("button")) {
+          btn.disabled = busy;
+        }
+        if (busy) {
+          startElapsedTimer();
+        } else {
+          stopElapsedTimer();
+        }
+      }
+
+      function stopElapsedTimer() {
+        if (elapsedTimer != null) {
+          clearInterval(elapsedTimer);
+          elapsedTimer = null;
+        }
+      }
+
+      function startElapsedTimer() {
+        if (elapsedTimer != null) return;
+        filterStartedAt = Date.now();
+        const tick = () => {
+          const seconds = Math.floor((Date.now() - filterStartedAt) / 1000);
+          modelElapsedEl.textContent =
+            seconds < 2 ? "" : `${seconds}s elapsed`;
+        };
+        tick();
+        elapsedTimer = setInterval(tick, 1000);
+      }
+
+      function appendModelLog(line) {
+        if (!line || line === lastLogLine) return;
+        lastLogLine = line;
+        for (const item of modelLogEl.querySelectorAll("li")) {
+          item.dataset.current = "false";
+        }
+        const li = document.createElement("li");
+        li.dataset.current = "true";
+        li.textContent = line;
+        modelLogEl.appendChild(li);
+      }
+
+      /**
+       * @param {"permission" | "accepted" | "thinking" | "writing" | "tool" | "applying"} phase
+       */
+      function setFilterPhase(phase) {
+        const copy = {
+          permission: {
+            title: "Waiting for permission…",
+            sub: "Approve the request in Inference Bridge if a prompt appears.",
+            log: "Waiting for permission",
+          },
+          accepted: {
+            title: "Model is working…",
+            sub: "Permission granted. The model is reading the query and notes.",
+            log: "Permission granted — calling the model",
+          },
+          thinking: {
+            title: "Thinking…",
+            sub: "The model is reasoning about which notes match.",
+            log: "Thinking",
+          },
+          writing: {
+            title: "Generating…",
+            sub: "The model is choosing which notes to keep.",
+            log: "Choosing notes",
+          },
+          tool: {
+            title: "Calling show_notes…",
+            sub: "The model chose matching notes. Applying them to the feed.",
+            log: "Calling show_notes",
+          },
+          applying: {
+            title: "Updating the feed…",
+            sub: "Showing the notes the model kept.",
+            log: "Applied filter",
+          },
+        };
+        const next = copy[phase];
+        if (!next) return;
+        modelPhaseEl.textContent = next.title;
+        modelSubEl.textContent = next.sub;
+        appendModelLog(next.log);
+      }
+
+      function resetRunStats() {
+        runStats = {
+          model: "",
+          inputTokens: 0,
+          outputTokens: 0,
+          sawInput: false,
+          sawOutput: false,
+        };
+        runMetaEl.textContent = "";
+      }
+
+      function recordRunChunk(chunk) {
+        if (typeof chunk.model === "string" && chunk.model) {
+          runStats.model = chunk.model;
+        }
+        const usage = chunk.usage;
+        if (!usage || typeof usage !== "object") return;
+        if (typeof usage.inputTokens === "number") {
+          runStats.inputTokens += usage.inputTokens;
+          runStats.sawInput = true;
+        }
+        if (typeof usage.outputTokens === "number") {
+          runStats.outputTokens += usage.outputTokens;
+          runStats.sawOutput = true;
+        }
+      }
+
+      function renderRunMeta() {
+        const parts = [];
+        if (runStats.model) parts.push(runStats.model);
+        if (runStats.sawInput) parts.push(`in ${runStats.inputTokens}`);
+        if (runStats.sawOutput) parts.push(`out ${runStats.outputTokens}`);
+        runMetaEl.textContent = parts.join(" · ");
+      }
+
+      function updateFeedStatus() {
+        if (notes.length === 0) {
+          feedStatusEl.textContent = "No notes loaded.";
+          return;
+        }
+        const shown = visibleNotes().length;
+        if (appliedFilter) {
+          feedStatusEl.replaceChildren(
+            document.createTextNode("Showing "),
+            Object.assign(document.createElement("strong"), { textContent: String(shown) }),
+            document.createTextNode(` of ${notes.length} notes`)
+          );
+        } else {
+          feedStatusEl.textContent = `${notes.length} notes`;
+        }
+      }
+
+      function kind1Event(note) {
+        const event = {
+          id: note.id,
+          pubkey: note.pubkey,
+          created_at: note.created_at,
+          kind: note.kind ?? 1,
+          tags: Array.isArray(note.tags) ? note.tags : [],
+          content: note.content ?? "",
+        };
+        if (typeof note.sig === "string" && note.sig) event.sig = note.sig;
+        return event;
+      }
+
+      function resetCopyLabel() {
+        eventCopyBtn.textContent = "Copy";
+        if (copyResetTimer) {
+          clearTimeout(copyResetTimer);
+          copyResetTimer = 0;
+        }
+      }
+
+      function openEventJson(note) {
+        if (!note) return;
+        eventJsonEl.textContent = JSON.stringify(kind1Event(note), null, 2);
+        resetCopyLabel();
+        if (!eventDialogEl.open) eventDialogEl.showModal();
+      }
+
+      function openIn(kind, code) {
+        if (!code) return;
+        const platform = detectClientPlatform();
+        const clients = clientsForPlatform(platform);
+        dialogListEl.replaceChildren();
+        clients.forEach((client, index) => {
+          const href = clientHref(client, code, kind);
+          const a = document.createElement("a");
+          a.className =
+            index === 0 ? "open-in-link primary" : "open-in-link secondary";
+          a.href = href;
+          a.textContent = client.name;
+          if (isWebClientHref(href)) {
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+          }
+          dialogListEl.appendChild(a);
+        });
+        if (!dialogEl.open) dialogEl.showModal();
+      }
+
+      function parseNostrEntity(raw) {
+        const input = raw.trim();
+        const code = input.toLowerCase().startsWith("nostr:")
+          ? input.slice(6)
+          : input;
+        try {
+          const decoded = nip19.decode(code);
+          if (decoded.type === "npub") {
+            return { kind: "profile", code };
+          }
+          if (decoded.type === "nprofile") {
+            return { kind: "profile", code };
+          }
+          if (decoded.type === "note" || decoded.type === "nevent") {
+            return { kind: "note", code };
+          }
+        } catch {
+          return null;
+        }
+        return null;
+      }
+
+      function appendContent(parent, content) {
+        const lines = String(content ?? "").split("\n");
+        lines.forEach((line, lineIndex) => {
+          if (lineIndex > 0) parent.appendChild(document.createElement("br"));
+          const parts = line.split(tokenRegex());
+          for (const part of parts) {
+            if (!part) continue;
+            const entity = parseNostrEntity(part);
+            if (entity) {
+              const a = document.createElement("a");
+              a.href = `https://njump.me/${entity.code}`;
+              a.target = "_blank";
+              a.rel = "noreferrer";
+              a.textContent =
+                entity.kind === "profile"
+                  ? `@${entity.code.slice(0, 12)}…`
+                  : `${entity.code.slice(0, 16)}…`;
+              a.addEventListener("click", (event) => {
+                if (!isUnmodifiedLeftClick(event)) return;
+                event.preventDefault();
+                openIn(entity.kind, entity.code);
+              });
+              parent.appendChild(a);
+              continue;
+            }
+            if (/^https?:\/\//i.test(part) && isSafeHttpUrl(part)) {
+              const a = document.createElement("a");
+              a.href = part;
+              a.target = "_blank";
+              a.rel = "noreferrer";
+              a.textContent = part;
+              parent.appendChild(a);
+              continue;
+            }
+            parent.appendChild(document.createTextNode(part));
+          }
+        });
+      }
+
+      function renderNotes() {
+        const shown = visibleNotes();
+        resultsEl.replaceChildren();
+        resultsEl.setAttribute("aria-busy", "false");
+        emptyEl.hidden = shown.length > 0;
+        for (const note of shown) {
+          const li = document.createElement("li");
+          li.className = "note";
+
+          let nevent = "";
+          try {
+            nevent = encodeNevent(note);
+          } catch {
+            nevent = "";
+          }
+          const npub = encodeNpub(note.pubkey);
+          const profile = profiles[note.pubkey] ?? {};
+
+          const actions = document.createElement("div");
+          actions.className = "note-actions";
+
+          const inspect = document.createElement("button");
+          inspect.type = "button";
+          inspect.className = "note-menu";
+          inspect.setAttribute("aria-haspopup", "dialog");
+          inspect.setAttribute("aria-label", "View kind 1 event");
+          inspect.title = "View kind 1 event";
+          inspect.innerHTML =
+            '<svg class="note-menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 4.75C6.6 4.75 5.25 6.4 5.25 8.7v1.4c0 1.15-.7 1.9-1.85 1.9 1.15 0 1.85.75 1.85 1.9v1.4c0 2.3 1.35 3.95 3.75 3.95M15 4.75c2.4 0 3.75 1.65 3.75 3.95v1.4c0 1.15.7 1.9 1.85 1.9-1.15 0-1.85.75-1.85 1.9v1.4c0 2.3-1.35 3.95-3.75 3.95"/></svg>';
+          inspect.addEventListener("click", () => openEventJson(note));
+
+          const menu = document.createElement("button");
+          menu.type = "button";
+          menu.className = "note-menu";
+          menu.setAttribute("aria-haspopup", "dialog");
+          menu.setAttribute("aria-label", "Open this note in…");
+          menu.title = "Open this note in…";
+          menu.innerHTML =
+            '<svg class="note-menu-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.65" fill="currentColor" /><circle cx="12" cy="12" r="1.65" fill="currentColor" /><circle cx="18" cy="12" r="1.65" fill="currentColor" /></svg>';
+          menu.addEventListener("click", () => {
+            if (nevent) openIn("note", nevent);
+          });
+          actions.append(inspect, menu);
+
+          const author = document.createElement(npub ? "a" : "div");
+          author.className = "note-author";
+          if (npub) {
+            author.href = `https://njump.me/${npub}`;
+            author.target = "_blank";
+            author.rel = "noreferrer";
+            author.addEventListener("click", (event) => {
+              if (!isUnmodifiedLeftClick(event)) return;
+              event.preventDefault();
+              openIn("profile", npub);
+            });
+          }
+
+          if (profile.picture) {
+            const img = document.createElement("img");
+            img.className = "avatar";
+            img.src = profile.picture;
+            img.alt = "";
+            img.referrerPolicy = "no-referrer";
+            img.decoding = "async";
+            img.loading = "lazy";
+            img.addEventListener("error", () => {
+              img.replaceWith(Object.assign(document.createElement("span"), {
+                className: "avatar-empty",
+              }));
+            });
+            author.appendChild(img);
+          } else {
+            const span = document.createElement("span");
+            span.className = "avatar-empty";
+            author.appendChild(span);
+          }
+
+          const copy = document.createElement("span");
+          copy.className = "note-author-copy";
+          const line = document.createElement("span");
+          line.className = "note-author-line";
+          const name = document.createElement("span");
+          name.className = "note-author-name";
+          name.textContent = profileLabel(note.pubkey, profile.displayName);
+          line.appendChild(name);
+          const via = clientName(note.tags);
+          if (via) {
+            const client = document.createElement("span");
+            client.className = "note-via";
+            client.textContent = `via ${via}`;
+            line.appendChild(client);
+          }
+          const time = document.createElement("time");
+          time.dateTime = new Date(note.created_at * 1000).toISOString();
+          time.textContent = formatCreatedAt(note.created_at);
+          copy.append(line, time);
+          author.appendChild(copy);
+
+          const body = document.createElement("div");
+          body.className = "note-body";
+          appendContent(body, note.content);
+
+          li.append(actions, author, body);
+          if (nevent) {
+            const link = document.createElement("a");
+            link.className = "note-nevent";
+            link.href = `https://njump.me/${nevent}`;
+            link.target = "_blank";
+            link.rel = "noreferrer";
+            link.textContent = `${nevent.slice(0, 18)}…`;
+            link.addEventListener("click", (event) => {
+              if (!isUnmodifiedLeftClick(event)) return;
+              event.preventDefault();
+              openIn("note", nevent);
+            });
+            li.appendChild(link);
+          }
+          resultsEl.appendChild(li);
+        }
+        updateFeedStatus();
+      }
+
+      const tools = [
+        {
+          type: "function",
+          function: {
+            name: "show_notes",
+            description:
+              "Replace the visible feed with these notes from the user message. Pass an empty n array if none match.",
+            parameters: {
+              type: "object",
+              properties: {
+                n: {
+                  type: "array",
+                  items: { type: "integer" },
+                  description: "n of every matching note (1-based from the notes list)",
+                },
+              },
+              required: ["n"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ];
+
+      const REQUEST_OPTIONS = {
+        reasoningEffort: "none",
+        temperature: 0,
+      };
+
+      function showNotes(args) {
+        if (!Array.isArray(args?.n)) {
+          return { error: "n must be an array of note numbers" };
+        }
+        const ids = [];
+        for (const value of args.n) {
+          const index = Number(value);
+          if (!Number.isInteger(index) || index < 1 || index > notes.length) {
+            continue;
+          }
+          ids.push(notes[index - 1].id);
+        }
+        if (args.n.length > 0 && ids.length === 0) {
+          return { error: "n must contain valid note numbers" };
+        }
+        visibleIds = ids;
+        appliedFilter = true;
+        setFilterPhase("applying");
+        renderNotes();
+        return {
+          shown: visibleIds.length,
+          requested: args.n.length,
+        };
+      }
+
+      async function filterFeed(query) {
+        clearError();
+        lastLogLine = "";
+        modelLogEl.replaceChildren();
+        resetRunStats();
+        activeController = new AbortController();
+        setBusy(true);
+        setFilterPhase("permission");
+
+        const messages = [
+          {
+            role: "system",
+            content: [
+              "You filter the Nostr notes in the user message.",
+              "Match the query against each note's name (author), content, and tags (hashtags, mentioned names, client).",
+              "Call show_notes with the n of every matching note, not a sample.",
+              "If nothing matches, call show_notes with an empty n array.",
+              "Do not invent n values. Prefer a tool call over a prose reply.",
+            ].join(" "),
+          },
+          {
+            role: "user",
+            content: [
+              `Query: ${query}`,
+              "",
+              "Notes:",
+              JSON.stringify(notesForModel()),
+            ].join("\n"),
+          },
+        ];
+
+        try {
+          let applied = false;
+          let applyError = null;
+
+          const { final } = await runTools({
+            request: getExperimentalRequest(),
+            messages,
+            tools,
+            execute: {
+              show_notes(args) {
+                const result = showNotes(args);
+                if (result?.error) applyError = result.error;
+                else applied = true;
+                return result;
+              },
+            },
+            options: REQUEST_OPTIONS,
+            maxRounds: 1,
+            signal: activeController.signal,
+            onAccepted() {
+              setFilterPhase("accepted");
+            },
+            onReasoningDelta() {
+              setFilterPhase("thinking");
+            },
+            onDelta() {
+              setFilterPhase("writing");
+            },
+            onToolCall() {
+              setFilterPhase("tool");
+            },
+          });
+
+          recordRunChunk(final);
+
+          if (!applied) {
+            const text =
+              typeof final?.message?.content === "string"
+                ? final.message.content.trim()
+                : "";
+            showError({
+              code: "provider_error",
+              message: applyError
+                ? `show_notes failed: ${applyError}`
+                : `The model did not call show_notes.${
+                    text
+                      ? ` It said: ${truncate(text, 240)}`
+                      : " Try another model in Inference Bridge."
+                  }`,
+            });
+            updateFeedStatus();
+          }
+
+          renderRunMeta();
+        } catch (err) {
+          if (isInferenceError(err) && err.code === "aborted") {
+            feedStatusEl.textContent = appliedFilter
+              ? `Showing ${visibleNotes().length} of ${notes.length} notes`
+              : `${notes.length} notes`;
+          } else {
+            showError(err);
+            updateFeedStatus();
+          }
+        } finally {
+          activeController = null;
+          setBusy(false);
+        }
+      }
+
+      async function loadFeed() {
+        feedStatusEl.textContent = "Loading snapshot…";
+        resultsEl.setAttribute("aria-busy", "true");
+        try {
+          const res = await fetch("./data.json");
+          if (!res.ok) {
+            throw new Error(`Could not load data.json (${res.status})`);
+          }
+          const data = await res.json();
+          const events = Array.isArray(data.notes) ? data.notes : [];
+          notes = events.filter(
+            (event) => event?.kind === 1 && typeof event.id === "string"
+          );
+          profiles =
+            data.profiles && typeof data.profiles === "object"
+              ? data.profiles
+              : {};
+          if (notes.length === 0) {
+            feedStatusEl.textContent = "Snapshot is empty.";
+          }
+          renderNotes();
+          setBusy(false);
+        } catch (err) {
+          resultsEl.replaceChildren();
+          resultsEl.setAttribute("aria-busy", "false");
+          emptyEl.hidden = true;
+          feedStatusEl.textContent = "Could not load the note snapshot.";
+          showError({
+            code: "provider_error",
+            message:
+              err && err.message ? err.message : "Failed to load data.json.",
+          });
+          setBusy(false);
+        }
+      }
+
+      for (const sample of SAMPLE_QUERIES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sample";
+        btn.textContent = sample;
+        btn.addEventListener("click", () => {
+          queryEl.value = sample;
+          queryEl.focus();
+        });
+        samplesEl.appendChild(btn);
+      }
+
+      formEl.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (activeController) return;
+        const query = queryEl.value.trim();
+        if (!query || notes.length === 0) return;
+        if (!isInferenceAvailable()) {
+          showError({
+            code: "unavailable",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+          });
+          return;
+        }
+        if (!hasExperimentalRequest()) {
+          showError({ code: "unavailable", message: IB_ONLY });
+          return;
+        }
+        filterFeed(query);
+      });
+
+      clearBtn.addEventListener("click", () => {
+        if (activeController) return;
+        queryEl.value = "";
+        visibleIds = null;
+        appliedFilter = false;
+        clearError();
+        resetRunStats();
+        renderNotes();
+        setBusy(false);
+        queryEl.focus();
+      });
+
+      abortBtn.addEventListener("click", () => {
+        if (activeController) activeController.abort();
+      });
+
+      eventCopyBtn.addEventListener("click", async () => {
+        const text = eventJsonEl.textContent;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          eventCopyBtn.textContent = "Copied";
+          if (copyResetTimer) clearTimeout(copyResetTimer);
+          copyResetTimer = setTimeout(resetCopyLabel, 1600);
+        } catch {
+          eventCopyBtn.textContent = "Copy failed";
+          if (copyResetTimer) clearTimeout(copyResetTimer);
+          copyResetTimer = setTimeout(resetCopyLabel, 1600);
+        }
+      });
+      dialogEl.addEventListener("click", (event) => {
+        if (event.target === dialogEl) dialogEl.close();
+      });
+      document.getElementById("open-in-cancel").addEventListener("click", () => {
+        dialogEl.close();
+      });
+      eventDialogEl.addEventListener("click", (event) => {
+        if (event.target === eventDialogEl) eventDialogEl.close();
+      });
+      eventDialogEl.addEventListener("close", () => {
+        resetCopyLabel();
+      });
+      document.getElementById("event-json-close").addEventListener("click", () => {
+        eventDialogEl.close();
+      });
+
+      refreshAvailability();
+      setBusy(false);
+      if (!isInferenceAvailable() || !hasExperimentalRequest()) {
+        void waitForInference()
+          .then(() => {
+            refreshAvailability();
+            setBusy(false);
+          })
+          .catch(() => {
+            /* stay unavailable */
+          });
+      }
+
+      void loadFeed();
+    </script>
+  </body>
+</html>

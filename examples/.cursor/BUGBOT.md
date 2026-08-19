@@ -11,4 +11,10 @@ Do **not** flag:
 - Suggestions to vendor `dist/`, switch to relative `./ipa-tools/` imports, or rewrite the demo to call `window.inference` directly just to avoid the CDN
 - Demos treating `window.inference` presence as sufficient for readiness (without a separate `isSupportedContext()` / secure-context guard). The bridge only injects on supported origins; dual-checking `file:`, opaque `"null"`, or non-loopback `http:` is optional polish, not a required demo fix.
 
+## Failed Nostr filter keeps the last successful slice
+
+In `examples/nostr/index.html`, a filter run that does not successfully apply `show_notes` (missing tool call, invalid args, or parse failure) should show an error and leave `visibleIds` / `appliedFilter` unchanged. Clearing the previous filter would make the new query look like it matched the full feed.
+
+Do **not** flag keeping prior results on a failed refilter. Do flag treating invalid or missing `show_notes` as a successful apply.
+
 Do flag real bugs in demo logic (null handling, broken parse paths, incorrect API usage, etc.).

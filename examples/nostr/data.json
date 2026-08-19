@@ -1,0 +1,532 @@
+{
+  "source": "https://api.nostr.wine/trending?limit=40 (kind 1 events fetched from public relays)",
+  "capturedAt": "2026-08-19T18:13:00Z",
+  "relayHint": "wss://trending.relays.land",
+  "notes": [
+    {
+      "id": "14e2332550d5f294027c9c7eb745c4176fdc56c09690b2d769b1de88720c2952",
+      "pubkey": "6e75f7972397ca3295e0f4ca0fbc6eb9cc79be85bafdd56bd378220ca8eee74e",
+      "created_at": 1787155328,
+      "kind": 1,
+      "tags": [],
+      "content": "I know a lot of people who never stacked anything else BUT Bitcoin. The same people are now also stacking Monero.\n\nI wonder why that might be?"
+    },
+    {
+      "id": "72bb957a794ef2ee3a3d7cf510662bc8780b8d9da05ceecccaa95b4605f92571",
+      "pubkey": "604e96e099936a104883958b040b47672e0f048c98ac793f37ffe4c720279eb2",
+      "created_at": 1787156526,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Primal Web"
+        ]
+      ],
+      "content": "funny how no one cares anymore when bitcoin finally start moving again 😂\nhttps://i.nostr.build/Wr4QvAEfSvPb1XZp.jpg"
+    },
+    {
+      "id": "7b2c8999737817a9bcc7ad99fe78029d1677c36dd2a7927efeda5b0888567e90",
+      "pubkey": "7672c39dd8ac61f16a52f81578bfebdb5f8c70bc5a7277656ab5ba67bb590f58",
+      "created_at": 1787154569,
+      "kind": 1,
+      "tags": [],
+      "content": "LOL. Monero is now banned from being mentioned/explained by Grok on X. Yet another “Elon is a completely manipulative subversive” moment. Free speech website, folks. \n\nhttps://static.klipy.com/ii/d7aec6f6f171607374b2065c836f92f4/ef/7d/7b1RCWkw.gif\n"
+    },
+    {
+      "id": "e4f5b9b53f7191997033100250e20986c751ccbd08c40825e0491eae95a4d327",
+      "pubkey": "e5237023a5c0929e7ae0e5128d41a8213138400ec110dbe9d8a29278f22b7c13",
+      "created_at": 1787153351,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/81f7be37a7465a853c5ce27526942da4f3f869a606e8290a76fb9ec61541d05f.jpg",
+          "m jpeg",
+          "dim 1290.0x1711.0"
+        ],
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "GM \nhttps://blossom.primal.net/81f7be37a7465a853c5ce27526942da4f3f869a606e8290a76fb9ec61541d05f.jpg"
+    },
+    {
+      "id": "3eaa457e6a03ce68fd7f4cf593ce72fc9afa6b55ed5246df2897b7c94bdfe440",
+      "pubkey": "532d830dffe09c13e75e8b145c825718fc12b0003f61d61e9077721c7fff93cb",
+      "created_at": 1787154738,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/f70f2e78d470fd2eafc8261d0a354375dfb1788706a930cb222e8232402fb448.gif",
+          "m image/gif",
+          "dim 420.0x293.0"
+        ],
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "Gm. Happy Wednesday. \n\nPost your steps/reps/movement for August 19th.  \nhttps://blossom.primal.net/f70f2e78d470fd2eafc8261d0a354375dfb1788706a930cb222e8232402fb448.gif"
+    },
+    {
+      "id": "75eab175037504aa0d50ab85ed8ccbc9773ae2df9203df25bf0db13f1e228747",
+      "pubkey": "e1fc88f8e378784587c2337f4eb90a46c0c0622c42e77d75ec4a37521f30f622",
+      "created_at": 1787156460,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Damus"
+        ]
+      ],
+      "content": "What’s the latest with privacy preserving AI? With a persistent account, biggest thing is payable in LN.\n\nI didn’t pull the trigger on one a few months ago because it looked like there was a backdoor. Then paused on researching privacy focused AI."
+    },
+    {
+      "id": "04ff60c70b8fac3861bcab43806bdfa3737f4e2deb68856e3606d3fd8018b23c",
+      "pubkey": "e01819d64d9744343d0e81eac6cdbc37d63385cea56cf0ee470881be20504efd",
+      "created_at": 1787157030,
+      "kind": 1,
+      "tags": [],
+      "content": "Did the Monero bros leave Nostr? I hardly see em no more. Raise your hands so I can see you if you are out there."
+    },
+    {
+      "id": "00003e356894080a8de195e80f3ea46852f9abe627146ca83a2a7b99e529160a",
+      "pubkey": "f568a043fc60098381a97f5720f253f1e3cad8ced9b96d06d4c65eb59ca8e94a",
+      "created_at": 1787156149,
+      "kind": 1,
+      "tags": [
+        [
+          "t",
+          "asknostr"
+        ],
+        [
+          "client",
+          "Wisp"
+        ],
+        [
+          "nonce",
+          "27444",
+          "16"
+        ]
+      ],
+      "content": "Are there any Nostr clients that are don't use up mobile data as much? I will be travelling to a place where connectivity isn't as great and last time I was there my mobile data was drained without actually seeing anything by Nostr clients 😂 #AskNostr"
+    },
+    {
+      "id": "4ee9de90d72d32eac04ff88ff8a8824329928b760b9c3bd989b26d09302686ff",
+      "pubkey": "26d6a946675e603f8de4bf6f9cef442037b70c7eee170ff06ed7673fc34c98f1",
+      "created_at": 1787156040,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://i.nostr.build/3qo9Lo4OAtv5oqfj61rAPS.jpg",
+          "blurhash eEHBC^o|-;J-yC-BE1NGo}R+_N%LRjRPnOTds:ahsT$i%Ls:V@xaS2",
+          "dim 1125x1217"
+        ],
+        [
+          "client",
+          "Damus"
+        ]
+      ],
+      "content": "My phone wanted me to see this throwback specifically\n\nhttps://i.nostr.build/3qo9Lo4OAtv5oqfj61rAPS.jpg"
+    },
+    {
+      "id": "000066ed713dd147cdf4e457d61c0dd5507cc8e18634c1e5dbe49720c53bd714",
+      "pubkey": "e2ccf7cf20403f3f2a4a55b328f0de3be38558a7d5f33632fdaaefc726c1c8eb",
+      "created_at": 1787147979,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://relay.utxo.one/6430982a429e6fd7fd0b461f9613b2b361fb2c3e0a55404596974a5552e126da.jpg",
+          "m image/jpeg",
+          "thumbhash zwcGHobHR1d/iXeEmHd1SHdmoFYIiHU=",
+          "dim 1080x939"
+        ],
+        [
+          "client",
+          "Wisp"
+        ],
+        [
+          "nonce",
+          "72578",
+          "16"
+        ]
+      ],
+      "content": "Can someone DM me NVK's address so I can pull a bitboy and make a nostr live stream at his house? \nhttps://relay.utxo.one/6430982a429e6fd7fd0b461f9613b2b361fb2c3e0a55404596974a5552e126da.jpg"
+    },
+    {
+      "id": "45b51af53f6a9376519bd06dd2b993461c182ceeec990654402c241f19ab7f35",
+      "pubkey": "e2260a7af33b3ba30074111c456793cef58d2ab43c5965bdbb655f90f97399ac",
+      "created_at": 1787147203,
+      "kind": 1,
+      "tags": [
+        [
+          "t",
+          "asknostr"
+        ],
+        [
+          "client",
+          "Primal Android"
+        ]
+      ],
+      "content": "How many of y'all are addicted to your smartphones?\n\nBe honest 🫣.\n\n#asknostr \n\n"
+    },
+    {
+      "id": "6ba8038afb147b93a44d8d4cdd57c70883b4e71e7769c0a2c53bee6e30def2c2",
+      "pubkey": "fcf70a45cfa817eaa813b9ba8a375d713d3169f4a27f3dcac3d49112df67d37e",
+      "created_at": 1787155462,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/36059f711d85d0b80ebe9572bfaaeb5ff2fc944b8f6ceb446c7569135ac5b968.jpg",
+          "blurhash L00l#bWWofj]tSfQkCj[tSbGfkay",
+          "sha256 36059f711d85d0b80ebe9572bfaaeb5ff2fc944b8f6ceb446c7569135ac5b968"
+        ]
+      ],
+      "content": "We literally just had the biggest daily short liquidation event in bitcoin history.\n\n\nhttps://blossom.primal.net/36059f711d85d0b80ebe9572bfaaeb5ff2fc944b8f6ceb446c7569135ac5b968.jpg"
+    },
+    {
+      "id": "8a31aabb1613f93f1ec0b5b40d039637ebd101974ce295e3d35773f4de9de44e",
+      "pubkey": "f8e6c64342f1e052480630e27e1016dce35fc3a614e60434fef4aa2503328ca9",
+      "created_at": 1787157293,
+      "kind": 1,
+      "tags": [
+        [
+          "e",
+          "00003e356894080a8de195e80f3ea46852f9abe627146ca83a2a7b99e529160a",
+          "",
+          "root"
+        ],
+        [
+          "p",
+          "f568a043fc60098381a97f5720f253f1e3cad8ced9b96d06d4c65eb59ca8e94a"
+        ],
+        [
+          "client",
+          "Wisp"
+        ]
+      ],
+      "content": "If you’re on iOS, Nostur has a low data mode that prevents it from auto loading the typical data-heavy stuff like new media. Primal has some good settings too such as disabling auto-play on videos, turning off profile pic animation. Those are big culprits. "
+    },
+    {
+      "id": "05360da5fab6c7a2a410d05c3f3f7283ff30820d2ad5b38e383227df97c2895d",
+      "pubkey": "6e75f7972397ca3295e0f4ca0fbc6eb9cc79be85bafdd56bd378220ca8eee74e",
+      "created_at": 1787156077,
+      "kind": 1,
+      "tags": [],
+      "content": "By the time the inFLUenzas tell you it's time to pick up some Monero (just in case pivoting catches on)... they've been stacking for a year already. \n\nYou don't drive up the fiat value before everyone else starts talking about it too."
+    },
+    {
+      "id": "a5b86269771fffadb86b4a09c51aec16b9d747a38c14b8f8654f04669c0bf0f0",
+      "pubkey": "0c9e5e17fbdf555ef41daf3c3a196749c848f9c791966f30fae5e4c0480e870b",
+      "created_at": 1787156007,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "68k what happened?"
+    },
+    {
+      "id": "ed1e134c20ecedee1aca087043c3f7854ee63d0260f7b527c4404f29deba4966",
+      "pubkey": "85bdb5875e113dcc99498b474636449882ee15a1c78154ab07c065b47339d672",
+      "created_at": 1787156261,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/4233e1aaf90ac57cc500d7e340d1ab995e6a18af0ce5bf93d7aaa4baa1537cf5.jpg",
+          "m image/jpeg",
+          "x 4233e1aaf90ac57cc500d7e340d1ab995e6a18af0ce5bf93d7aaa4baa1537cf5",
+          "size 39218"
+        ]
+      ],
+      "content": "It’s beautiful.\nhttps://blossom.primal.net/4233e1aaf90ac57cc500d7e340d1ab995e6a18af0ce5bf93d7aaa4baa1537cf5.jpg"
+    },
+    {
+      "id": "8fc1d4fe02f7eb80643849ed1bdcb2f073297f23a460623c5793786a7bd4f882",
+      "pubkey": "38dbb9b07d93861d40620ad62d44b1a8e8785df0997eeb4454f12d217048cd5c",
+      "created_at": 1787154064,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "Who / what is funding this pump ? Abnormally large"
+    },
+    {
+      "id": "165e9aa331bada0526c0f27e99bf42b12df65e984ba8dcf0a275a2ff69501330",
+      "pubkey": "e83b66a8ed2d37c07d1abea6e1b000a15549c69508fa4c5875556d52b0526c2b",
+      "created_at": 1787154222,
+      "kind": 1,
+      "tags": [],
+      "content": "We have rain 🌧 🎉"
+    },
+    {
+      "id": "8bca5ef645671a92491bb7bd7adff9fe81acbe58acdd4759d5a80b72876fdc9f",
+      "pubkey": "8d7e9c016e78dc20e48a7c384cf9123642a5c35fb833b0fb1515cd93ca12555c",
+      "created_at": 1787158244,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://image.nostr.build/ef459edc06c523d1db6a32245a9a9a8aab845b361257027dec04baeaedfb239a.jpg",
+          "dim 2800x2100",
+          "blurhash LfE:GDR4WBRj%%Mxj[WCXoV@ofof",
+          "sha256 ad3e031dcf6d8922d406943d0a35f89318022a260ebc92887190bb1838973df2"
+        ],
+        [
+          "client",
+          "Nostur",
+          "31990:9be0be0fc079548233231614e4e1efc9f28b0db398011efeecf05fe570e5dd33:1685868693432"
+        ]
+      ],
+      "content": "￼what if humans lifespan became 1000 years?\nanswer is, it's impossible.\nhttps://image.nostr.build/ef459edc06c523d1db6a32245a9a9a8aab845b361257027dec04baeaedfb239a.jpg"
+    },
+    {
+      "id": "8acc3aff26df7b63e2e38ed006981f4130408e01fd831fea4c36e8bf4ed98423",
+      "pubkey": "c48e29f04b482cc01ca1f9ef8c86ef8318c059e0e9353235162f080f26e14c11",
+      "created_at": 1787101164,
+      "kind": 1,
+      "tags": [
+        [
+          "p",
+          "bf2376e17ba4ec269d10fcc996a4746b451152be9031fa48e74553dde5526bce",
+          "",
+          "mention"
+        ],
+        [
+          "imeta",
+          "url https://blossom.primal.net/717f9e518867bd411723276c14aa25d2b1d7f66228bb721bb9eb193bc54a245e.jpg",
+          "m jpeg",
+          "dim 1236.0x927.0"
+        ],
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "After 18 days in the NICU we finally got to bring baby girl home today. After a truly harrowing journey these past months, our family is finally all together at home. \n\nBeyond grateful.\nnostr:npub1hu3hdctm5nkzd8gslnyedfr5ddz3z547jqcl5j88g4fame2jd08qh6h8nh \nhttps://blossom.primal.net/717f9e518867bd411723276c14aa25d2b1d7f66228bb721bb9eb193bc54a245e.jpg"
+    },
+    {
+      "id": "049bd90a26a2b5d14dff0a5860ac5f62e5685228b06e8aef19b53afd5caaf440",
+      "pubkey": "f240be2b684f85cc81566f2081386af81d7427ea86250c8bde6b7a8500c761ba",
+      "created_at": 1787153419,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/06ff1a95ac3ad83ed9ae89b1c25daba0d1ac0aba3f6bed297cd76eb723975003.jpg",
+          "m jpeg",
+          "dim 1525.0x1102.0"
+        ],
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "Bitcoin is surging hard on the news that the U.S. Treasury is going to buy back $4B of debt to \"increase liquidity support by at least double\"\n\nWelcome back, money printing \nhttps://blossom.primal.net/06ff1a95ac3ad83ed9ae89b1c25daba0d1ac0aba3f6bed297cd76eb723975003.jpg"
+    },
+    {
+      "id": "6b5848ee7302b10daa3a0e5e85773babb787853c6378557ef022d11a0b454e9d",
+      "pubkey": "1bd32a386a7be6f688b3dc7c480efc21cd946b43eac14ba4ba7834ac77a23e69",
+      "created_at": 1787158615,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://blossom.primal.net/d01b2f9a59d1cca179e0cf6ca4e5d21fd2fbb7d25f366d12be80d12df31779d9.mov",
+          "m video/quicktime",
+          "dim 1320.0x730.0"
+        ],
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "One word:\nhttps://blossom.primal.net/d01b2f9a59d1cca179e0cf6ca4e5d21fd2fbb7d25f366d12be80d12df31779d9.mov"
+    },
+    {
+      "id": "6eab9500037ca996e0f50bcfb7fc7d4db304ee59837a577cc40c9d5621065451",
+      "pubkey": "47f97d4e0a640c8a963d3fa71d9f0a6aad958afa505fefdedd6d529ef4122ef3",
+      "created_at": 1787156373,
+      "kind": 1,
+      "tags": [
+        [
+          "imeta",
+          "url https://birobela.blossom.band/fe72cfce4ede7b430e64d4689b9cd9cc7c3224b622f591d7f0128e6eed84f638.jpg",
+          "ox fe72cfce4ede7b430e64d4689b9cd9cc7c3224b622f591d7f0128e6eed84f638",
+          "x fe72cfce4ede7b430e64d4689b9cd9cc7c3224b622f591d7f0128e6eed84f638",
+          "m image/jpeg",
+          "dim 1080x1280",
+          "bh LBEBs:O?0et7}]jFk=t7=y$iO@WB",
+          "blurhash LBEBs:O?0et7}]jFk=t7=y$iO@WB",
+          "thumb https://i.nostr.build/thumb/zA5bjvJRvze47fm0AMkutm.jpg",
+          "size 150028",
+          "fallback https://i.nostr.build/zA5bjvJRvze47fm0AMkutm.jpg",
+          "thumbhash GDgGDgQHydanWMiJVoZ2iEa3cJoIp3k="
+        ]
+      ],
+      "content": "https://birobela.blossom.band/fe72cfce4ede7b430e64d4689b9cd9cc7c3224b622f591d7f0128e6eed84f638.jpg"
+    },
+    {
+      "id": "000029b989f9060ff2c133be869df65a0a83678168d17a989726b1dd001d87da",
+      "pubkey": "5cad82c898ee66013711945d687f7d9549f645a0118467dae2f5e274c598d6ff",
+      "created_at": 1787155609,
+      "kind": 1,
+      "tags": [
+        [
+          "q",
+          "a43c2feca1782fa9adfcd98956de55444d086eb1c40410cd2d77475e546494b1",
+          "wss://goskatespots.nostr1.com"
+        ],
+        [
+          "p",
+          "caba497f7beda0650d6b78ab211216e4d2ebabeec9ca6eb2a05cee8e55c6871b"
+        ],
+        [
+          "client",
+          "Dark Wisp"
+        ],
+        [
+          "nonce",
+          "522",
+          "16"
+        ]
+      ],
+      "content": "Just don't use the word \"gay\" as a slur and you're ahead of 80% of Bitcoiners.\nnostr:nevent1qqs2g0p0ajshstaf4h7dnz2kme25gnggd6cugpqse5khw36723jffvgpr4mhxue69uhkwmmnddshgetnwphhguewdehhxarjxyhxxmmdqgsv4wjf0aa7mgr9p44h32epzgtwf5ht40hvnjnwk2s9em5w2hrgwxcgg2n6f"
+    },
+    {
+      "id": "1d7d8dd9688b2d16f15b3a269c7f6939f05fed5af979d3d2c73d44aad542e64e",
+      "pubkey": "8272868af52afb527827e933c36f3ce00150c438341847abc799b0f9e461be4f",
+      "created_at": 1787151087,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Primal iOS"
+        ]
+      ],
+      "content": "when’s the last time you camped overnight? "
+    },
+    {
+      "id": "2677e83b6dc0cbe23b7de835e763ea66a6e09f82fe06e0f67858786bc0279360",
+      "pubkey": "26d6a946675e603f8de4bf6f9cef442037b70c7eee170ff06ed7673fc34c98f1",
+      "created_at": 1787152724,
+      "kind": 1,
+      "tags": [
+        [
+          "client",
+          "Damus"
+        ]
+      ],
+      "content": "I did it! I wanted to take the week off screens and it is done💃"
+    }
+  ],
+  "profiles": {
+    "e2ccf7cf20403f3f2a4a55b328f0de3be38558a7d5f33632fdaaefc726c1c8eb": {
+      "displayName": "utxo the webmaster 🧑‍💻",
+      "picture": "https://npub1utx00neqgqln72j22kej3ux7803c2k986henvvha4thuwfkper4s7r50e8.blossom.band/bb8c182bd6f0a2c2d80589b6a2000ea083eb4e182e00c48f548744a739ae0326.jpg"
+    },
+    "604e96e099936a104883958b040b47672e0f048c98ac793f37ffe4c720279eb2": {
+      "displayName": "NotBiebs and 69 others",
+      "picture": "https://image.nostr.build/78b5bfcde5cce94bb69ffc0ba3a894b2097d80abf1311e862a9bd8ff9eb6e78f.gif"
+    },
+    "e83b66a8ed2d37c07d1abea6e1b000a15549c69508fa4c5875556d52b0526c2b": {
+      "displayName": "mike",
+      "picture": "https://i.nostr.build/lM3M9KTTSl6HvWfE.jpg"
+    },
+    "f8e6c64342f1e052480630e27e1016dce35fc3a614e60434fef4aa2503328ca9": {
+      "displayName": "corndalorian",
+      "picture": "https://npub1lrnvvs6z78s9yjqxxr38uyqkmn34lsaxznnqgd877j4z2qej3j5s09qnw5.blossom.band/93a25383c10bdd146daf19e4824ac2a2f3ff27ea20a6c3811fef221e30f80902.jpg"
+    },
+    "6e75f7972397ca3295e0f4ca0fbc6eb9cc79be85bafdd56bd378220ca8eee74e": {
+      "displayName": "TheGrinder",
+      "picture": "https://i.nostr.build/TghNVYXqMe7knx7P.jpg"
+    },
+    "47f97d4e0a640c8a963d3fa71d9f0a6aad958afa505fefdedd6d529ef4122ef3": {
+      "displayName": "Biro Bela",
+      "picture": "https://image.nostr.build/76a4530fde7ac83ab8446ece4b7eb2f37ddc605731347462037d3c4128de34bf.jpg"
+    },
+    "e5237023a5c0929e7ae0e5128d41a8213138400ec110dbe9d8a29278f22b7c13": {
+      "displayName": "Helen Yrmom",
+      "picture": "https://blossom.primal.net/abcf2a67358a4f67e2e5c2994dbc3b9f7077fb028c4f60fca21d383da23f1a49.jpg"
+    },
+    "e2260a7af33b3ba30074111c456793cef58d2ab43c5965bdbb655f90f97399ac": {
+      "displayName": "ShiShi21m",
+      "picture": "https://nostr.build/i/nostr.build_38eb1985a77c3d497517390abc0d9c3cd5aab92d54637c4c943fc265db419042.gif"
+    },
+    "f240be2b684f85cc81566f2081386af81d7427ea86250c8bde6b7a8500c761ba": {
+      "displayName": "markusturm",
+      "picture": "https://blossom.primal.net/897f9479aa2ce2d146e58d27a4d3de343f9667858ffa680fa2f7b9737638a947.png"
+    },
+    "f568a043fc60098381a97f5720f253f1e3cad8ced9b96d06d4c65eb59ca8e94a": {
+      "displayName": "Sarah Connor",
+      "picture": "https://npub17452qsluvqyc8qdf0atjpujn783u4kxwmxuk6pk5ce0tt89ga99qqqt5hd.blossom.band/94bb2b7ae84d77638c94a37dba905719fe666ace064d91cd5949cfc0f48104c4.jpg"
+    },
+    "8272868af52afb527827e933c36f3ce00150c438341847abc799b0f9e461be4f": {
+      "displayName": "citadelx",
+      "picture": "https://blossom.primal.net/4d1fdf6462abe2b3350b01e68715bd922192d5fb2ed204885d6a7a53247bb225.jpg"
+    },
+    "c48e29f04b482cc01ca1f9ef8c86ef8318c059e0e9353235162f080f26e14c11": {
+      "displayName": "walker",
+      "picture": "https://image.nostr.build/89ad0e9a72ff60b6c8c7dc71bb92800598c56d09cad44a4ff6b700479104811f.jpg"
+    },
+    "7672c39dd8ac61f16a52f81578bfebdb5f8c70bc5a7277656ab5ba67bb590f58": {
+      "displayName": "weev",
+      "picture": "https://profilepics.nostur.com/profilepic_v1/edb1b288b200e25234cd8649080011e1ec2f0763c0b7016069312c91fcd460cf/profilepic.jpg?1759191729"
+    },
+    "5cad82c898ee66013711945d687f7d9549f645a0118467dae2f5e274c598d6ff": {
+      "displayName": "Anita",
+      "picture": "https://anita.onl/about/_Anita-Profile-small.jpg"
+    },
+    "0c9e5e17fbdf555ef41daf3c3a196749c848f9c791966f30fae5e4c0480e870b": {
+      "displayName": "Bfgreen",
+      "picture": "https://blossom.primal.net/c6994e0bb31a9eb36d7eed55e8c9fdfad63533737bb86af60cdf45f9dddb99c8.png"
+    },
+    "85bdb5875e113dcc99498b474636449882ee15a1c78154ab07c065b47339d672": {
+      "displayName": "TFTC",
+      "picture": "https://blossom.primal.net/f6821fad54d1cf8c0b4ce059fd59dec725c9b7fb34bd82f0bdc82fbb3d68bef7.jpg"
+    },
+    "532d830dffe09c13e75e8b145c825718fc12b0003f61d61e9077721c7fff93cb": {
+      "displayName": "primal",
+      "picture": "https://blossom.primal.net/3006f1743f2c3c725136d20d2da99820c80509b43e2687b7d5ddd33e098fe706.png"
+    },
+    "26d6a946675e603f8de4bf6f9cef442037b70c7eee170ff06ed7673fc34c98f1": {
+      "displayName": "Noshole",
+      "picture": "https://i.nostr.build/X2q0WZTIV6Thij3D.jpg"
+    },
+    "e01819d64d9744343d0e81eac6cdbc37d63385cea56cf0ee470881be20504efd": {
+      "displayName": "Mr Anderson",
+      "picture": "https://m.primal.net/HUci.jpg"
+    },
+    "8d7e9c016e78dc20e48a7c384cf9123642a5c35fb833b0fb1515cd93ca12555c": {
+      "displayName": "xiangcai",
+      "picture": "https://image.nostr.build/3d70ddb587f308e2118595248eb001e44e36d023265e69c89151ca2e3aabb8a4.jpg"
+    },
+    "1bd32a386a7be6f688b3dc7c480efc21cd946b43eac14ba4ba7834ac77a23e69": {
+      "displayName": "Alan ₿",
+      "picture": "https://image.nostr.build/3196b237890c30f51df848de6d0ab0f096a23c6aa7106420be5f5e00f20b2da3.jpg"
+    },
+    "fcf70a45cfa817eaa813b9ba8a375d713d3169f4a27f3dcac3d49112df67d37e": {
+      "displayName": "Cyph3rp9nk",
+      "picture": "https://m.primal.net/HINp.jpg"
+    },
+    "e1fc88f8e378784587c2337f4eb90a46c0c0622c42e77d75ec4a37521f30f622": {
+      "displayName": "Toxic Bitcoiner",
+      "picture": "https://image.nostr.build/e97ba2999f6d2fbf0f3056e545457f73235f442a78345c36a541b2ba14dea8d2.jpg"
+    },
+    "38dbb9b07d93861d40620ad62d44b1a8e8785df0997eeb4454f12d217048cd5c": {
+      "displayName": "BitcoinSandy",
+      "picture": "https://pfp.nostr.build/c4f32ca3ad1355eb121504e83da989f3e23cece08c4b6bde495f0eb392c1e264.gif"
+    }
+  }
+}

@@ -319,7 +319,15 @@ A persistent allow grant for text chat does not cover a later request that inclu
 
 When a request includes `tools`, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Request-content preview remains optional (see Security).
 
-Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant).
+Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant). Those follow-ups often have no second preview: tool result bodies can reach the provider without appearing in the Allow UI.
+
+Applications SHOULD make the data a tool will return to the provider inspectable **before** the user allows inference. Do not rely on a later `role: "tool"` message for that disclosure. Practical options (any one can suffice):
+
+- Include the data, or a faithful truncated copy, in the first `messages` so an implementation preview can show it.
+- Name the class of data in the tool `description` (for example “returns the user’s currently loaded social posts”).
+- Disclose it in the page UI next to the action that starts `request`.
+
+This is a `SHOULD`, not a `MUST`. Live or huge tool results cannot always be inlined on the first turn. The requirement is honesty about what will be sent, not stuffing every payload into `messages`. Applications must not assume the permission UI reveals message content or later tool-result rounds.
 
 ### Security
 
@@ -344,7 +352,7 @@ default local installs work without configuring `OLLAMA_ORIGINS` or equivalent
 allowlists. Broad wildcards such as `chrome-extension://*` remain an optional
 fallback, not the recommended default.
 
-Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content. Implementations may emphasize some messages and collapse others (for example by role) without changing the request sent to the provider.
+Implementations may show a truncated preview of request content in the permission UI to support informed consent. Previewing content is optional; applications must not assume the UI reveals message content, including `role: "tool"` payloads on a later round of the same permission episode. Implementations may emphasize some messages and collapse others (for example by role) without changing the request sent to the provider.
 
 Function tools run in the page. A site that offers tools can cause the model to request those functions with attacker-influenced arguments (including via retrieved or user-supplied text). Implementations must not execute page-defined tools, and must not treat a chat-only persistent grant as consent for tools. Listing function names at approval time is required so the user can refuse a tools request independently of chat.
 
