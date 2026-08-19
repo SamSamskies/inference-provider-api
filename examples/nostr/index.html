@@ -1796,6 +1796,9 @@
               typeof done?.message?.content === "string"
                 ? done.message.content.trim()
                 : "";
+            visibleIds = null;
+            appliedFilter = false;
+            renderNotes();
             showError({
               code: "provider_error",
               message: `The model did not call show_notes.${
