@@ -1911,12 +1911,14 @@
 
       clearBtn.addEventListener("click", () => {
         if (activeController) return;
+        queryEl.value = "";
         visibleIds = null;
         appliedFilter = false;
         clearError();
         resetRunStats();
         renderNotes();
         setBusy(false);
+        queryEl.focus();
       });
 
       abortBtn.addEventListener("click", () => {
