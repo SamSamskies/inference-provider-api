@@ -566,21 +566,8 @@
         line-height: 1.5;
       }
 
-      .note-body a,
-      .note-nevent {
+      .note-body a {
         color: var(--signal);
-      }
-
-      .note-nevent {
-        display: inline-block;
-        margin-top: 0.75rem;
-        font-family: var(--mono);
-        font-size: 0.75rem;
-        text-decoration: none;
-      }
-
-      .note-nevent:hover {
-        text-decoration: underline;
       }
 
       .note-actions {
@@ -1669,20 +1656,6 @@
           appendContent(body, note.content);
 
           li.append(actions, author, body);
-          if (nevent) {
-            const link = document.createElement("a");
-            link.className = "note-nevent";
-            link.href = `https://njump.me/${nevent}`;
-            link.target = "_blank";
-            link.rel = "noreferrer";
-            link.textContent = `${nevent.slice(0, 18)}…`;
-            link.addEventListener("click", (event) => {
-              if (!isUnmodifiedLeftClick(event)) return;
-              event.preventDefault();
-              openIn("note", nevent);
-            });
-            li.appendChild(link);
-          }
           resultsEl.appendChild(li);
         }
         updateFeedStatus();
