@@ -149,6 +149,8 @@ const { final, messages } = await runTools({
 
 Handlers run in the page. The package never talks to providers or API keys.
 
+`options` (`temperature`, `reasoningEffort`) are forwarded on every round. `onAccepted` fires when a round yields `accepted`. `maxRounds` (default 5) is the max provider calls: if the last round has `toolCalls`, handlers still run and the result returns with `stopReason: "max_rounds"` instead of throwing. A text `done` is `stopReason: "end_turn"`. Use `maxRounds: 1` to run tools once and stop without a follow-up model turn.
+
 ### When `toolCalling` is not advertised
 
 `getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Call `runTools` only when `getFeatures().toolCalling` is true — otherwise the injector must reject `tools` with `invalid_request`. Do not rely on experimental injector surfaces for production apps.
