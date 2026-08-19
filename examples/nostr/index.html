@@ -935,8 +935,9 @@
       import {
         isInferenceAvailable,
         isInferenceError,
+        runTools,
         waitForInference,
-      } from "https://esm.sh/ipa-tools@0.3.1";
+      } from "https://esm.sh/ipa-tools@0.4.0";
       import { nip19 } from "https://esm.sh/nostr-tools@2.24.2";
 
       const TRENDING_RELAY = "wss://trending.relays.land";
@@ -1082,7 +1083,7 @@
       /**
        * Tool calling is not on stable IPA `request` yet (Inference Bridge
        * advertises getFeatures().toolCalling === false). Until it graduates,
-       * call `window.inference.experimental.request` and run tools on the page.
+       * pass `window.inference.experimental.request` into `runTools`.
        *
        * Bind so `this` stays the experimental namespace. If another injector
        * ships a different experimental shape, the TypeError / non-iterable
@@ -1438,14 +1439,6 @@
         runMetaEl.textContent = parts.join(" · ");
       }
 
-      function onStreamChunk(chunk) {
-        if (!chunk || typeof chunk !== "object") return;
-        if (chunk.type === "accepted") setFilterPhase("accepted");
-        else if (chunk.type === "reasoning_delta") setFilterPhase("thinking");
-        else if (chunk.type === "delta") setFilterPhase("writing");
-        else if (chunk.type === "done") recordRunChunk(chunk);
-      }
-
       function updateFeedStatus() {
         if (notes.length === 0) {
           feedStatusEl.textContent = "No notes loaded.";
@@ -1757,7 +1750,6 @@
         setBusy(true);
         setFilterPhase("permission");
 
-        const request = getExperimentalRequest();
         const messages = [
           {
             role: "system",
@@ -1781,66 +1773,56 @@
         ];
 
         try {
-          let done;
-          for await (const chunk of request({
-            method: "chat",
-            messages,
-            tools,
-            options: REQUEST_OPTIONS,
-            signal: activeController.signal,
-          })) {
-            onStreamChunk(chunk);
-            if (chunk.type === "done") done = chunk;
-          }
-
-          const toolCalls = done?.message?.toolCalls;
-          if (!toolCalls?.length) {
-            const text =
-              typeof done?.message?.content === "string"
-                ? done.message.content.trim()
-                : "";
-            showError({
-              code: "provider_error",
-              message: `The model did not call show_notes.${
-                text ? ` It said: ${truncate(text, 240)}` : " Try another model in Inference Bridge."
-              }`,
-            });
-            updateFeedStatus();
-            renderRunMeta();
-            return;
-          }
-
           let applied = false;
           let applyError = null;
-          for (const call of toolCalls) {
-            const name = call.function?.name;
-            let args = {};
-            try {
-              args = JSON.parse(call.function?.arguments || "{}");
-            } catch {
-              args = {};
-            }
-            if (name === "show_notes") {
+
+          const { final } = await runTools({
+            request: getExperimentalRequest(),
+            messages,
+            tools,
+            execute: {
+              show_notes(args) {
+                const result = showNotes(args);
+                if (result?.error) applyError = result.error;
+                else applied = true;
+                return result;
+              },
+            },
+            options: REQUEST_OPTIONS,
+            maxRounds: 1,
+            signal: activeController.signal,
+            onAccepted() {
+              setFilterPhase("accepted");
+            },
+            onReasoningDelta() {
+              setFilterPhase("thinking");
+            },
+            onDelta() {
+              setFilterPhase("writing");
+            },
+            onToolCall() {
               setFilterPhase("tool");
-              const result = showNotes(args);
-              if (result?.error) {
-                applyError = result.error;
-              } else {
-                applied = true;
-              }
-            }
-          }
+            },
+          });
+
+          recordRunChunk(final);
 
           if (!applied) {
+            const text =
+              typeof final?.message?.content === "string"
+                ? final.message.content.trim()
+                : "";
             showError({
               code: "provider_error",
               message: applyError
                 ? `show_notes failed: ${applyError}`
-                : "The model did not call show_notes. Try another model in Inference Bridge.",
+                : `The model did not call show_notes.${
+                    text
+                      ? ` It said: ${truncate(text, 240)}`
+                      : " Try another model in Inference Bridge."
+                  }`,
             });
             updateFeedStatus();
-            renderRunMeta();
-            return;
           }
 
           renderRunMeta();
