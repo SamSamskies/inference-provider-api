@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `runTools` `options?: InferenceOptions`, reused on every provider call ([#33](https://github.com/SamSamskies/inference-provider-api/issues/33)).
+- `runTools` `onAccepted?: () => void` for `type: "accepted"` stream chunks.
+- `RunToolsResult.stopReason`: `"end_turn"` (text `done`) or `"max_rounds"` (tools ran on the last provider call).
+
+### Changed
+
+- `maxRounds` is the max provider calls. Tool calls on the last round are executed and the loop returns instead of throwing `Tool loop exceeded maxRounds`.
+
 ## [0.3.1] - 2026-08-17
 
 ### Fixed

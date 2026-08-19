@@ -104,6 +104,7 @@ describe("runTools", () => {
       { role: "user", content: "hi" },
       { role: "assistant", content: "Just text." },
     ]);
+    expect(result.stopReason).toBe("end_turn");
     expect(input).toEqual([{ role: "user", content: "hi" }]);
   });
 
@@ -170,6 +171,7 @@ describe("runTools", () => {
       },
       { role: "assistant", content: "It is 22°C in Austin." },
     ]);
+    expect(result.stopReason).toBe("end_turn");
   });
 
   it("runs parallel toolCalls on one turn", async () => {
@@ -256,6 +258,58 @@ describe("runTools", () => {
     expect(seen[1]?.messages).toHaveLength(3);
   });
 
+  it("forwards InferenceOptions on each round", async () => {
+    const seen: InferenceRequest[] = [];
+    const request = (req: InferenceRequest) => {
+      seen.push(req);
+      if (seen.length === 1) {
+        return fakeRequest([
+          {
+            role: "assistant",
+            content: null,
+            toolCalls: [
+              {
+                id: "c1",
+                type: "function",
+                function: { name: "get_weather", arguments: "{}" },
+              },
+            ],
+          },
+        ])(req);
+      }
+      return fakeRequest([{ role: "assistant", content: "done" }])(req);
+    };
+    const requestOptions = { temperature: 0, reasoningEffort: "none" as const };
+
+    await runTools({
+      request,
+      messages: [{ role: "user", content: "hi" }],
+      tools: weatherTools,
+      options: requestOptions,
+      execute: { get_weather: async () => ({ ok: true }) },
+    });
+
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.options).toBe(requestOptions);
+    expect(seen[1]?.options).toBe(requestOptions);
+  });
+
+  it("omits options on the provider request when they are not passed", async () => {
+    const seen: InferenceRequest[] = [];
+    const request = (req: InferenceRequest) => {
+      seen.push(req);
+      return fakeRequest([{ role: "assistant", content: "done" }])(req);
+    };
+
+    await runTools({
+      request,
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toHaveProperty("options");
+  });
+
   it("throws when execute handler is missing", async () => {
     await expect(
       runTools({
@@ -283,8 +337,86 @@ describe("runTools", () => {
     });
   });
 
-  it("throws when maxRounds is exceeded", async () => {
-    const request = fakeRequest([
+  it("executes last-round toolCalls and returns instead of throwing", async () => {
+    const execute = { get_weather: vi.fn(async () => ({ ok: true })) };
+    const request = vi.fn(
+      fakeRequest([
+        {
+          role: "assistant",
+          content: null,
+          toolCalls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "get_weather", arguments: "{}" },
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: null,
+          toolCalls: [
+            {
+              id: "c2",
+              type: "function",
+              function: { name: "get_weather", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "assistant", content: "should not be requested" },
+      ])
+    );
+
+    const result = await runTools({
+      request,
+      messages: [{ role: "user", content: "hi" }],
+      tools: weatherTools,
+      execute,
+      maxRounds: 2,
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(execute.get_weather).toHaveBeenCalledTimes(2);
+    expect(result.stopReason).toBe("max_rounds");
+    expect(result.final.message).toMatchObject({
+      role: "assistant",
+      toolCalls: [{ id: "c2" }],
+    });
+    expect(result.messages.filter((m) => m.role === "tool")).toHaveLength(2);
+  });
+
+  it("maxRounds: 1 means one provider call, run tools, stop", async () => {
+    const execute = { get_weather: vi.fn(async () => ({ ok: true })) };
+    const request = vi.fn(
+      fakeRequest([
+        {
+          role: "assistant",
+          content: null,
+          toolCalls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "get_weather", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "assistant", content: "should not be requested" },
+      ])
+    );
+
+    const result = await runTools({
+      request,
+      messages: [{ role: "user", content: "hi" }],
+      tools: weatherTools,
+      execute,
+      maxRounds: 1,
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(execute.get_weather).toHaveBeenCalledOnce();
+    expect(result.stopReason).toBe("max_rounds");
+    expect(result.messages).toEqual([
+      { role: "user", content: "hi" },
       {
         role: "assistant",
         content: null,
@@ -296,35 +428,12 @@ describe("runTools", () => {
           },
         ],
       },
-      {
-        role: "assistant",
-        content: null,
-        toolCalls: [
-          {
-            id: "c2",
-            type: "function",
-            function: { name: "get_weather", arguments: "{}" },
-          },
-        ],
-      },
+      { role: "tool", toolCallId: "c1", content: '{"ok":true}' },
     ]);
-
-    await expect(
-      runTools({
-        request,
-        messages: [{ role: "user", content: "hi" }],
-        tools: weatherTools,
-        execute: { get_weather: async () => ({ ok: true }) },
-        maxRounds: 2,
-      })
-    ).rejects.toMatchObject({
-      name: "InferenceError",
-      code: "provider_error",
-      message: "Tool loop exceeded maxRounds (2).",
-    });
   });
 
-  it("forwards onDelta and onReasoningDelta; onToolCall after parse before execute", async () => {
+  it("forwards onAccepted, onDelta and onReasoningDelta; onToolCall after parse before execute", async () => {
+    const accepted: number[] = [];
     const deltas: string[] = [];
     const reasoning: string[] = [];
     const toolCalls: object[] = [];
@@ -333,6 +442,7 @@ describe("runTools", () => {
     await runTools({
       request: fakeRequest([
         [
+          { type: "accepted" },
           { type: "reasoning_delta", content: "think" },
           { type: "delta", content: "calling " },
           {
@@ -353,6 +463,7 @@ describe("runTools", () => {
           },
         ],
         [
+          { type: "accepted" },
           { type: "delta", content: "22C" },
           {
             type: "done",
@@ -368,6 +479,7 @@ describe("runTools", () => {
           return { tempC: 22 };
         },
       },
+      onAccepted: () => accepted.push(1),
       onDelta: (c) => deltas.push(c),
       onReasoningDelta: (c) => reasoning.push(c),
       onToolCall(info) {
@@ -375,6 +487,7 @@ describe("runTools", () => {
       },
     });
 
+    expect(accepted).toEqual([1, 1]);
     expect(deltas).toEqual(["calling ", "22C"]);
     expect(reasoning).toEqual(["think"]);
     expect(toolCalls).toEqual([

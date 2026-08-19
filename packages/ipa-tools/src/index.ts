@@ -39,6 +39,7 @@ export {
   serializeToolResult,
   type RunToolsOptions,
   type RunToolsResult,
+  type RunToolsStopReason,
   type ToolExecutor,
 } from "./run-tools.js";
 export {

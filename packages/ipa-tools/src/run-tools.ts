@@ -8,6 +8,8 @@ import { getInference } from "./inference.js";
 import type {
   DoneChunk,
   Inference,
+  InferenceOptions,
+  InferenceRequest,
   Message,
   Tool,
   ToolCall,
@@ -16,13 +18,19 @@ import type {
 
 export type ToolExecutor = (args: unknown) => unknown | Promise<unknown>;
 
+/** Why `runTools` stopped. `"end_turn"` is a text `done`; `"max_rounds"` is tools on the last provider call. */
+export type RunToolsStopReason = "end_turn" | "max_rounds";
+
 export type RunToolsOptions = {
   messages: Message[];
   tools?: Tool[];
   execute?: Record<string, ToolExecutor>;
   toolChoice?: ToolChoice;
-  /** Default 5; must be a positive finite number. */
+  /** Forwarded on every round. Same object each provider call. */
+  options?: InferenceOptions;
+  /** Default 5; max provider calls. Must be a positive finite number. */
   maxRounds?: number;
+  onAccepted?: () => void;
   onDelta?: (content: string) => void;
   onReasoningDelta?: (content: string) => void;
   onToolCall?: (info: {
@@ -48,6 +56,7 @@ export type RunToolsOptions = {
 export type RunToolsResult = {
   messages: Message[];
   final: DoneChunk;
+  stopReason: RunToolsStopReason;
 };
 
 /**
@@ -94,6 +103,8 @@ export function parseToolArguments(
  * Page-executed multi-round function-tool loop.
  * Does not talk to providers or keys — only calls the supplied `request`
  * (or `window.inference.request`) and `execute` handlers.
+ * `maxRounds` is max provider calls: last-round toolCalls are executed and
+ * returned (`stopReason: "max_rounds"`), not thrown.
  */
 export async function runTools(
   options: RunToolsOptions
@@ -110,6 +121,8 @@ export async function runTools(
     execute,
     maxRounds = 5,
     toolChoice,
+    options: requestOptions,
+    onAccepted,
     onDelta,
     onReasoningDelta,
     onToolCall,
@@ -166,19 +179,14 @@ export async function runTools(
       throw makeInferenceError("aborted", "Request aborted");
     }
 
-    const req: {
-      method: "chat";
-      messages: Message[];
-      signal?: AbortSignal;
-      tools?: Tool[];
-      toolChoice?: ToolChoice;
-    } = {
+    const req: InferenceRequest = {
       method,
       messages,
       signal,
     };
     if (tools !== undefined) req.tools = tools;
     if (toolChoice !== undefined) req.toolChoice = toolChoice;
+    if (requestOptions !== undefined) req.options = requestOptions;
 
     let done: DoneChunk | undefined;
     for await (const chunk of request(req)) {
@@ -186,7 +194,9 @@ export async function runTools(
         throw makeInferenceError("aborted", "Request aborted");
       }
       if (!chunk || typeof chunk !== "object") continue;
-      if (chunk.type === "delta" && typeof onDelta === "function") {
+      if (chunk.type === "accepted" && typeof onAccepted === "function") {
+        onAccepted();
+      } else if (chunk.type === "delta" && typeof onDelta === "function") {
         onDelta(chunk.content);
       } else if (
         chunk.type === "reasoning_delta" &&
@@ -222,7 +232,7 @@ export async function runTools(
       if (message && typeof message === "object") {
         messages = [...messages, message];
       }
-      return { messages, final: done };
+      return { messages, final: done, stopReason: "end_turn" };
     }
 
     const assistantMessage: Extract<Message, { role: "assistant" }> = {
@@ -286,6 +296,10 @@ export async function runTools(
           content: serializeToolResult(result),
         },
       ];
+    }
+
+    if (round === maxRounds - 1) {
+      return { messages, final: done, stopReason: "max_rounds" };
     }
   }
 
