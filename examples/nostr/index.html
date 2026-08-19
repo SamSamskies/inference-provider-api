@@ -1807,6 +1807,7 @@
           }
 
           let applied = false;
+          let applyError = null;
           for (const call of toolCalls) {
             const name = call.function?.name;
             let args = {};
@@ -1817,8 +1818,12 @@
             }
             if (name === "show_notes") {
               setFilterPhase("tool");
-              applied = true;
-              showNotes(args);
+              const result = showNotes(args);
+              if (result?.error) {
+                applyError = result.error;
+              } else {
+                applied = true;
+              }
             }
           }
 
@@ -1828,8 +1833,9 @@
             renderNotes();
             showError({
               code: "provider_error",
-              message:
-                "The model did not call show_notes. Try another model in Inference Bridge.",
+              message: applyError
+                ? `show_notes failed: ${applyError}`
+                : "The model did not call show_notes. Try another model in Inference Bridge.",
             });
             renderRunMeta();
             return;
