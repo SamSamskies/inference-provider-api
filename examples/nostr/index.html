@@ -1796,15 +1796,13 @@
               typeof done?.message?.content === "string"
                 ? done.message.content.trim()
                 : "";
-            visibleIds = null;
-            appliedFilter = false;
-            renderNotes();
             showError({
               code: "provider_error",
               message: `The model did not call show_notes.${
                 text ? ` It said: ${truncate(text, 240)}` : " Try another model in Inference Bridge."
               }`,
             });
+            updateFeedStatus();
             renderRunMeta();
             return;
           }
@@ -1831,15 +1829,13 @@
           }
 
           if (!applied) {
-            visibleIds = null;
-            appliedFilter = false;
-            renderNotes();
             showError({
               code: "provider_error",
               message: applyError
                 ? `show_notes failed: ${applyError}`
                 : "The model did not call show_notes. Try another model in Inference Bridge.",
             });
+            updateFeedStatus();
             renderRunMeta();
             return;
           }
