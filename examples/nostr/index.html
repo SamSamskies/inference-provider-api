@@ -1735,6 +1735,9 @@
           }
           ids.push(notes[index - 1].id);
         }
+        if (args.n.length > 0 && ids.length === 0) {
+          return { error: "n must contain valid note numbers" };
+        }
         visibleIds = ids;
         appliedFilter = true;
         setFilterPhase("applying");
