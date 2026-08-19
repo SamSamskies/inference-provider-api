@@ -20,6 +20,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
 - [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 - [Translate demo](https://samsamskies.github.io/inference-provider-api/translate/) — short haiku translated with [`ipa-tools`](./packages/ipa-tools) `complete` ([source](./examples/translate/))
+- [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — snapshot of kind 1 notes filtered with Inference Bridge experimental tool calling ([source](./examples/nostr/))
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces.
 
@@ -175,7 +176,10 @@ Allow once, or deny only this request.
 Request preview is optional extension UX for this draft, not part of the API
 contract. When the request includes `tools`, the permission UI must list the
 function names; a persistent chat grant does not silently cover a later tools
-request.
+request. A follow-up that only appends `role: "tool"` results may not re-prompt
+and may not appear in any preview, so applications should disclose what data
+those tools will send to the provider **before** Allow (in the first `messages`,
+the tool description, or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling).
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
 persists access for that origin together with the chosen provider and model; Deny
