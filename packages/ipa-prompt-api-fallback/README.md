@@ -4,8 +4,6 @@ Chrome [Prompt API](https://developer.chrome.com/docs/ai/prompt-api) (`LanguageM
 
 **This is not IPA.** There is no origin permission prompt, no user-chosen provider/model, and no `permission_denied` from the browser. Do **not** assign the adapter to `window.inference`. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay false/throwing on the fallback path.
 
-**Status:** `0.x` while IPA is an Experimental Draft ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20)).
-
 ## Install
 
 ```bash

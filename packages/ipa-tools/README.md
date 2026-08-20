@@ -6,8 +6,6 @@ Application helpers and TypeScript types for the [Inference Provider API](https:
 
 This package is **not** part of the injected API. Streaming stays on `window.inference.request`. Use `ipa-tools` for types, draining a stream to `done`, and the page-executed function-tool loop.
 
-**Status:** `0.x` while IPA is an Experimental Draft.
-
 ## Install
 
 ```bash
