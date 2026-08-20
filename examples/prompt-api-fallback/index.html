@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Today in history — IPA fallback POC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
+        --radius: 10px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2.5rem 1.25rem 3rem;
+      }
+
+      main {
+        width: 100%;
+        max-width: 28rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      #status.ready {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      #status.missing {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .lede {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.45;
+        font-size: 0.95rem;
+      }
+
+      #progress-wrap {
+        display: none;
+        gap: 0.5rem;
+        align-items: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      #progress-wrap.visible {
+        display: flex;
+      }
+
+      #progress {
+        flex: 1;
+        height: 0.45rem;
+        accent-color: var(--accent);
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 500;
+        border: none;
+        border-radius: var(--radius);
+        padding: 0.85rem 1.1rem;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        flex: 1;
+      }
+
+      button.secondary {
+        flex: 0 0 auto;
+        background: var(--surface);
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      #fact {
+        display: none;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      #fact.visible {
+        display: block;
+      }
+
+      #fact.pending {
+        color: var(--muted);
+      }
+
+      .status-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .dots {
+        display: inline-flex;
+        gap: 0.2rem;
+      }
+
+      .dots span {
+        width: 0.28rem;
+        height: 0.28rem;
+        border-radius: 50%;
+        background: var(--muted);
+        animation: blink 1.2s infinite ease-in-out;
+      }
+
+      .dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.25;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dots span {
+          animation: none;
+          opacity: 0.6;
+        }
+      }
+
+      #meta {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        min-height: 1rem;
+      }
+
+      #meta.error {
+        color: var(--danger);
+        background: var(--danger-soft);
+        border-radius: 6px;
+        padding: 0.4rem 0.55rem;
+      }
+    </style>
+    <!--
+      Serve the repo root so these paths resolve, e.g.:
+        npx serve .
+      then open /examples/prompt-api-fallback/
+      Build packages first: npm run build
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "ipa-tools": "/packages/ipa-tools/dist/index.js",
+          "ipa-prompt-api-fallback": "/packages/ipa-prompt-api-fallback/dist/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Today in history</h1>
+        <div id="status" class="missing" role="status">checking…</div>
+      </header>
+      <p class="lede">
+        One click → a fun historical fact for today’s date. Uses
+        <code>createInference</code> (IPA first, optional Chrome Prompt API
+        fallback). Not IPA when the fallback runs.
+      </p>
+      <div id="progress-wrap">
+        <span id="progress-label">Downloading…</span>
+        <progress id="progress" value="0" max="1"></progress>
+      </div>
+      <div class="actions">
+        <button type="button" id="go" disabled>Get today’s fact</button>
+        <button type="button" id="stop" class="secondary" hidden>Stop</button>
+      </div>
+      <div id="fact" aria-live="polite"></div>
+      <div id="meta" aria-live="polite"></div>
+    </main>
+
+    <script type="module">
+      import {
+        createInference,
+        isInferenceError,
+      } from "ipa-tools";
+      import { createPromptApiBackend } from "ipa-prompt-api-fallback";
+
+      const statusEl = document.getElementById("status");
+      const goBtn = document.getElementById("go");
+      const stopBtn = document.getElementById("stop");
+      const factEl = document.getElementById("fact");
+      const metaEl = document.getElementById("meta");
+      const progressWrap = document.getElementById("progress-wrap");
+      const progress = document.getElementById("progress");
+      const progressLabel = document.getElementById("progress-label");
+
+      /** @type {Awaited<ReturnType<typeof inference.probe>> | null} */
+      let probeStatus = null;
+      let consentedToPromptApi = false;
+      /** @type {AbortController | null} */
+      let activeController = null;
+
+      const todayLabel = new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+      }).format(new Date());
+
+      const inference = createInference({
+        fallbacks: [createPromptApiBackend()],
+        onDownloadProgress(loaded) {
+          progressWrap.classList.add("visible");
+          setPending(
+            loaded >= 1
+              ? "Loading on-device model"
+              : `Downloading on-device model… ${Math.round(loaded * 100)}%`
+          );
+          if (loaded >= 1) {
+            progress.removeAttribute("value");
+            progressLabel.textContent = "Loading model…";
+          } else {
+            progress.value = loaded;
+            progressLabel.textContent = `Downloading… ${Math.round(loaded * 100)}%`;
+          }
+        },
+      });
+
+      function canAttempt(status) {
+        if (status.ipa === "available") return true;
+        return status.promptApi != null && status.promptApi !== "unavailable";
+      }
+
+      function renderProbe(status) {
+        probeStatus = status;
+        const promptApi = status.promptApi ?? "unavailable";
+        if (status.ipa === "available" || promptApi === "available") {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+        } else if (promptApi === "downloadable" || promptApi === "downloading") {
+          statusEl.textContent = promptApi;
+          statusEl.className = "missing";
+        } else {
+          statusEl.textContent = "unavailable";
+          statusEl.className = "missing";
+        }
+        const busy = activeController != null;
+        goBtn.disabled = busy || !canAttempt(status);
+        stopBtn.hidden = !busy;
+      }
+
+      function setMeta(text, { error = false } = {}) {
+        metaEl.textContent = text;
+        metaEl.classList.toggle("error", error);
+      }
+
+      function setPending(label) {
+        factEl.classList.add("visible", "pending");
+        factEl.innerHTML =
+          `<span class="status-row"><span>${label}</span>` +
+          `<span class="dots" aria-hidden="true"><span></span><span></span><span></span></span></span>`;
+      }
+
+      function clearFact() {
+        factEl.classList.remove("visible", "pending");
+        factEl.textContent = "";
+      }
+
+      async function confirmPromptApiIfNeeded(status) {
+        if (status.ipa === "available") return true;
+        if (status.promptApi === "unavailable" || status.promptApi == null) {
+          return false;
+        }
+        if (consentedToPromptApi) return true;
+
+        const needsDownload =
+          status.promptApi === "downloadable" ||
+          status.promptApi === "downloading";
+        const ok = window.confirm(
+          needsDownload
+            ? "No inference extension found. Chrome can use an on-device model (a few GB download). Continue?"
+            : "No inference extension found. Use Chrome’s on-device model on this device?"
+        );
+        if (ok) consentedToPromptApi = true;
+        return ok;
+      }
+
+      goBtn.addEventListener("click", async () => {
+        if (activeController) return;
+
+        const status = probeStatus ?? (await inference.probe());
+        renderProbe(status);
+
+        if (!canAttempt(status)) {
+          clearFact();
+          setMeta(
+            "unavailable: install Inference Bridge, or enable Chrome’s Prompt API.",
+            { error: true }
+          );
+          return;
+        }
+
+        if (!(await confirmPromptApiIfNeeded(status))) {
+          clearFact();
+          setMeta("Skipped — Prompt API not consented.");
+          return;
+        }
+
+        activeController = new AbortController();
+        renderProbe(status);
+        setMeta("");
+        progressWrap.classList.remove("visible");
+        setPending(
+          status.ipa === "available"
+            ? "Waiting for permission"
+            : "Starting on-device model"
+        );
+
+        let sawDelta = false;
+
+        try {
+          for await (const chunk of inference.request({
+            method: "chat",
+            messages: [
+              {
+                role: "user",
+                content: `Share one surprising, true historical fact that happened on ${todayLabel} (any year). One or two sentences. No preamble.`,
+              },
+            ],
+            options: { reasoningEffort: "none" },
+            signal: activeController.signal,
+          })) {
+            if (chunk.type === "accepted") {
+              setPending(
+                status.ipa === "available"
+                  ? "Generating"
+                  : "Generating (Prompt API)"
+              );
+            } else if (chunk.type === "delta") {
+              if (!sawDelta) {
+                sawDelta = true;
+                factEl.classList.remove("pending");
+                factEl.textContent = "";
+              }
+              factEl.textContent += chunk.content;
+            } else if (chunk.type === "done") {
+              factEl.classList.remove("pending");
+              factEl.classList.add("visible");
+              if (chunk.message.content != null) {
+                // Prompt API often pads with trailing newlines; trim for display.
+                factEl.textContent = chunk.message.content.trim();
+              } else {
+                factEl.textContent = factEl.textContent.trim();
+              }
+              const parts = [`model ${chunk.model}`];
+              if (chunk.usage) {
+                const { inputTokens, outputTokens } = chunk.usage;
+                if (inputTokens != null) parts.push(`in ${inputTokens}`);
+                if (outputTokens != null) parts.push(`out ${outputTokens}`);
+              }
+              setMeta(parts.join(" · "));
+            }
+          }
+        } catch (err) {
+          if (!sawDelta) clearFact();
+          const code = isInferenceError(err) ? err.code : "unknown";
+          const message = err && err.message ? err.message : String(err);
+          if (code === "aborted") {
+            setMeta("Stopped.");
+          } else {
+            setMeta(`${code}: ${message}`, { error: true });
+          }
+        } finally {
+          activeController = null;
+          progressWrap.classList.remove("visible");
+          void inference.probe().then(renderProbe);
+        }
+      });
+
+      stopBtn.addEventListener("click", () => {
+        activeController?.abort();
+      });
+
+      try {
+        renderProbe(await inference.probe());
+      } catch (err) {
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        const message = err && err.message ? err.message : String(err);
+        setMeta(message, { error: true });
+      }
+    </script>
+  </body>
+</html>
