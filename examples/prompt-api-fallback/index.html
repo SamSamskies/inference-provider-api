@@ -219,20 +219,6 @@
         padding: 0.4rem 0.55rem;
       }
     </style>
-    <!--
-      Serve the repo root so these paths resolve, e.g.:
-        npx serve .
-      then open /examples/prompt-api-fallback/
-      Build packages first: npm run build
-    -->
-    <script type="importmap">
-      {
-        "imports": {
-          "ipa-tools": "/packages/ipa-tools/dist/index.js",
-          "ipa-prompt-api-fallback": "/packages/ipa-prompt-api-fallback/dist/index.js"
-        }
-      }
-    </script>
   </head>
   <body>
     <main>
@@ -261,8 +247,8 @@
       import {
         createInference,
         isInferenceError,
-      } from "ipa-tools";
-      import { createPromptApiBackend } from "ipa-prompt-api-fallback";
+      } from "https://esm.sh/ipa-tools@0.4.1";
+      import { createPromptApiBackend } from "https://esm.sh/ipa-prompt-api-fallback@0.1.0";
 
       const statusEl = document.getElementById("status");
       const goBtn = document.getElementById("go");

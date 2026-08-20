@@ -1,25 +1,26 @@
-# Today in history — IPA + Prompt API fallback POC
+# Today in history — IPA + Prompt API fallback
 
-One-button local POC for [`ipa-prompt-api-fallback`](../../packages/ipa-prompt-api-fallback) with [`ipa-tools`](../../packages/ipa-tools) `createInference({ fallbacks })`.
+One-button demo for [`ipa-prompt-api-fallback`](https://www.npmjs.com/package/ipa-prompt-api-fallback) with [`ipa-tools`](https://www.npmjs.com/package/ipa-tools) `createInference({ fallbacks })`.
 
-Click **Get today’s fact** → a short historical fact for today’s month/day. IPA is tried first; Chrome Prompt API is the optional fallback.
+**Live demo:** [https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)
 
-## Setup
+Click **Get today’s fact** → a short historical fact for today’s month/day. IPA is tried first; Chrome Prompt API is the optional fallback (not IPA when the fallback runs).
 
-From the repo root:
+## Try it
 
-```bash
-npm install
-npm run build
-npx serve .
-```
+1. Install [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) (optional — without it, Chrome Prompt API can still run when available).
+2. Open the [live demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/), or serve this folder locally:
 
-Open `http://localhost:3000/examples/prompt-api-fallback/` (port may vary).
+   ```bash
+   npx serve .
+   ```
+
+3. Click **Get today’s fact**
 
 ### Chrome Prompt API
 
 1. Use a Chrome build where `LanguageModel` is available ([docs](https://developer.chrome.com/docs/ai/prompt-api)).
-2. On localhost the API is allowed; you may still need flags / model download via `chrome://on-device-internals`.
+2. On localhost / GitHub Pages the API is allowed when the browser supports it; you may still need flags / model download via `chrome://on-device-internals`.
 3. First download can be several GB — the page asks before `create()` when status is `downloadable`.
 
 ### Inference Bridge
