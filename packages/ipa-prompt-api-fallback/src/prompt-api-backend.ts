@@ -118,12 +118,15 @@ export function createPromptApiBackend(
       }
 
       throwIfAborted(signal);
-      return createInferenceFromSession(session);
+      return createInferenceFromSession(session, sessionOptions);
     },
   };
 }
 
-function createInferenceFromSession(baseSession: LanguageModelSession): Inference {
+function createInferenceFromSession(
+  baseSession: LanguageModelSession,
+  sessionOptions: LanguageModelCreateOptions
+): Inference {
   return {
     getFeatures() {
       return { toolCalling: false };
@@ -150,11 +153,13 @@ function createInferenceFromSession(baseSession: LanguageModelSession): Inferenc
 
           const prompts = toLanguageModelMessages(request.messages);
           let session: LanguageModelSession | undefined;
-          let owned = false;
 
           try {
-            session = await openRequestSession(baseSession, signal);
-            owned = session !== baseSession;
+            session = await openRequestSession(
+              baseSession,
+              sessionOptions,
+              signal
+            );
             throwIfAborted(signal);
 
             // Synthesized: Prompt API has no IPA-style permission prompt.
@@ -183,7 +188,9 @@ function createInferenceFromSession(baseSession: LanguageModelSession): Inferenc
           } catch (error) {
             throw mapPromptApiError(error);
           } finally {
-            if (owned && session != null) {
+            // Always destroy the per-request session (clone or one-shot create).
+            // Never prompt on the warm base — that would accumulate context.
+            if (session != null) {
               try {
                 session.destroy();
               } catch {
@@ -197,22 +204,43 @@ function createInferenceFromSession(baseSession: LanguageModelSession): Inferenc
   };
 }
 
+/**
+ * Prefer cloning the warm base session (keeps download / initial setup).
+ * If clone is missing or fails for a non-abort reason, create a one-shot
+ * session so each request starts with an empty conversation context.
+ */
 async function openRequestSession(
   baseSession: LanguageModelSession,
+  sessionOptions: LanguageModelCreateOptions,
   signal?: AbortSignal
 ): Promise<LanguageModelSession> {
   if (typeof baseSession.clone === "function") {
     try {
       return await baseSession.clone({ signal });
     } catch (error) {
-      // Fall through to reuse the base session if clone is unsupported
-      // at runtime despite being present, unless the call was aborted.
       if (signal?.aborted || isAbortName(error)) {
         throw mapPromptApiError(error);
       }
+      // Fall through to one-shot create.
     }
   }
-  return baseSession;
+
+  const LanguageModel = getLanguageModel();
+  if (LanguageModel == null || typeof LanguageModel.create !== "function") {
+    throw makeInferenceError(
+      "unavailable",
+      "Chrome Prompt API (LanguageModel) is not available."
+    );
+  }
+
+  try {
+    return await LanguageModel.create({
+      ...sessionOptions,
+      signal,
+    });
+  } catch (error) {
+    throw mapPromptApiError(error);
+  }
 }
 
 async function* iteratePromptStream(

@@ -171,16 +171,18 @@ describe("createPromptApiBackend", () => {
     ]);
     expect(clone).toHaveBeenCalled();
     expect(destroy).toHaveBeenCalled();
+    expect(base.destroy).not.toHaveBeenCalled();
   });
 
   it("normalizes cumulative stream chunks into deltas", async () => {
-    const session = makeSession({
-      promptStreaming: () => asyncStream(["Hel", "Hello", "Hello!"]),
-      destroy: vi.fn(),
-    });
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
-      create: vi.fn(async () => session),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["Hel", "Hello", "Hello!"]),
+          destroy: vi.fn(),
+        })
+      ),
     });
 
     const inference = await createPromptApiBackend().create({});
@@ -194,14 +196,94 @@ describe("createPromptApiBackend", () => {
     expect(deltas).toEqual(["Hel", "lo", "!"]);
   });
 
-  it("rejects tools on request", async () => {
-    const session = makeSession({
-      promptStreaming: () => asyncStream(["x"]),
-      destroy: vi.fn(),
+  it("without clone, creates and destroys a one-shot session per request", async () => {
+    const requestDestroys: ReturnType<typeof vi.fn>[] = [];
+    const create = vi.fn(async () => {
+      const destroy = vi.fn();
+      const session = makeSession({
+        promptStreaming: () => asyncStream(["ok"]),
+        destroy,
+      });
+      // First create is the warm base (no clone); later creates are one-shots.
+      if (create.mock.calls.length > 1) requestDestroys.push(destroy);
+      return session;
     });
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
-      create: vi.fn(async () => session),
+      create,
+    });
+
+    const inference = await createPromptApiBackend().create({});
+    expect(create).toHaveBeenCalledTimes(1);
+
+    for (let i = 0; i < 2; i++) {
+      for await (const _ of inference.request({
+        method: "chat",
+        messages: [{ role: "user", content: `Hi ${i}` }],
+      })) {
+        // drain
+      }
+    }
+
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(requestDestroys).toHaveLength(2);
+    for (const destroy of requestDestroys) {
+      expect(destroy).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("when clone fails non-abort, falls back to one-shot create", async () => {
+    const oneShotDestroy = vi.fn();
+    const base = makeSession({
+      promptStreaming: () => asyncStream([]),
+      clone: vi.fn(async () => {
+        throw new Error("clone unsupported");
+      }),
+      destroy: vi.fn(),
+    });
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce(base)
+      .mockResolvedValueOnce(
+        makeSession({
+          promptStreaming: () => asyncStream(["fallback"]),
+          destroy: oneShotDestroy,
+        })
+      );
+
+    setLanguageModel({
+      availability: vi.fn().mockResolvedValue("available"),
+      create,
+    });
+
+    const inference = await createPromptApiBackend().create({});
+    const chunks: unknown[] = [];
+    for await (const chunk of inference.request({
+      method: "chat",
+      messages: [{ role: "user", content: "Hi" }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(oneShotDestroy).toHaveBeenCalled();
+    expect(base.destroy).not.toHaveBeenCalled();
+    expect(chunks).toContainEqual({
+      type: "done",
+      model: PROMPT_API_MODEL,
+      message: { role: "assistant", content: "fallback" },
+    });
+  });
+
+  it("rejects tools on request", async () => {
+    setLanguageModel({
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["x"]),
+          destroy: vi.fn(),
+        })
+      ),
     });
     const inference = await createPromptApiBackend().create({});
     const iter = inference.request({
@@ -235,13 +317,14 @@ describe("createPromptApiBackend", () => {
   });
 
   it("does not assign window.inference", async () => {
-    const session = makeSession({
-      promptStreaming: () => asyncStream(["ok"]),
-      destroy: vi.fn(),
-    });
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
-      create: vi.fn(async () => session),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["ok"]),
+          destroy: vi.fn(),
+        })
+      ),
     });
 
     (globalThis as { window: { inference?: unknown } }).window = {};
@@ -271,13 +354,14 @@ describe("createInference + promptApi backend", () => {
   });
 
   it("resolves Prompt API when IPA is missing", async () => {
-    const session = makeSession({
-      promptStreaming: () => asyncStream(["hey"]),
-      destroy: vi.fn(),
-    });
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
-      create: vi.fn(async () => session),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["hey"]),
+          destroy: vi.fn(),
+        })
+      ),
     });
     (globalThis as { window: { inference?: unknown } }).window = {};
 
