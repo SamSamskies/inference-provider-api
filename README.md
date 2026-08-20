@@ -20,7 +20,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
 - [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 - [Translate demo](https://samsamskies.github.io/inference-provider-api/translate/) — short haiku translated with [`ipa-tools`](./packages/ipa-tools) `complete` ([source](./examples/translate/))
-- [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — snapshot of kind 1 notes filtered with Inference Bridge experimental tool calling ([source](./examples/nostr/))
+- [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — a feed of Nostr notes filtered with natural language using Inference Bridge experimental tool calling ([source](./examples/nostr/))
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces.
 
