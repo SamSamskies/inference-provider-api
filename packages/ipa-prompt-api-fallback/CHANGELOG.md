@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-08-20
 
 ### Added
 
-- Initial package: `createPromptApiBackend()` and `getPromptApiAvailability()` for Chrome Prompt API → IPA-shaped `Inference` ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20) phase 2).
-- Compatibility backend only — not an IPA implementation; does not mutate `window.inference`.
+- Initial release: `createPromptApiBackend()` and `getPromptApiAvailability()` for Chrome Prompt API → IPA-shaped `Inference` ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20)).
+- Compatibility backend only — **not** an IPA implementation; does not mutate `window.inference`. Apps import this package and pass the backend into `ipa-tools` `createInference({ fallbacks })`.

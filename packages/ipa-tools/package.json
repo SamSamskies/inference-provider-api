@@ -1,6 +1,6 @@
 {
   "name": "ipa-tools",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Application helpers and TypeScript types for the Inference Provider API",
   "type": "module",
   "license": "MIT",

@@ -18,11 +18,11 @@ Zero runtime dependencies. Browser ESM only (no Node APIs).
 
 ### CDN / no bundler
 
-Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@0.4.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
+Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@0.4.1`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
 
 ```html
 <script type="module">
-  import { complete, runTools } from "https://esm.sh/ipa-tools@0.4.0";
+  import { complete, runTools } from "https://esm.sh/ipa-tools@0.4.1";
 
   const { message } = await complete({
     method: "chat",
@@ -38,7 +38,7 @@ Import map equivalent:
 <script type="importmap">
   {
     "imports": {
-      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@0.4.0/+esm"
+      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@0.4.1/+esm"
     }
   }
 </script>

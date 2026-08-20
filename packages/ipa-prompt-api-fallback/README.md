@@ -2,15 +2,17 @@
 
 Chrome [Prompt API](https://developer.chrome.com/docs/ai/prompt-api) (`LanguageModel`) compatibility backend for [`ipa-tools`](../ipa-tools) `createInference({ fallbacks })`.
 
-**This is not IPA.** There is no origin permission prompt, no user-chosen provider/model, and no `permission_denied` from the browser. Do **not** assign the adapter to `window.inference`. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay false/throwing on the Nano path.
+**This is not IPA.** There is no origin permission prompt, no user-chosen provider/model, and no `permission_denied` from the browser. Do **not** assign the adapter to `window.inference`. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay false/throwing on the fallback path.
 
-**Status:** `0.x` while IPA is an Experimental Draft. Prefer workspace / local builds until published (see issue [#20](https://github.com/SamSamskies/inference-provider-api/issues/20)).
+**Status:** `0.x` while IPA is an Experimental Draft ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20)).
 
 ## Install
 
 ```bash
 npm install ipa-tools ipa-prompt-api-fallback
 ```
+
+[![npm](https://img.shields.io/npm/v/ipa-prompt-api-fallback)](https://www.npmjs.com/package/ipa-prompt-api-fallback)
 
 Peer dependency: `ipa-tools` `>=0.3.0`. Zero other runtime deps. Browser ESM only.
 
@@ -96,4 +98,4 @@ npm run build -w ipa-prompt-api-fallback
 npm test -w ipa-prompt-api-fallback
 ```
 
-POC: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback).
+POC: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback) (also on [GitHub Pages](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)).
