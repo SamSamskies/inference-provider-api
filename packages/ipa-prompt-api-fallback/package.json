@@ -1,0 +1,53 @@
+{
+  "name": "ipa-prompt-api-fallback",
+  "version": "0.1.0",
+  "description": "Chrome Prompt API compatibility backend for ipa-tools createInference fallbacks",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Samskies and contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SamSamskies/inference-provider-api.git",
+    "directory": "packages/ipa-prompt-api-fallback"
+  },
+  "homepage": "https://github.com/SamSamskies/inference-provider-api/tree/main/packages/ipa-prompt-api-fallback",
+  "bugs": {
+    "url": "https://github.com/SamSamskies/inference-provider-api/issues"
+  },
+  "keywords": [
+    "inference-provider-api",
+    "ipa",
+    "ipa-tools",
+    "prompt-api",
+    "chrome",
+    "gemini-nano",
+    "fallback"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "peerDependencies": {
+    "ipa-tools": ">=0.3.0"
+  },
+  "devDependencies": {
+    "ipa-tools": "*",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

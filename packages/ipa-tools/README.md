@@ -79,6 +79,25 @@ sendButton.addEventListener("click", async () => {
 
 Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
 
+Apps import backend packages themselves (no string aliases in `ipa-tools`):
+
+```ts
+import { createInference } from "ipa-tools";
+import { createPromptApiBackend } from "ipa-prompt-api-fallback";
+
+const inference = createInference({
+  fallbacks: [createPromptApiBackend()],
+  onDownloadProgress(loaded) {
+    status.textContent = `Downloading on-device model… ${Math.round(loaded * 100)}%`;
+  },
+});
+
+const status = await inference.probe();
+// { ipa: "unavailable", promptApi: "downloadable" }
+```
+
+Chrome Prompt API requirements, download disclosure, and mapping caveats live in the [`ipa-prompt-api-fallback`](../ipa-prompt-api-fallback) README. That path is **not** an IPA implementation.
+
 ## `complete`
 
 Drain a stream to one `done` chunk:

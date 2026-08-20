@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Document `createInference` fallbacks with `ipa-prompt-api-fallback` object example ([#20](https://github.com/SamSamskies/inference-provider-api/issues/20)).
+
 ## [0.4.0] - 2026-08-19
 
 ### Added

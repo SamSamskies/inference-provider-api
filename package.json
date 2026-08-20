@@ -1,0 +1,16 @@
+{
+  "name": "inference-provider-api",
+  "private": true,
+  "description": "Inference Provider API spec, demos, and packages",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
