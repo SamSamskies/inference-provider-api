@@ -365,7 +365,9 @@
       goBtn.addEventListener("click", async () => {
         if (activeController) return;
 
-        const status = probeStatus ?? (await inference.probe());
+        // Always re-probe: IPA may have become available since page load
+        // (e.g. Inference Bridge installed after the initial probe).
+        const status = await inference.probe();
         renderProbe(status);
 
         if (!canAttempt(status)) {
