@@ -96,6 +96,77 @@ const status = await inference.probe();
 
 Chrome Prompt API requirements, download disclosure, and mapping caveats live in the [`ipa-prompt-api-fallback`](../ipa-prompt-api-fallback) README. That path is **not** an IPA implementation.
 
+### Hosted / custom HTTP fallback
+
+Pass any object that implements `InferenceBackend`. A minimal same-origin JSON endpoint looks like this (consent, quotas, and auth headers stay in your app):
+
+```ts
+import {
+  createInference,
+  makeInferenceError,
+  type InferenceBackend,
+  type InferenceRequest,
+} from "ipa-tools";
+
+/** Your `/api/infer` POST handler should return this JSON shape. */
+type GeminiApiReply = { content: string; model: string };
+
+function createGeminiApiBackend(): InferenceBackend {
+  const features = {
+    toolCalling: false,
+    options: { reasoningEffort: true, temperature: true },
+  } as const;
+
+  return {
+    id: "gemini-api",
+    getFeatures: () => features,
+    async probe() {
+      try {
+        const res = await fetch("/api/infer", { method: "GET" });
+        return res.ok ? "available" : "unavailable";
+      } catch {
+        return "unavailable";
+      }
+    },
+    async create() {
+      return {
+        getFeatures: () => features,
+        async *request(req: InferenceRequest) {
+          const res = await fetch("/api/infer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: req.messages,
+              ...(req.options ? { options: req.options } : {}),
+            }),
+            signal: req.signal,
+          });
+          if (!res.ok) {
+            throw makeInferenceError("provider_error", `HTTP ${res.status}`);
+          }
+
+          // Trust the endpoint contract (see GeminiApiReply).
+          const { content, model } = (await res.json()) as GeminiApiReply;
+
+          yield { type: "accepted" as const };
+          yield {
+            type: "done" as const,
+            model,
+            message: { role: "assistant" as const, content },
+          };
+        },
+      };
+    },
+  };
+}
+
+const inference = createInference({
+  fallbacks: [createGeminiApiBackend()],
+});
+```
+
+This path is **not** IPA and must not be assigned to `window.inference`.
+
 ## `complete`
 
 Drain a stream to one `done` chunk:
