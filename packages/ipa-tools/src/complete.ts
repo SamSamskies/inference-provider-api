@@ -11,7 +11,7 @@ export type CompleteOptions = {
   /** Defaults to `window.inference.request`. */
   request?: Inference["request"];
   /**
-   * Tried only after IPA is unavailable (at most one entry; see `MAX_FALLBACKS`).
+   * Tried only after IPA is unavailable (at most `MAX_FALLBACKS` entries).
    * Prefer `createInference` when sending more than once (caches the resolved
    * backend).
    */

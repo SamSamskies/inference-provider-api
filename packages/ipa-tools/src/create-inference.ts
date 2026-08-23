@@ -22,9 +22,9 @@ import type {
 
 export type CreateInferenceOptions = {
   /**
-   * Optional page-side backend tried only after IPA is unavailable.
-   * At most one entry today (`MAX_FALLBACKS`).
-   * Omit or `[]` for IPA only.
+   * Optional page-side backends tried only after IPA is unavailable,
+   * in preference order. At most `MAX_FALLBACKS` entries (currently 2:
+   * Prompt API then Transformers.js). Omit or `[]` for IPA only.
    */
   fallbacks?: FallbackInput[];
   /** Forwarded to fallback `create()` when the backend supports downloads. */

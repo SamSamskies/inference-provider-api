@@ -22,6 +22,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Translate demo](https://samsamskies.github.io/inference-provider-api/translate/) — short haiku translated with [`ipa-tools`](./packages/ipa-tools) `complete` ([source](./examples/translate/))
 - [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — a feed of Nostr notes filtered with natural language using Inference Bridge experimental tool calling ([source](./examples/nostr/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
+- Transformers.js fallback demo (`examples/transformers-fallback`) — local POC: IPA, then Prompt API, then [`ipa-transformers-fallback`](./packages/ipa-transformers-fallback) (CDN / Pages after a `0.x` publish)
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces.
 

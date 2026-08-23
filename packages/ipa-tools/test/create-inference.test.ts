@@ -93,18 +93,25 @@ describe("normalizeFallbacks", () => {
     );
   });
 
-  it("rejects more than one entry", () => {
+  it("rejects more than MAX_FALLBACKS entries", () => {
     expect(() =>
       normalizeFallbacks([
         fakeBackend({ id: "a" }),
         fakeBackend({ id: "b" }),
+        fakeBackend({ id: "c" }),
       ])
     ).toThrow(
       expect.objectContaining({
         code: "invalid_request",
-        message: expect.stringContaining("at most 1 entry"),
+        message: expect.stringContaining("at most 2 entries"),
       })
     );
+  });
+
+  it("accepts two backend objects", () => {
+    const a = fakeBackend({ id: "a" });
+    const b = fakeBackend({ id: "b" });
+    expect(normalizeFallbacks([a, b])).toEqual([a, b]);
   });
 
   it("accepts backend objects", () => {
@@ -150,6 +157,48 @@ describe("createInference / resolver", () => {
     expect(
       done.message.role === "assistant" ? done.message.content : null
     ).toBe("from:b");
+  });
+
+  it("skips an unavailable fallback and uses the next", async () => {
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({ id: "dead", availability: "unavailable" }),
+        fakeBackend({ id: "ok" }),
+      ],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:ok");
+  });
+
+  it("uses the next fallback when create() fails", async () => {
+    const failing: InferenceBackend = {
+      id: "failing",
+      async probe() {
+        return "available";
+      },
+      async create() {
+        throw new Error("download failed");
+      },
+    };
+    const inference = createInference({
+      fallbacks: [failing, fakeBackend({ id: "ok" })],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(
+      done.message.role === "assistant" ? done.message.content : null
+    ).toBe("from:ok");
   });
 
   it("caches the resolved fallback across calls", async () => {

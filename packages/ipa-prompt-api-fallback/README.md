@@ -96,4 +96,4 @@ npm run build -w ipa-prompt-api-fallback
 npm test -w ipa-prompt-api-fallback
 ```
 
-POC: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback) (also on [GitHub Pages](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)).
+POC: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback) (also on [GitHub Pages](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)). To also try Transformers.js after Prompt API, see [`ipa-transformers-fallback`](../ipa-transformers-fallback) (`MAX_FALLBACKS` is 2).

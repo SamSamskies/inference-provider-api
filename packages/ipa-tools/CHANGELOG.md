@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Document a minimal custom HTTP `InferenceBackend` recipe for `createInference({ fallbacks })` (hosted endpoints; not IPA).
+- Point at [`ipa-transformers-fallback`](../ipa-transformers-fallback) as another `InferenceBackend` object for `createInference({ fallbacks })` (not IPA).
+- Raise `MAX_FALLBACKS` from 1 to 2 so apps can pass Prompt API then Transformers.js in one `fallbacks` array ([#37](https://github.com/SamSamskies/inference-provider-api/issues/37)).
 
 ## [0.4.1] - 2026-08-20
 

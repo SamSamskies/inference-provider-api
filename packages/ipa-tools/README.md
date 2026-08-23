@@ -75,26 +75,30 @@ sendButton.addEventListener("click", async () => {
 });
 ```
 
-Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
+Optional `fallbacks` (at most `MAX_FALLBACKS` entries, currently 2) can supply page-side `InferenceBackend`s after IPA is unavailable, in preference order — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
 
 Apps import backend packages themselves (no string aliases in `ipa-tools`):
 
 ```ts
 import { createInference } from "ipa-tools";
 import { createPromptApiBackend } from "ipa-prompt-api-fallback";
+import { createTransformersBackend } from "ipa-transformers-fallback";
 
 const inference = createInference({
-  fallbacks: [createPromptApiBackend()],
+  fallbacks: [
+    createPromptApiBackend(),
+    createTransformersBackend(),
+  ],
   onDownloadProgress(loaded) {
-    status.textContent = `Downloading on-device model… ${Math.round(loaded * 100)}%`;
+    status.textContent = `Downloading model… ${Math.round(loaded * 100)}%`;
   },
 });
 
 const status = await inference.probe();
-// { ipa: "unavailable", promptApi: "downloadable" }
+// { ipa: "unavailable", promptApi: "downloadable", transformers: "downloadable" }
 ```
 
-Chrome Prompt API requirements, download disclosure, and mapping caveats live in the [`ipa-prompt-api-fallback`](../ipa-prompt-api-fallback) README. That path is **not** an IPA implementation.
+Disclose download size before `create()` when a fallback is `"downloadable"`. Chrome Prompt API caveats live in [`ipa-prompt-api-fallback`](../ipa-prompt-api-fallback); Transformers.js size and mapping live in [`ipa-transformers-fallback`](../ipa-transformers-fallback). Those paths are **not** IPA implementations.
 
 ### Hosted / custom HTTP fallback
 

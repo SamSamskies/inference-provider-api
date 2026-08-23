@@ -62,9 +62,9 @@ export type ProbeStatus = {
 
 /**
  * Maximum entries allowed in `fallbacks`. Kept as an array so this can rise
- * later without an API rename; start at one for a simpler mental model.
+ * later without an API rename. Two covers Prompt API then Transformers.js.
  */
-export const MAX_FALLBACKS = 1;
+export const MAX_FALLBACKS = 2;
 
 /** Thrown when every fallback was skipped for lacking toolCalling. */
 const NO_TOOLS_BACKEND_MESSAGE =
@@ -98,9 +98,7 @@ export function normalizeFallbacks(
   if (fallbacks.length > MAX_FALLBACKS) {
     throw makeInferenceError(
       "invalid_request",
-      `fallbacks accepts at most ${MAX_FALLBACKS} entr${
-        MAX_FALLBACKS === 1 ? "y" : "ies"
-      } (got ${fallbacks.length}).`
+      `fallbacks accepts at most ${MAX_FALLBACKS} entries (got ${fallbacks.length}).`
     );
   }
 
