@@ -108,6 +108,28 @@ describe("runTools", () => {
     expect(input).toEqual([{ role: "user", content: "hi" }]);
   });
 
+  it("forwards hosted web_search tools without an execute handler", async () => {
+    const request = vi.fn(
+      fakeRequest([{ role: "assistant", content: "Headlines…" }])
+    );
+    const result = await runTools({
+      request,
+      messages: [{ role: "user", content: "What's in the news?" }],
+      tools: [{ type: "web_search" }],
+    });
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: [{ type: "web_search" }],
+      })
+    );
+    expect(result.stopReason).toBe("end_turn");
+    expect(result.final.message).toEqual({
+      role: "assistant",
+      content: "Headlines…",
+    });
+  });
+
   it("runs toolCalls then returns the final text done chunk", async () => {
     const execute = {
       get_weather: vi.fn(async ({ city }: { city: string }) => ({

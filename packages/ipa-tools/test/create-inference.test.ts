@@ -3,6 +3,8 @@ import {
   createResolver,
   normalizeFallbacks,
   probeFallbacks,
+  requestNeedsTools,
+  requestNeedsWebSearch,
   type InferenceBackend,
 } from "../src/backends.js";
 import { complete } from "../src/complete.js";
@@ -20,6 +22,7 @@ function stubInference(inference: Inference) {
 function fakeInference(options?: {
   id?: string;
   toolCalling?: boolean;
+  webSearch?: boolean;
   message?: string;
 }): Inference {
   const content = options?.message ?? `from:${options?.id ?? "ipa"}`;
@@ -33,9 +36,16 @@ function fakeInference(options?: {
       };
     },
     getFeatures:
-      options?.toolCalling === undefined
+      options?.toolCalling === undefined && options?.webSearch === undefined
         ? undefined
-        : () => ({ toolCalling: options.toolCalling }),
+        : () => ({
+            ...(options.toolCalling !== undefined
+              ? { toolCalling: options.toolCalling }
+              : {}),
+            ...(options.webSearch !== undefined
+              ? { webSearch: options.webSearch }
+              : {}),
+          }),
   };
 }
 
@@ -43,6 +53,7 @@ function fakeBackend(options: {
   id: string;
   availability?: "unavailable" | "downloadable" | "downloading" | "available";
   toolCalling?: boolean;
+  webSearch?: boolean;
   onCreate?: () => void;
 }): InferenceBackend {
   const availability = options.availability ?? "available";
@@ -52,14 +63,22 @@ function fakeBackend(options: {
       return availability;
     },
     getFeatures:
-      options.toolCalling === undefined
+      options.toolCalling === undefined && options.webSearch === undefined
         ? undefined
-        : () => ({ toolCalling: options.toolCalling }),
+        : () => ({
+            ...(options.toolCalling !== undefined
+              ? { toolCalling: options.toolCalling }
+              : {}),
+            ...(options.webSearch !== undefined
+              ? { webSearch: options.webSearch }
+              : {}),
+          }),
     async create() {
       options.onCreate?.();
       return fakeInference({
         id: options.id,
         toolCalling: options.toolCalling,
+        webSearch: options.webSearch,
         message: `from:${options.id}`,
       });
     },
@@ -69,6 +88,43 @@ function fakeBackend(options: {
 afterEach(() => {
   delete (globalThis as { window?: unknown }).window;
   delete (globalThis as { inference?: unknown }).inference;
+});
+
+describe("requestNeedsTools / requestNeedsWebSearch", () => {
+  it("treats function tools and hosted search as independent", () => {
+    expect(requestNeedsTools({})).toBe(false);
+    expect(requestNeedsWebSearch({})).toBe(false);
+    expect(requestNeedsTools({ tools: [{ type: "web_search" }] })).toBe(false);
+    expect(requestNeedsWebSearch({ tools: [{ type: "web_search" }] })).toBe(
+      true
+    );
+    expect(
+      requestNeedsTools({
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).toBe(true);
+    expect(
+      requestNeedsWebSearch({
+        tools: [{ type: "function", function: { name: "ping" } }],
+      })
+    ).toBe(false);
+    expect(
+      requestNeedsTools({
+        tools: [
+          { type: "web_search" },
+          { type: "function", function: { name: "ping" } },
+        ],
+      })
+    ).toBe(true);
+    expect(
+      requestNeedsWebSearch({
+        tools: [
+          { type: "web_search" },
+          { type: "function", function: { name: "ping" } },
+        ],
+      })
+    ).toBe(true);
+  });
 });
 
 describe("normalizeFallbacks", () => {
@@ -240,6 +296,82 @@ describe("createInference / resolver", () => {
     });
 
     expect(created).toBe(false);
+  });
+
+  it("does not require toolCalling for a search-only tools array", async () => {
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "chat-only",
+          toolCalling: false,
+          webSearch: true,
+          onCreate: () => {
+            created = true;
+          },
+        }),
+      ],
+    });
+
+    const done = await inference.complete({
+      method: "chat",
+      messages: [{ role: "user", content: "news?" }],
+      tools: [{ type: "web_search" }],
+    });
+
+    expect(created).toBe(true);
+    expect(done.message.content).toBe("from:chat-only");
+  });
+
+  it("does not call create on a backend that advertises no webSearch", async () => {
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "no-search",
+          toolCalling: true,
+          webSearch: false,
+          onCreate: () => {
+            created = true;
+          },
+        }),
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "news?" }],
+        tools: [{ type: "web_search" }],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports web search.",
+    });
+
+    expect(created).toBe(false);
+  });
+
+  it("requires both capabilities for mixed function and web_search tools", async () => {
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({ id: "tools-only", toolCalling: true, webSearch: false }),
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "hi" }],
+        tools: [
+          { type: "web_search" },
+          { type: "function", function: { name: "ping" } },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports tool calling and web search.",
+    });
   });
 
   it("caches create() when tools support is only known after create", async () => {

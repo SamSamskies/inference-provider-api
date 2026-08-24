@@ -6,7 +6,11 @@
 export type InferenceRequest = {
   method: "chat";
   messages: Message[];
-  /** Function tools. Only when getFeatures().toolCalling is true. */
+  /**
+   * Function tools and/or `{ type: "web_search" }`.
+   * Function tools only when getFeatures().toolCalling is true.
+   * `{ type: "web_search" }` only when getFeatures().webSearch is true.
+   */
   tools?: Tool[];
   toolChoice?: ToolChoice;
   /** Generation preferences for this request. See InferenceOptions. */
@@ -61,10 +65,15 @@ export type InferenceChunk =
 
 export type InferenceFeatures = {
   /**
-   * Implementation accepts tools, toolChoice, and tool messages on request.
-   * Absent or false means unsupported.
+   * Implementation accepts function tools, toolChoice, and tool messages
+   * on request. Absent or false means unsupported.
    */
   toolCalling?: boolean;
+  /**
+   * Implementation accepts `{ type: "web_search" }` in `tools`.
+   * Absent or false means unsupported. Independent of `toolCalling`.
+   */
+  webSearch?: boolean;
   /**
    * Which InferenceOptions keys this implementation accepts.
    * Absent keys (and an absent options object) mean ignore those fields.
@@ -75,15 +84,17 @@ export type InferenceFeatures = {
   };
 };
 
-export type Tool = {
-  type: "function";
-  function: {
-    name: string;
-    description?: string;
-    /** JSON Schema object for the function arguments. */
-    parameters?: { [key: string]: unknown };
-  };
-};
+export type Tool =
+  | {
+      type: "function";
+      function: {
+        name: string;
+        description?: string;
+        /** JSON Schema object for the function arguments. */
+        parameters?: { [key: string]: unknown };
+      };
+    }
+  | { type: "web_search" };
 
 export type ToolChoice =
   | "auto"

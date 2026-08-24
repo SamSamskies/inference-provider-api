@@ -74,7 +74,7 @@ const promptApi = await getPromptApiAvailability();
 | `accepted` | Synthesized (not a permission prompt) |
 | `delta` / `done` | From `promptStreaming()` (lossy) |
 | `usage` | Omitted |
-| `tools` / `toolCalling` | Unsupported (`getFeatures().toolCalling === false`) |
+| `tools` / `toolCalling` / `webSearch` | Unsupported (`getFeatures().toolCalling === false`; `webSearch` absent) |
 | Provider / model picker | None — `done.model` is `"on-device"` |
 
 ## API

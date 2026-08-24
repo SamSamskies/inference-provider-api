@@ -73,7 +73,7 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is required. `getFeatures` reports optional capabilities such as tool calling and request `options` (for example `reasoningEffort`, `temperature`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
+`request` is required. `getFeatures` reports optional capabilities such as tool calling, hosted web search, and request `options` (for example `reasoningEffort`, `temperature`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
 
 ```ts
 async function complete(request) {
@@ -96,6 +96,18 @@ Feature-detect optional capabilities before sending tools. Missing `getFeatures`
 
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
+
+if (features.webSearch) {
+  for await (const chunk of window.inference.request({
+    method: "chat",
+    messages: [{ role: "user", content: "What's the weather in New York City today?" }],
+    tools: [{ type: "web_search" }],
+  })) {
+    if (chunk.type === "done") {
+      // search is folded into message.content; no page-side execute
+    }
+  }
+}
 
 if (features.toolCalling) {
   const tools = [
@@ -141,16 +153,17 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-Any multi-round tool loop is application code. Implementations that do not
-advertise `toolCalling` reject `tools` with `invalid_request`. Unsupported
-`options` keys are ignored (not rejected) so apps may send them for forward
-compatibility. For a ready-made loop (plus types and `complete`), see the
-non-normative [`ipa-tools`](./packages/ipa-tools) package
-(`npm install ipa-tools`).
+Any multi-round function-tool loop is application code. Function tools without
+`toolCalling`, and `{ type: "web_search" }` without `webSearch`, are
+`invalid_request`. The two flags are independent: search-only requests must not
+require `toolCalling`. Unsupported `options` keys are ignored (not rejected) so
+apps may send them for forward compatibility. For a ready-made function-tool
+loop (plus types and `complete`), see the non-normative
+[`ipa-tools`](./packages/ipa-tools) package (`npm install ipa-tools`).
 
-Sending `tools` on IPA `request` without a `toolCalling` advertisement is
-`invalid_request`. Prefer `getFeatures().toolCalling` before enabling tools;
-see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-is-not-advertised).
+Prefer `getFeatures().toolCalling` before sending function tools, and
+`getFeatures().webSearch` before sending `{ type: "web_search" }`;
+see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-or-websearch-is-not-advertised).
 The extension prompts the user for permission:
 
 ```text
@@ -175,22 +188,27 @@ Allow once, or deny only this request.
 ```
 
 Request preview is optional extension UX for this draft, not part of the API
-contract. When the request includes `tools`, the permission UI must list the
-function names; a persistent chat grant does not silently cover a later tools
-request. A follow-up that only appends `role: "tool"` results may not re-prompt
-and may not appear in any preview, so applications should disclose what data
-those tools will send to the provider **before** Allow (in the first `messages`,
-the tool description, or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling).
+contract. When the request includes function tools, the permission UI must
+list the function names; when it includes `{ type: "web_search" }`, it must
+list a hosted-search label (and disclose public-web lookup / fetch). A
+persistent chat grant does not silently cover a later tools request, and a
+function-tools grant does not cover hosted search. A follow-up that only
+appends `role: "tool"` results may not re-prompt and may not appear in any
+preview, so applications should disclose what data those tools will send to
+the provider **before** Allow (in the first `messages`, the tool description,
+or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling) and
+[Hosted web search](./SPEC.md#hosted-web-search).
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
 persists access for that origin together with the chosen provider and model; Deny
 permanently blocks it. Changing the extension’s global default does not alter
 existing origin grants.
 
-Text chat is required. Tool calling is optional: implementations that support it
-return `{ toolCalling: true }` from `getFeatures` and accept `tools` on
-`request`. The page defines and executes function tools; the extension only
-relays schemas, `toolCalls`, and results. Optional `options` (for example
+Text chat is required. Tool calling and hosted web search are optional:
+implementations advertise them with `{ toolCalling: true }` and
+`{ webSearch: true }` from `getFeatures`. The page defines and executes function
+tools; `{ type: "web_search" }` is implementation- or provider-executed and
+does not produce page-side `toolCalls`. Optional `options` (for example
 `options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`,
 `options.temperature`: number in `[0, 2]`) lets apps prefer generation settings
 when the matching `getFeatures().options` key is true — not a permission change;
@@ -208,6 +226,7 @@ user override or clamp controls are optional extension UX. See
 - Zero backend required
 - Optional capability discovery (`getFeatures`)
 - Optional function tools, executed by the page
+- Optional hosted web search (`webSearch`, `{ type: "web_search" }`)
 - Optional request `options` (for example `reasoningEffort`, `temperature`)
 
 ## Non-goals
@@ -283,8 +302,8 @@ Some topics that still need community discussion:
 - Should model selection always remain under user control?
 - Should images, embeddings, and speech use this API or separate APIs?
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
-- Should `getFeatures` grow beyond booleans (for example nested tool kinds), or stay one key per capability?
-- Should hosted / provider-executed tools (web search, MCP) be specified, or remain implementation-specific?
+- Should `getFeatures` add a nested object later (for example for MCP), or stay one key per capability as with `toolCalling` and `webSearch`?
+- Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?
 - Should tool calls stream as their own chunk type, or stay on `done.message.toolCalls` only?
 - Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
 - How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?

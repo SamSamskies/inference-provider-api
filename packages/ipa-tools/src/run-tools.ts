@@ -1,6 +1,7 @@
 import {
   createResolver,
   requestNeedsTools,
+  requestNeedsWebSearch,
   type FallbackInput,
 } from "./backends.js";
 import { makeInferenceError } from "./errors.js";
@@ -156,6 +157,7 @@ export async function runTools(
       });
       const inference = await resolver.resolve({
         needsTools: requestNeedsTools(options),
+        needsWebSearch: requestNeedsWebSearch(options),
         signal,
       });
       request = inference.request.bind(inference);
