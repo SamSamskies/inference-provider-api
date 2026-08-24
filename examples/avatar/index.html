@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Avatar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --radius: 10px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+      }
+
+      .shell {
+        max-width: 52rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 3rem;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+
+      h1.app-title {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1.app-title span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        margin-left: 0.4rem;
+      }
+
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .source {
+        display: inline-flex;
+        color: var(--muted);
+        line-height: 0;
+        border-radius: 2px;
+      }
+
+      .source svg {
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+
+      .source:hover {
+        color: var(--accent);
+      }
+
+      .source:focus-visible,
+      textarea:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+      }
+
+      #status.ready {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: #b7dccf;
+      }
+
+      #status.missing {
+        color: var(--danger);
+        background: var(--danger-soft);
+        border-color: #ebc5c5;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.15rem;
+        align-items: start;
+      }
+
+      @media (min-width: 800px) {
+        .layout {
+          grid-template-columns: minmax(16rem, 18.5rem) minmax(0, 1fr);
+        }
+
+        .preview-col {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        .form-col {
+          grid-column: 2;
+          grid-row: 1;
+        }
+      }
+
+      .preview-col,
+      .form-col {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: calc(var(--radius) + 2px);
+        padding: 1.15rem 1.15rem 1.2rem;
+      }
+
+      .preview-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.85rem;
+      }
+
+      .preview-wrap {
+        position: relative;
+        width: min(16rem, 100%);
+      }
+
+      .preview-wrap[data-busy="true"] .frame {
+        opacity: 0.38;
+      }
+
+      .frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: 0 10px 28px rgba(26, 31, 28, 0.06);
+        transition: opacity 0.2s ease;
+      }
+
+      .placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        padding: 1.25rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+
+      .placeholder svg {
+        width: 3.4rem;
+        height: 3.4rem;
+        opacity: 0.55;
+      }
+
+      .preview-wrap[data-state="filled"] .placeholder {
+        display: none;
+      }
+
+      #preview {
+        display: none;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .preview-wrap[data-state="filled"] #preview {
+        display: block;
+      }
+
+      .sizes {
+        display: none;
+        align-items: center;
+        gap: 0.65rem;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.65rem;
+      }
+
+      .preview-wrap[data-state="filled"] + .sizes {
+        display: flex;
+      }
+
+      .size-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .size-chip img {
+        display: block;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        object-fit: cover;
+      }
+
+      .size-chip.sm img {
+        width: 2.5rem;
+        height: 2.5rem;
+      }
+
+      .size-chip.xs img {
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+
+      .downloads {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.45rem;
+      }
+
+      .loading-overlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        pointer-events: none;
+      }
+
+      .preview-wrap[data-busy="true"] .loading-overlay {
+        display: flex;
+      }
+
+      .loading-card {
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        box-shadow: 0 10px 28px rgba(26, 31, 28, 0.08);
+        max-width: 14rem;
+      }
+
+      .loading-card strong {
+        font-size: 0.88rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .loading-card .loading-sub {
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .progress-dots {
+        display: inline-flex;
+        gap: 0.2rem;
+        align-items: center;
+      }
+
+      .progress-dots span {
+        width: 0.35rem;
+        height: 0.35rem;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.35;
+        animation: progress-bounce 1.2s ease-in-out infinite;
+      }
+
+      .progress-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+
+      .progress-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes progress-bounce {
+        0%,
+        80%,
+        100% {
+          opacity: 0.35;
+          transform: translateY(0);
+        }
+        40% {
+          opacity: 1;
+          transform: translateY(-2px);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .progress-dots span {
+          animation: none;
+          opacity: 0.7;
+        }
+
+        .frame {
+          transition: none;
+        }
+      }
+
+      .form-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+
+      label[for="description"] {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      textarea {
+        font: inherit;
+        width: 100%;
+        min-height: 7.5rem;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.7rem 0.75rem;
+        color: var(--ink);
+        background: var(--paper);
+        line-height: 1.45;
+      }
+
+      .samples-label {
+        margin: 0.15rem 0 0;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .samples {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .sample {
+        font: inherit;
+        font-size: 0.78rem;
+        line-height: 1.3;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .sample:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--ink);
+        background: #fff;
+      }
+
+      .sample:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        margin-top: 0.15rem;
+      }
+
+      button {
+        font: inherit;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        background: var(--ink);
+        color: #fff;
+      }
+
+      button:hover:not(:disabled) {
+        background: #2a322e;
+      }
+
+      button.secondary {
+        background: var(--surface);
+        color: var(--ink);
+        border-color: var(--line);
+      }
+
+      button.secondary:hover:not(:disabled) {
+        background: #e8eee9;
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .models {
+        margin: 0.2rem 0 0;
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .models strong {
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      .models a {
+        color: var(--accent);
+      }
+
+      #meta {
+        margin-top: 1rem;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        min-height: 1rem;
+      }
+
+      #error {
+        margin-top: 0.85rem;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--danger);
+        background: var(--danger-soft);
+        border: 1px solid #ebc5c5;
+        border-radius: 8px;
+        padding: 0.65rem 0.75rem;
+        display: none;
+      }
+
+      #error[data-show="true"] {
+        display: block;
+      }
+
+      .hint {
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .hint a {
+        color: var(--accent);
+      }
+
+      .hint code {
+        font-family: var(--mono);
+        font-size: 0.8em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <h1 class="app-title">IPA Avatar<span>ipa-tools · complete</span></h1>
+        <div class="header-meta">
+          <a
+            class="source"
+            href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/avatar"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Source on GitHub"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"
+              />
+            </svg>
+          </a>
+          <div id="status" class="missing" role="status">checking…</div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <div class="form-col">
+          <label for="description">Describe the avatar</label>
+          <textarea
+            id="description"
+            maxlength="500"
+            rows="5"
+            autocomplete="off"
+            placeholder="A dog in a knit hat, round sticker style, cream background"
+          ></textarea>
+          <p class="samples-label" id="samples-label">Try a prompt</p>
+          <div
+            class="samples"
+            id="samples"
+            role="group"
+            aria-labelledby="samples-label"
+          ></div>
+          <div class="toolbar">
+            <button type="button" id="create" disabled>Create avatar</button>
+            <button type="button" id="reset" class="secondary" disabled>Clear</button>
+            <button type="button" id="abort" class="secondary" hidden>Stop</button>
+          </div>
+          <p class="models">
+            <strong>Models.</strong>
+            Pick one in Inference Bridge — the page does not choose for you.
+            Strongest SVG: a current Claude or GPT-class model (OpenAI, Anthropic,
+            or OpenRouter). Local:
+            <a
+              href="https://ollama.com/library/qwen2.5-coder"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Qwen2.5-Coder</a
+            >
+            14B or larger. Tiny chat models often return markdown or invalid markup.
+          </p>
+        </div>
+
+        <div class="preview-col">
+          <div class="preview-wrap" id="preview-wrap" data-state="empty">
+            <div
+              class="loading-overlay"
+              id="loading-overlay"
+              role="status"
+              aria-live="polite"
+              aria-hidden="true"
+            >
+              <div class="loading-card">
+                <span class="progress-dots" aria-hidden="true"
+                  ><span></span><span></span><span></span
+                ></span>
+                <strong id="loading-title">Creating avatar…</strong>
+                <span class="loading-sub" id="loading-sub"
+                  >Approve in Inference Bridge if a prompt appears.</span
+                >
+              </div>
+            </div>
+            <div class="frame">
+              <div class="placeholder" id="placeholder">
+                <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <circle cx="32" cy="32" r="30" fill="#e8efe9" stroke="#d4ddd6" />
+                  <circle cx="32" cy="26" r="10" fill="#c5d4cb" />
+                  <ellipse cx="32" cy="52" rx="16" ry="12" fill="#c5d4cb" />
+                </svg>
+                Your avatar will show up here
+              </div>
+              <img id="preview" alt="" />
+            </div>
+          </div>
+          <div class="sizes" aria-label="Size check">
+            <span class="size-chip sm"
+              ><img id="preview-sm" alt="" width="40" height="40" /><span>40</span></span
+            >
+            <span class="size-chip xs"
+              ><img id="preview-xs" alt="" width="24" height="24" /><span>24</span></span
+            >
+          </div>
+          <div class="downloads">
+            <button type="button" id="download-png" disabled>Download PNG</button>
+            <button type="button" id="download-svg" class="secondary" disabled>
+              Download SVG
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="meta" aria-live="polite"></div>
+      <div id="error" role="alert"></div>
+
+      <p class="hint">
+        Uses
+        <a
+          href="https://github.com/SamSamskies/inference-provider-api/tree/main/packages/ipa-tools"
+          >ipa-tools</a
+        >
+        <code>complete</code>
+        over
+        <code>window.inference</code>
+        to generate SVG markup, then rasterizes it in the page for download.
+        Requires
+        <a
+          href="https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd"
+          >Inference Bridge</a
+        >.
+        Shortcut: ⌘/Ctrl+Enter.
+      </p>
+    </div>
+
+    <script type="module">
+      import {
+        complete,
+        isInferenceAvailable,
+        isInferenceError,
+        waitForInference,
+      } from "https://esm.sh/ipa-tools@0.5.0";
+
+      const SYSTEM = [
+        "You are an SVG avatar illustrator.",
+        "Return ONLY one complete SVG document. No markdown, no code fences, no commentary before or after.",
+        "Hard rules:",
+        '- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">',
+        "- Self-contained vector only: no <script>, <foreignObject>, <image>, <style>, fonts, or external URLs",
+        "- Centered character or creature that reads as a profile picture at 64px",
+        "- Flat geometric shapes (circle, ellipse, rect, path, polygon) and solid fills",
+        "- Opaque background that fills the viewBox (filled circle or rounded square)",
+        "- No written text, letters, or watermarks unless the user asked for them",
+        "- Keep the file small: a few dozen elements, no filters or animation",
+      ].join("\n");
+
+      const SAMPLES = [
+        {
+          label: "Dog in a knit hat",
+          prompt:
+            "Dog in a knit hat, round sticker style, cream background, flat shapes",
+        },
+        {
+          label: "Astronaut cat",
+          prompt:
+            "Tired astronaut cat in a round helmet, circular badge, muted teal and cream",
+        },
+        {
+          label: "Owl librarian",
+          prompt:
+            "Geometric owl with round glasses, mustard and navy, circular badge",
+        },
+        {
+          label: "Cactus pal",
+          prompt:
+            "Friendly cactus person waving, desert sunset circle, simple geometric shapes",
+        },
+        {
+          label: "Retro robot",
+          prompt:
+            "Retro robot with one antenna, navy and gold, circular 8-bit-ish sticker",
+        },
+      ];
+
+      const FORBIDDEN_TAGS = new Set([
+        "script",
+        "foreignobject",
+        "iframe",
+        "object",
+        "embed",
+        "link",
+        "meta",
+        "video",
+        "audio",
+        "canvas",
+        "style",
+        "image",
+      ]);
+
+      const GRAPHIC_SELECTOR =
+        "path, circle, rect, ellipse, polygon, polyline, line, g, text, use";
+
+      const statusEl = document.getElementById("status");
+      const descriptionEl = document.getElementById("description");
+      const samplesEl = document.getElementById("samples");
+      const createBtn = document.getElementById("create");
+      const resetBtn = document.getElementById("reset");
+      const abortBtn = document.getElementById("abort");
+      const downloadPngBtn = document.getElementById("download-png");
+      const downloadSvgBtn = document.getElementById("download-svg");
+      const previewWrap = document.getElementById("preview-wrap");
+      const loadingOverlay = document.getElementById("loading-overlay");
+      const loadingTitle = document.getElementById("loading-title");
+      const loadingSub = document.getElementById("loading-sub");
+      const previewEl = document.getElementById("preview");
+      const previewSmEl = document.getElementById("preview-sm");
+      const previewXsEl = document.getElementById("preview-xs");
+      const metaEl = document.getElementById("meta");
+      const errorEl = document.getElementById("error");
+
+      /** @type {AbortController | null} */
+      let activeController = null;
+      /** @type {ReturnType<typeof setInterval> | null} */
+      let elapsedTimer = null;
+      /** @type {string | null} */
+      let previewUrl = null;
+      /** @type {string | null} */
+      let currentSvg = null;
+      /** @type {string} */
+      let currentPrompt = "";
+
+      /**
+       * @param {string} text
+       */
+      function extractSvg(text) {
+        const unfenced = text
+          .replace(/```(?:svg)?\s*/gi, "")
+          .replace(/```/g, "");
+        const start = unfenced.search(/<svg\b/i);
+        if (start < 0) return null;
+        const tagRe = /<svg\b[^>]*\/>|<\/?svg\b[^>]*>/gi;
+        tagRe.lastIndex = start;
+        let depth = 0;
+        let match;
+        while ((match = tagRe.exec(unfenced))) {
+          const token = match[0];
+          if (/\/\s*>$/.test(token) && !token.startsWith("</")) {
+            if (depth === 0) {
+              return unfenced.slice(start, match.index + token.length);
+            }
+            continue;
+          }
+          if (token.startsWith("</")) {
+            depth -= 1;
+            if (depth === 0) {
+              return unfenced.slice(start, match.index + token.length);
+            }
+          } else {
+            depth += 1;
+          }
+        }
+        return null;
+      }
+
+      /**
+       * @param {Element} el
+       */
+      function sanitizeTree(el) {
+        const tag = el.localName.toLowerCase();
+        if (FORBIDDEN_TAGS.has(tag)) {
+          el.remove();
+          return;
+        }
+
+        for (const attr of [...el.attributes]) {
+          const name = attr.name.toLowerCase();
+          const value = attr.value.trim();
+          if (name.startsWith("on") || /^javascript:/i.test(value)) {
+            el.removeAttribute(attr.name);
+            continue;
+          }
+          if (/url\s*\(\s*['"]?\s*(https?:|\/\/)/i.test(value)) {
+            el.removeAttribute(attr.name);
+            continue;
+          }
+          if (
+            name === "href" ||
+            name === "src" ||
+            name === "xlink:href" ||
+            name.endsWith(":href")
+          ) {
+            if (!(value.startsWith("#") || value.startsWith("data:image/"))) {
+              el.removeAttribute(attr.name);
+            }
+          }
+        }
+
+        for (const child of [...el.children]) sanitizeTree(child);
+      }
+
+      /**
+       * @param {string} svgText
+       */
+      function sanitizeSvg(svgText) {
+        const parsed = new DOMParser().parseFromString(
+          svgText,
+          "image/svg+xml"
+        );
+        if (parsed.querySelector("parsererror")) {
+          throw {
+            code: "provider_error",
+            message:
+              "Could not parse SVG from the model reply. Try a recommended prompt or a stronger model.",
+          };
+        }
+        const svg = parsed.documentElement;
+        if (!svg || svg.localName.toLowerCase() !== "svg") {
+          throw {
+            code: "provider_error",
+            message: "The model reply was not an SVG document.",
+          };
+        }
+
+        sanitizeTree(svg);
+
+        if (!svg.querySelector(GRAPHIC_SELECTOR)) {
+          throw {
+            code: "provider_error",
+            message:
+              "The SVG had no drawable shapes after cleanup. Try again or pick a stronger model.",
+          };
+        }
+
+        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svg.setAttribute("width", "256");
+        svg.setAttribute("height", "256");
+        if (!svg.getAttribute("viewBox")) {
+          svg.setAttribute("viewBox", "0 0 256 256");
+        }
+
+        return new XMLSerializer().serializeToString(svg);
+      }
+
+      function revokePreview() {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          previewUrl = null;
+        }
+      }
+
+      /**
+       * @param {string} svgMarkup
+       * @param {string} description
+       */
+      function showAvatar(svgMarkup, description) {
+        revokePreview();
+        currentSvg = svgMarkup;
+        currentPrompt = description;
+        previewUrl = URL.createObjectURL(
+          new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" })
+        );
+        const alt = `Generated avatar: ${description}`;
+        previewEl.src = previewUrl;
+        previewEl.alt = alt;
+        previewSmEl.src = previewUrl;
+        previewSmEl.alt = "";
+        previewXsEl.src = previewUrl;
+        previewXsEl.alt = "";
+        previewWrap.dataset.state = "filled";
+      }
+
+      function clearAvatar() {
+        revokePreview();
+        currentSvg = null;
+        currentPrompt = "";
+        previewEl.removeAttribute("src");
+        previewEl.alt = "";
+        previewSmEl.removeAttribute("src");
+        previewXsEl.removeAttribute("src");
+        previewWrap.dataset.state = "empty";
+      }
+
+      function clearError() {
+        errorEl.dataset.show = "false";
+        errorEl.textContent = "";
+      }
+
+      function showError(err) {
+        const code = isInferenceError(err)
+          ? err.code
+          : err && err.code
+            ? err.code
+            : "unknown";
+        const message =
+          err && err.message ? err.message : String(err ?? "Unknown error");
+        errorEl.textContent = `${code}: ${message}`;
+        errorEl.dataset.show = "true";
+      }
+
+      function stopElapsedTimer() {
+        if (elapsedTimer != null) {
+          clearInterval(elapsedTimer);
+          elapsedTimer = null;
+        }
+      }
+
+      function descriptionValue() {
+        return descriptionEl.value.trim();
+      }
+
+      /**
+       * @param {boolean} busy
+       */
+      function setBusy(busy) {
+        const available = isInferenceAvailable();
+        const hasText = descriptionValue().length > 0;
+        const hasAvatar = currentSvg != null;
+        createBtn.disabled = busy || !available || !hasText;
+        descriptionEl.disabled = busy || !available;
+        resetBtn.disabled = busy || !hasAvatar;
+        abortBtn.hidden = !busy;
+        downloadPngBtn.disabled = busy || !hasAvatar;
+        downloadSvgBtn.disabled = busy || !hasAvatar;
+        previewWrap.dataset.busy = busy ? "true" : "false";
+        loadingOverlay.setAttribute("aria-hidden", busy ? "false" : "true");
+        for (const btn of samplesEl.querySelectorAll("button")) {
+          btn.disabled = busy || !available;
+        }
+
+        if (busy) {
+          loadingTitle.textContent = "Creating avatar…";
+          const started = Date.now();
+          const tick = () => {
+            const seconds = Math.floor((Date.now() - started) / 1000);
+            loadingSub.textContent =
+              seconds < 2
+                ? "Approve in Inference Bridge if a prompt appears."
+                : `Still working… ${seconds}s elapsed. You can stop anytime.`;
+          };
+          tick();
+          stopElapsedTimer();
+          elapsedTimer = setInterval(tick, 1000);
+        } else {
+          stopElapsedTimer();
+          activeController = null;
+        }
+      }
+
+      function refreshAvailability() {
+        if (isInferenceAvailable()) {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+          setBusy(false);
+          return true;
+        }
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        createBtn.disabled = true;
+        descriptionEl.disabled = true;
+        resetBtn.disabled = currentSvg == null;
+        downloadPngBtn.disabled = currentSvg == null;
+        downloadSvgBtn.disabled = currentSvg == null;
+        for (const btn of samplesEl.querySelectorAll("button")) {
+          btn.disabled = true;
+        }
+        return false;
+      }
+
+      /**
+       * @param {string} text
+       */
+      function slugify(text) {
+        const slug = text
+          .toLowerCase()
+          .normalize("NFKD")
+          .replace(/[^\w\s-]/g, "")
+          .replace(/[_\s]+/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40);
+        return slug || "avatar";
+      }
+
+      /**
+       * @param {Blob} blob
+       * @param {string} filename
+       */
+      function triggerDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      /**
+       * @param {string} svgMarkup
+       * @param {number} size
+       */
+      function svgToPngBlob(svgMarkup, size = 512) {
+        return new Promise((resolve, reject) => {
+          const blob = new Blob([svgMarkup], {
+            type: "image/svg+xml;charset=utf-8",
+          });
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext("2d");
+              if (!ctx) {
+                URL.revokeObjectURL(url);
+                reject(new Error("Could not create a canvas."));
+                return;
+              }
+              ctx.drawImage(img, 0, 0, size, size);
+              canvas.toBlob((png) => {
+                URL.revokeObjectURL(url);
+                if (!png) {
+                  reject(new Error("Could not encode PNG."));
+                  return;
+                }
+                resolve(png);
+              }, "image/png");
+            } catch (err) {
+              URL.revokeObjectURL(url);
+              reject(err);
+            }
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("Could not rasterize SVG."));
+          };
+          img.src = url;
+        });
+      }
+
+      async function createAvatar() {
+        clearError();
+        metaEl.textContent = "";
+
+        if (!refreshAvailability()) {
+          showError({
+            code: "unavailable",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+          });
+          return;
+        }
+
+        const description = descriptionValue();
+        if (!description) {
+          showError({
+            code: "invalid_request",
+            message: "Describe the avatar first, or pick a recommended prompt.",
+          });
+          return;
+        }
+
+        activeController = new AbortController();
+        setBusy(true);
+
+        try {
+          const done = await complete({
+            method: "chat",
+            messages: [
+              { role: "system", content: SYSTEM },
+              { role: "user", content: description },
+            ],
+            signal: activeController.signal,
+            options: {
+              reasoningEffort: "none",
+              temperature: 0.8,
+            },
+          });
+
+          const text =
+            typeof done.message.content === "string"
+              ? done.message.content.replace(/^\uFEFF/, "").trim()
+              : "";
+          if (!text) {
+            throw {
+              code: "provider_error",
+              message:
+                "Empty model reply. Try again or pick a recommended prompt.",
+            };
+          }
+
+          const extracted = extractSvg(text);
+          if (!extracted) {
+            throw {
+              code: "provider_error",
+              message:
+                "No <svg> in the model reply. Try a recommended prompt or a stronger model.",
+            };
+          }
+
+          const svg = sanitizeSvg(extracted);
+          showAvatar(svg, description);
+
+          const parts = [`model ${done.model}`];
+          if (done.usage) {
+            const { inputTokens, outputTokens } = done.usage;
+            if (inputTokens != null) parts.push(`in ${inputTokens}`);
+            if (outputTokens != null) parts.push(`out ${outputTokens}`);
+          }
+          metaEl.textContent = parts.join(" · ");
+        } catch (err) {
+          showError(err);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function clearCard() {
+        if (activeController) return;
+        clearAvatar();
+        metaEl.textContent = "";
+        clearError();
+        setBusy(false);
+      }
+
+      async function downloadPng() {
+        if (!currentSvg) return;
+        clearError();
+        try {
+          const png = await svgToPngBlob(currentSvg);
+          triggerDownload(png, `${slugify(currentPrompt)}.png`);
+        } catch (err) {
+          showError({
+            code: "provider_error",
+            message:
+              err && err.message ? err.message : "Could not download PNG.",
+          });
+        }
+      }
+
+      function downloadSvgFile() {
+        if (!currentSvg) return;
+        const blob = new Blob([currentSvg], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        triggerDownload(blob, `${slugify(currentPrompt)}.svg`);
+      }
+
+      for (const sample of SAMPLES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sample";
+        btn.textContent = sample.label;
+        btn.addEventListener("click", () => {
+          descriptionEl.value = sample.prompt;
+          descriptionEl.focus();
+          setBusy(false);
+        });
+        samplesEl.appendChild(btn);
+      }
+
+      descriptionEl.value = SAMPLES[0].prompt;
+
+      createBtn.addEventListener("click", () => {
+        if (activeController) return;
+        createAvatar();
+      });
+
+      descriptionEl.addEventListener("input", () => {
+        if (!activeController) setBusy(false);
+      });
+
+      descriptionEl.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (!activeController && !createBtn.disabled) createAvatar();
+        }
+      });
+
+      resetBtn.addEventListener("click", clearCard);
+      abortBtn.addEventListener("click", () => {
+        if (activeController) activeController.abort();
+      });
+      downloadPngBtn.addEventListener("click", () => {
+        void downloadPng();
+      });
+      downloadSvgBtn.addEventListener("click", downloadSvgFile);
+
+      window.addEventListener("pagehide", revokePreview);
+
+      if (!refreshAvailability()) {
+        metaEl.textContent =
+          "window.inference is missing — install Inference Bridge and open this page over https or localhost.";
+        void waitForInference()
+          .then(() => {
+            if (refreshAvailability()) metaEl.textContent = "";
+          })
+          .catch(() => {
+            /* stay unavailable after timeout */
+          });
+      }
+    </script>
+  </body>
+</html>
