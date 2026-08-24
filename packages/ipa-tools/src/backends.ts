@@ -30,7 +30,8 @@ export type InferenceBackend = {
   }): Promise<Inference>;
   /**
    * Optional feature snapshot used to skip `create()` when the call needs
-   * tools and `toolCalling` is not true (avoids download / session side effects).
+   * `toolCalling` or `webSearch` that this backend does not advertise
+   * (avoids download / session side effects).
    */
   getFeatures?(): InferenceFeatures;
 };
@@ -54,6 +55,8 @@ export type ResolveOptions = {
   signal?: AbortSignal;
   /** When true, skip a fallback whose `getFeatures().toolCalling` is not true. */
   needsTools?: boolean;
+  /** When true, skip a fallback whose `getFeatures().webSearch` is not true. */
+  needsWebSearch?: boolean;
 };
 
 export type ProbeStatus = {
@@ -69,6 +72,12 @@ export const MAX_FALLBACKS = 1;
 /** Thrown when every fallback was skipped for lacking toolCalling. */
 const NO_TOOLS_BACKEND_MESSAGE =
   "No configured backend supports tool calling.";
+/** Thrown when every fallback was skipped for lacking webSearch. */
+const NO_WEB_SEARCH_BACKEND_MESSAGE =
+  "No configured backend supports web search.";
+/** Thrown when every fallback was skipped for lacking both capabilities. */
+const NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE =
+  "No configured backend supports tool calling and web search.";
 
 function isBackendObject(value: unknown): value is InferenceBackend {
   return (
@@ -140,10 +149,63 @@ function supportsTools(inference: Inference): boolean {
   return inference.getFeatures?.().toolCalling === true;
 }
 
+function supportsWebSearch(inference: Inference): boolean {
+  return inference.getFeatures?.().webSearch === true;
+}
+
+function supportsNeeded(
+  inference: Inference,
+  needsTools: boolean,
+  needsWebSearch: boolean
+): boolean {
+  if (needsTools && !supportsTools(inference)) return false;
+  if (needsWebSearch && !supportsWebSearch(inference)) return false;
+  return true;
+}
+
 /** Prefer backend-advertised features so we can skip `create()` for tools. */
-function backendSupportsTools(backend: InferenceBackend): boolean | undefined {
+function backendSupportsNeeded(
+  backend: InferenceBackend,
+  needsTools: boolean,
+  needsWebSearch: boolean
+): boolean | undefined {
   if (typeof backend.getFeatures !== "function") return undefined;
-  return backend.getFeatures().toolCalling === true;
+  const features = backend.getFeatures();
+  if (needsTools && features.toolCalling !== true) return false;
+  if (needsWebSearch && features.webSearch !== true) return false;
+  return true;
+}
+
+function capabilitySkipMessage(
+  needsTools: boolean,
+  needsWebSearch: boolean
+): string {
+  if (needsTools && needsWebSearch) {
+    return NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE;
+  }
+  if (needsWebSearch) return NO_WEB_SEARCH_BACKEND_MESSAGE;
+  return NO_TOOLS_BACKEND_MESSAGE;
+}
+
+function shouldRetryCapabilitySkip(
+  error: unknown,
+  needsTools: boolean,
+  needsWebSearch: boolean
+): boolean {
+  if (
+    !isInferenceError(error) ||
+    error.code !== "invalid_request"
+  ) {
+    return false;
+  }
+  if (error.message === NO_TOOLS_BACKEND_MESSAGE) return !needsTools;
+  if (error.message === NO_WEB_SEARCH_BACKEND_MESSAGE) {
+    return !needsWebSearch;
+  }
+  if (error.message === NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE) {
+    return !needsTools || !needsWebSearch;
+  }
+  return false;
 }
 
 /**
@@ -173,6 +235,7 @@ export type InferenceResolver = {
   probe(): Promise<ProbeStatus>;
   resolve(options?: {
     needsTools?: boolean;
+    needsWebSearch?: boolean;
     signal?: AbortSignal;
   }): Promise<Inference>;
 };
@@ -196,9 +259,11 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
 
   async function resolveOnce(resolveOptions?: {
     needsTools?: boolean;
+    needsWebSearch?: boolean;
     signal?: AbortSignal;
   }): Promise<Inference> {
     const needsTools = resolveOptions?.needsTools === true;
+    const needsWebSearch = resolveOptions?.needsWebSearch === true;
     const signal = resolveOptions?.signal ?? options?.signal;
     const throwIfAborted = () => {
       if (signal?.aborted) {
@@ -212,24 +277,26 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       return getInference();
     }
 
-    if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
+    if (
+      cachedFallback &&
+      supportsNeeded(cachedFallback, needsTools, needsWebSearch)
+    ) {
       return cachedFallback;
     }
 
-    let skippedForTools = false;
+    let skippedForCapabilities = false;
     let lastCreateError: unknown;
 
     for (const entry of fallbacks) {
       throwIfAborted();
 
       if (
-        needsTools &&
         cachedFallback &&
         entry === cachedFallbackEntry &&
-        !supportsTools(cachedFallback)
+        !supportsNeeded(cachedFallback, needsTools, needsWebSearch)
       ) {
-        // Already resolved this exact entry; it lacks toolCalling.
-        skippedForTools = true;
+        // Already resolved this exact entry; it lacks a required capability.
+        skippedForCapabilities = true;
         continue;
       }
 
@@ -247,8 +314,10 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         continue;
       }
 
-      if (needsTools && backendSupportsTools(backend) === false) {
-        skippedForTools = true;
+      if (
+        backendSupportsNeeded(backend, needsTools, needsWebSearch) === false
+      ) {
+        skippedForCapabilities = true;
         continue;
       }
 
@@ -288,9 +357,9 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         return getInference();
       }
 
-      if (needsTools && !supportsTools(inference)) {
-        // Cache so later tools requests skip recreate via cachedFallbackEntry.
-        skippedForTools = true;
+      if (!supportsNeeded(inference, needsTools, needsWebSearch)) {
+        // Cache so later capability requests skip recreate via cachedFallbackEntry.
+        skippedForCapabilities = true;
         cachedFallback = inference;
         cachedFallbackEntry = entry;
         continue;
@@ -309,8 +378,14 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       throw lastCreateError;
     }
 
-    if (needsTools && skippedForTools) {
-      throw makeInferenceError("invalid_request", NO_TOOLS_BACKEND_MESSAGE);
+    if (
+      (needsTools || needsWebSearch) &&
+      skippedForCapabilities
+    ) {
+      throw makeInferenceError(
+        "invalid_request",
+        capabilitySkipMessage(needsTools, needsWebSearch)
+      );
     }
 
     throw makeInferenceError(
@@ -328,6 +403,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
 
     async resolve(resolveOptions) {
       const needsTools = resolveOptions?.needsTools === true;
+      const needsWebSearch = resolveOptions?.needsWebSearch === true;
       const signal = resolveOptions?.signal ?? options?.signal;
       const throwIfAborted = () => {
         if (signal?.aborted) {
@@ -341,14 +417,19 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       if (isInferenceAvailable()) {
         return getInference();
       }
-      if (cachedFallback && (!needsTools || supportsTools(cachedFallback))) {
+      if (
+        cachedFallback &&
+        supportsNeeded(cachedFallback, needsTools, needsWebSearch)
+      ) {
         return cachedFallback;
       }
 
       // Join or start a single in-flight attempt. Loop when:
-      // - a concurrent non-tools resolve succeeded with a no-tools backend, or
-      // - a concurrent tools resolve rejected with tools invalid_request while
-      //   this caller only needs plain chat (may succeed against the same chain).
+      // - a concurrent weaker resolve succeeded with a backend that lacks a
+      //   capability this caller needs, or
+      // - a concurrent capability resolve rejected with a skip error while
+      //   this caller does not need that capability (may succeed against the
+      //   same chain).
       for (;;) {
         throwIfAborted();
         if (!resolveInFlight) {
@@ -366,20 +447,22 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           if (isInferenceAvailable()) {
             return getInference();
           }
-          if (!needsTools || supportsTools(shared)) {
+          if (supportsNeeded(shared, needsTools, needsWebSearch)) {
             return shared;
           }
+          // Shared result lacks a capability this caller needs. Drop the
+          // settled in-flight so the next loop starts resolveOnce with this
+          // caller's flags instead of re-awaiting the same result.
+          resolveInFlight = undefined;
+          continue;
         } catch (error) {
           throwIfAborted();
-          // Only retry for the tools-capability rejection from a concurrent
-          // needsTools resolve — not create()/validation invalid_request,
-          // which would loop forever when no backend succeeds.
-          if (
-            !needsTools &&
-            isInferenceError(error) &&
-            error.code === "invalid_request" &&
-            error.message === NO_TOOLS_BACKEND_MESSAGE
-          ) {
+          // Only retry for a capability-skip rejection from a concurrent
+          // resolve this caller would not also produce — not
+          // create()/validation invalid_request, which would loop forever
+          // when no backend succeeds.
+          if (shouldRetryCapabilitySkip(error, needsTools, needsWebSearch)) {
+            resolveInFlight = undefined;
             continue;
           }
           // Share create/unavailable failures with concurrent waiters.
@@ -390,9 +473,22 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
   };
 }
 
-/** True when the request carries a non-empty `tools` array. */
+/** True when the request includes at least one function tool. */
 export function requestNeedsTools(request: {
   tools?: InferenceRequest["tools"];
 }): boolean {
-  return Array.isArray(request.tools) && request.tools.length > 0;
+  return (
+    Array.isArray(request.tools) &&
+    request.tools.some((tool) => tool?.type === "function")
+  );
+}
+
+/** True when the request includes `{ type: "web_search" }`. */
+export function requestNeedsWebSearch(request: {
+  tools?: InferenceRequest["tools"];
+}): boolean {
+  return (
+    Array.isArray(request.tools) &&
+    request.tools.some((tool) => tool?.type === "web_search")
+  );
 }

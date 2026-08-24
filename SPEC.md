@@ -19,7 +19,11 @@ window.inference.getFeatures(): InferenceFeatures
 type InferenceRequest = {
   method: "chat";
   messages: Message[];
-  /** Function tools. Only when getFeatures().toolCalling is true. */
+  /**
+   * Function tools and/or `{ type: "web_search" }`.
+   * Function tools only when getFeatures().toolCalling is true.
+   * `{ type: "web_search" }` only when getFeatures().webSearch is true.
+   */
   tools?: Tool[];
   toolChoice?: ToolChoice;
   /** Generation preferences for this request. See Request options. */
@@ -74,10 +78,15 @@ type InferenceChunk =
 
 type InferenceFeatures = {
   /**
-   * Implementation accepts tools, toolChoice, and tool messages on request.
-   * Absent or false means unsupported.
+   * Implementation accepts function tools, toolChoice, and tool messages
+   * on request. Absent or false means unsupported.
    */
   toolCalling?: boolean;
+  /**
+   * Implementation accepts `{ type: "web_search" }` in `tools`.
+   * Absent or false means unsupported. Independent of `toolCalling`.
+   */
+  webSearch?: boolean;
   /**
    * Which InferenceOptions keys this implementation accepts.
    * Absent keys (and an absent options object) mean ignore those fields.
@@ -88,15 +97,17 @@ type InferenceFeatures = {
   };
 }
 
-type Tool = {
-  type: "function";
-  function: {
-    name: string;
-    description?: string;
-    /** JSON Schema object for the function arguments. */
-    parameters?: { [key: string]: unknown };
-  };
-}
+type Tool =
+  | {
+      type: "function";
+      function: {
+        name: string;
+        description?: string;
+        /** JSON Schema object for the function arguments. */
+        parameters?: { [key: string]: unknown };
+      };
+    }
+  | { type: "web_search" };
 
 type ToolChoice =
   | "auto"
@@ -126,7 +137,7 @@ type InferenceError = Error & {
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling, hosted web search, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`.
 
 ### Example
 
@@ -172,7 +183,10 @@ Applications must feature-detect. Older injectors may omit the method:
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
 if (features.toolCalling) {
-  // request accepts tools / toolChoice / tool messages
+  // request accepts function tools / toolChoice / tool messages
+}
+if (features.webSearch) {
+  // request accepts tools: [{ type: "web_search" }, ...]
 }
 if (features.options?.reasoningEffort) {
   // request.options.reasoningEffort accepted; implementation will try to map it
@@ -184,14 +198,18 @@ if (features.options?.temperature) {
 
 Rules:
 
-1. `toolCalling: true` means `request` accepts `tools`, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions.
-2. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none. The same per-key rule applies to `options.temperature` and any later `options` keys.
-3. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under `options`) so later capabilities can be added without breaking callers.
-4. The result must not include provider name, model id, or other user or account identity.
-5. Implementations that do not support tool calling must reject `tools`, `toolChoice`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`.
-6. Implementations must **ignore** unsupported `options` keys (must not reject the request solely for including them). Applications may send future keys for forward compatibility; they have no effect until advertised.
-7. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
-8. Advertising an `options` key does not guarantee that the user's provider or model will honor that preference. Implementations map best-effort and must not fail a well-formed request solely because the current model cannot apply the option.
+1. `toolCalling: true` means `request` accepts function tools, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions, and it does not advertise `{ type: "web_search" }`.
+2. `webSearch: true` means `request` accepts `{ type: "web_search" }` in `tools`. It does not mean the selected provider can search, and not whether the origin has a grant. `webSearch` and `toolCalling` are independent: a search-only `tools` array must not require `toolCalling`; function tools must not require `webSearch`.
+3. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none. The same per-key rule applies to `options.temperature` and any later `options` keys.
+4. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under `options`) so later capabilities can be added without breaking callers. Unknown keys already allow a later draft to add a nested object (for example for MCP) without breaking callers that check `features.webSearch`.
+5. The result must not include provider name, model id, or other user or account identity.
+6. Implementations that do not support tool calling must reject function tools, `toolChoice` values other than `"auto"` and `"none"`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`. A search-only `tools` array (`[{ type: "web_search" }]`) must not be rejected solely for lacking `toolCalling`. `"none"` and `"auto"` remain valid on a search-only request so the page can suppress hosted search without `toolCalling`.
+7. Implementations that do not support hosted web search must reject `{ type: "web_search" }` with `invalid_request` — including implementations that omit `getFeatures`. Function tools must not be rejected solely for lacking `webSearch`. Same reject rule as function tools, not the ignore rule used for `options`.
+8. If `tools` contains a kind that is not advertised, or an unknown `tools[].type`, the whole request is `invalid_request`. Do not silently drop hosted search or function tools. Extra keys on `{ type: "web_search" }` are ignored (forward compatible).
+9. Implementations must **ignore** unsupported `options` keys (must not reject the request solely for including them). Applications may send future keys for forward compatibility; they have no effect until advertised.
+10. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
+11. Advertising `webSearch` does not guarantee that the model will actually search, only that the implementation will enable search for providers that can honor it. Applications must still handle a text `done`. If the request includes `{ type: "web_search" }` and the **currently selected** provider cannot honor it (or required extra credentials are missing), do not complete a normal chat reply — see Hosted web search.
+12. Advertising an `options` key does not guarantee that the user's provider or model will honor that preference. Implementations map best-effort and must not fail a well-formed request solely because the current model cannot apply the option.
 
 ### Request options
 
@@ -230,12 +248,12 @@ Applications must not assume every model honors temperature exactly; advertising
 
 Function tools are defined and **executed by the page**. The implementation relays JSON schemas, `toolCalls`, and `role: "tool"` results; it must not run application tool handlers or widen host permissions in order to execute tools.
 
-This draft specifies function tools only. The implementation is not an agent runtime: the page owns any multi-round loop (send tools → receive `toolCalls` → execute → send `role: "tool"` results → repeat).
+This draft specifies function tools and hosted web search (see Hosted web search). Other hosted tool types (for example MCP) are out of scope. The implementation is not an agent runtime: the page owns any multi-round function-tool loop (send tools → receive `toolCalls` → execute → send `role: "tool"` results → repeat). Hosted search turns stay hidden from the page.
 
 #### Request
 
-- `tools`, when present, must be a non-empty array of function tools. `parameters` is a JSON Schema object for the function arguments.
-- `toolChoice`, when omitted and `tools` is present, defaults to `"auto"` (the model may reply in text or call tools). `"none"` suppresses calls; `"required"` asks for at least one call; a function object forces that function.
+- `tools`, when present, must be a non-empty array of function tools and/or `{ type: "web_search" }`. Mixed arrays are allowed only when **both** `toolCalling` and `webSearch` are advertised; if the array contains a kind that is not advertised, the whole request is `invalid_request`. `parameters` on a function tool is a JSON Schema object for the function arguments. `{ type: "web_search" }` has no `function` and no parameters in this draft.
+- `toolChoice` remains a function-tool control. When omitted and `tools` is present, it defaults to `"auto"` (the model may reply in text or call function tools). `"none"` suppresses function calls **and** hosted search. `"required"` asks for at least one function call; a function object forces that function. `"auto"`, `"required"`, and a named function do not force a web search. There is no `{ type: "web_search" }` variant of `toolChoice` in this draft.
 - `role: "tool"` messages must include `toolCallId` (the `id` from the corresponding `ToolCall`) and string `content` (usually JSON text). They must not include `toolCalls` or `reasoning`.
 - Assistant messages may include `toolCalls` (non-empty when present). `content` may be `null` when the turn is tool-only. `toolCalls[].function.arguments` is a JSON string, not a parsed object.
 - `system` and `user` messages must not include `toolCalls` or `toolCallId`. Their `content` is always a string.
@@ -315,11 +333,11 @@ The loop above is application code, not part of `window.inference`. A non-normat
 
 #### Permission
 
-A persistent allow grant for text chat does not cover a later request that includes `tools`, or a wider tool set than the grant records. Implementations must prompt again in those cases, including when a persistent grant already exists for the origin.
+A persistent allow grant for text chat does not cover a later request that includes `tools`, or a wider tool set than the grant records. A function-tools grant does not cover `{ type: "web_search" }`, and a hosted-search grant does not cover function tools. Implementations must prompt again in those cases, including when a persistent grant already exists for the origin.
 
-When a request includes `tools`, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Request-content preview remains optional (see Security).
+When a request includes function tools, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Hosted search has its own disclosure (see Hosted web search). Request-content preview remains optional (see Security).
 
-Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant). Those follow-ups often have no second preview: tool result bodies can reach the provider without appearing in the Allow UI.
+Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. Adding or removing `{ type: "web_search" }` is a wider tool set and needs a new prompt (or a covering grant). A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant). Those follow-ups often have no second preview: tool result bodies can reach the provider without appearing in the Allow UI.
 
 Applications SHOULD make the data a tool will return to the provider inspectable **before** the user allows inference. Do not rely on a later `role: "tool"` message for that disclosure. Practical options (any one can suffice):
 
@@ -328,6 +346,72 @@ Applications SHOULD make the data a tool will return to the provider inspectable
 - Disclose it in the page UI next to the action that starts `request`.
 
 This is a `SHOULD`, not a `MUST`. Live or huge tool results cannot always be inlined on the first turn. The requirement is honesty about what will be sent, not stuffing every payload into `messages`. Applications must not assume the permission UI reveals message content or later tool-result rounds.
+
+### Hosted web search
+
+Hosted web search is **not page-executed**. The implementation (or the selected provider) runs it. The page must not see `toolCalls` / `role: "tool"` turns for `web_search`, and must not implement `execute.web_search`.
+
+`getFeatures().webSearch === true` means the implementation **accepts the type**, not that every provider will search, and not that the origin has a grant.
+
+```ts
+const features = window.inference.getFeatures?.() ?? {};
+if (features.webSearch) {
+  for await (const chunk of window.inference.request({
+    method: "chat",
+    messages: [{ role: "user", content: "What's the weather in New York City today?" }],
+    tools: [{ type: "web_search" }],
+  })) {
+    if (chunk.type === "delta") {
+      // append chunk.content — search is folded into the assistant text
+    }
+  }
+}
+```
+
+Mixed arrays are allowed when both flags are advertised:
+
+```ts
+tools: [
+  { type: "web_search" },
+  {
+    type: "function",
+    function: { name: "get_weather", parameters: { type: "object" } },
+  },
+]
+```
+
+#### Execution and stream
+
+Stream shape is unchanged: `accepted` → optional `reasoning_delta` / `delta` → `done`. Search is folded into the assistant text. Citations, source lists, and search-status chunks are out of scope; implementations may put links in `message.content` as ordinary text.
+
+Who runs the search is an implementation detail (provider-hosted vs extension-executed, including a hidden local loop such as Ollama → ollama.com), as long as the page contract is the same.
+
+#### `toolChoice`
+
+`"none"` means “do not use tools this turn.” Hosted search is a tool, so `"none"` suppresses it as well as function calls. Pages that keep `{ type: "web_search" }` in `tools` can still disable it for a given turn without rebuilding the array. Implementations must omit or disable hosted search for that request (not warn-and-continue, and not run a hidden search loop).
+
+`"auto"` / `"required"` / a named function do not force a web search. `"required"` and a named function without `toolCalling` (or without any function tool in `tools`) are `invalid_request`.
+
+#### Permission
+
+A chat-only persistent grant does not cover `{ type: "web_search" }`. A function-tools grant does not cover it either. Hosted search is a distinct identity in the grant.
+
+When `tools` includes `{ type: "web_search" }`, the permission UI must disclose that the provider or implementation will query the public web (and may fetch result pages). Listing a clear hosted-search label is required; showing extra description is optional.
+
+Follow-up rounds that only append `role: "tool"` results for **page** function calls stay in the existing tools episode. Adding or removing `{ type: "web_search" }` is a wider tool set and needs a new prompt (or a covering grant).
+
+#### Provider cannot search
+
+Do **not** warn-and-continue: a successful `done` after the page asked for search, with no search, is a silent capability lie.
+
+If the request includes `{ type: "web_search" }` and the **currently selected** provider cannot honor it (or required extra credentials are missing), do not complete a normal chat reply. Implementations should disable Allow in the permission UI, or fail the request with **`unavailable`**.
+
+Use `unavailable` (not `invalid_request`) for this case:
+
+- `{ type: "web_search" }` on an implementation that advertised `webSearch` is a well-formed request. The failure is that *this* provider or credential set cannot honor it right now — same bucket as a missing key or a provider that is not ready.
+- `invalid_request` stays the code for unadvertised `{ type: "web_search" }`, unknown `tools[].type`, and other malformed requests. Using it for a provider mismatch would teach apps that the tool shape itself was wrong.
+
+Prefer disabling Allow so the user never hits the error; if the request still proceeds, throw `unavailable`. Advertising `webSearch` does not guarantee the model will actually search, only that the implementation will enable search for providers that can. Applications must still handle a text `done`.
 
 ### Security
 
@@ -356,8 +440,17 @@ Implementations may show a truncated preview of request content in the permissio
 
 Function tools run in the page. A site that offers tools can cause the model to request those functions with attacker-influenced arguments (including via retrieved or user-supplied text). Implementations must not execute page-defined tools, and must not treat a chat-only persistent grant as consent for tools. Listing function names at approval time is required so the user can refuse a tools request independently of chat.
 
+Hosted web search is implementation- or provider-executed, not page-executed. The page never sees `web_search` `toolCalls` and must not run a page-side search handler. A chat-only grant and a function-tools grant each do not cover `{ type: "web_search" }`. Listing a hosted-search label at approval time is required so the user can refuse public-web lookup independently of chat and of page function tools. Implementations that fetch result pages (not only a search index) must disclose that fetch, not only “web search”.
+
 ### Out of scope for this draft
 
-Images, embeddings, speech, hosted / provider-executed tools (for example web search or MCP), streaming `toolCall` deltas, and an in-API agent loop.
+Hosted `{ type: "web_search" }` is specified above. This draft does **not** specify:
+
+- Images, embeddings, or speech
+- Other hosted / provider-executed tools (for example MCP)
+- Options on `{ type: "web_search" }` such as search filters, recency, or location
+- Structured citations / a `sources` field on `done` (links may appear as ordinary text in `message.content`)
+- Streaming `toolCall` deltas
+- An in-API agent loop (the page still owns the function-tool loop; hosted search turns stay hidden)
 
 Estimated cost in the permission UI is optional extension UX and is not required by this draft.

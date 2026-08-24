@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SPEC-aligned `webSearch` on `InferenceFeatures` and `{ type: "web_search" }` on `Tool` ([#39](https://github.com/SamSamskies/inference-provider-api/issues/39)).
+
 ### Changed
 
 - Document a minimal custom HTTP `InferenceBackend` recipe for `createInference({ fallbacks })` (hosted endpoints; not IPA).
+- `createInference` fallbacks treat search-only `tools` as needing `webSearch`, not `toolCalling`. Function tools and hosted search are gated independently.
 
 ## [0.4.1] - 2026-08-20
 

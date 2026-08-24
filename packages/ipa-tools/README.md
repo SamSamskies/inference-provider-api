@@ -239,9 +239,9 @@ Handlers run in the page. The package never talks to providers or API keys.
 
 `options` (`temperature`, `reasoningEffort`) are forwarded on every round. `onAccepted` fires when a round yields `accepted`. `maxRounds` (default 5) is the max provider calls: if the last round has `toolCalls`, handlers still run and the result returns with `stopReason: "max_rounds"` instead of throwing. A text `done` is `stopReason: "end_turn"`. Use `maxRounds: 1` to run tools once and stop without a follow-up model turn.
 
-### When `toolCalling` is not advertised
+### When `toolCalling` or `webSearch` is not advertised
 
-`getFeatures` is optional; missing it (or omitting `toolCalling`) means tools are not part of the IPA contract. Call `runTools` only when `getFeatures().toolCalling` is true — otherwise the injector must reject `tools` with `invalid_request`. Do not rely on experimental injector surfaces for production apps.
+`getFeatures` is optional; missing it (or omitting a flag) means that capability is not part of the IPA contract. Call `runTools` with function tools only when `getFeatures().toolCalling` is true. Send `{ type: "web_search" }` only when `getFeatures().webSearch` is true. The flags are independent: a search-only `tools` array must not require `toolCalling`. Hosted search is not page-executed — do not put `web_search` on `execute`. Do not rely on experimental injector surfaces for production apps.
 
 ## `waitForInference` / `getInference` / `getFeatures` / `isInferenceError`
 
@@ -292,7 +292,7 @@ try {
 | `waitForInference` | Background poll until injected (do not await on first paint) |
 | `getInference` / `getFeatures` / `isInferenceAvailable` | Resolve or check `window.inference` |
 
-Out of v1: UI, injecting onto `window.inference`, hosted/MCP tools, streaming `toolCall` chunks.
+Out of v1: UI, injecting onto `window.inference`, MCP and other unspec'd hosted tools, streaming `toolCall` chunks. Hosted `{ type: "web_search" }` is in the types (not page-executed).
 
 ## License
 

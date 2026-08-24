@@ -2,6 +2,7 @@ import {
   createResolver,
   normalizeFallbacks,
   requestNeedsTools,
+  requestNeedsWebSearch,
   type FallbackInput,
   type InferenceResolver,
   type ProbeStatus,
@@ -96,6 +97,7 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
       // mid-conversation after a late IPA injection.
       const inference = await resolver.resolve({
         needsTools: requestNeedsTools(runOptions),
+        needsWebSearch: requestNeedsWebSearch(runOptions),
         signal: runOptions.signal,
       });
       return runTools({
@@ -109,15 +111,18 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
 function requestWithResolver(
   resolver: InferenceResolver,
   request: InferenceRequest,
-  resolveHints?: { needsTools?: boolean }
+  resolveHints?: { needsTools?: boolean; needsWebSearch?: boolean }
 ): AsyncIterable<InferenceChunk> {
   const needsTools =
     resolveHints?.needsTools === true || requestNeedsTools(request);
+  const needsWebSearch =
+    resolveHints?.needsWebSearch === true || requestNeedsWebSearch(request);
 
   return {
     async *[Symbol.asyncIterator]() {
       const inference = await resolver.resolve({
         needsTools,
+        needsWebSearch,
         signal: request.signal,
       });
       const bound = inference.request.bind(inference) as Inference["request"];
