@@ -274,6 +274,53 @@
         padding: 0.28rem 0.5rem;
       }
 
+      .thumb-avatar {
+        background:
+          radial-gradient(ellipse 50% 45% at 50% 80%, #d8efe6 0%, transparent 55%),
+          linear-gradient(180deg, #f7faf7 0%, #e8efe9 100%);
+      }
+
+      .thumb-avatar .disc {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 4.6rem;
+        height: 4.6rem;
+        margin: -2.4rem 0 0 -2.3rem;
+        border-radius: 50%;
+        background: #e7c15a;
+        border: 2px solid var(--ink);
+      }
+
+      .thumb-avatar .eye {
+        position: absolute;
+        top: 1.55rem;
+        width: 0.72rem;
+        height: 0.92rem;
+        border-radius: 50%;
+        background: var(--ink);
+      }
+
+      .thumb-avatar .eye.l {
+        left: 1.15rem;
+      }
+
+      .thumb-avatar .eye.r {
+        right: 1.15rem;
+      }
+
+      .thumb-avatar .beak {
+        position: absolute;
+        left: 50%;
+        top: 2.55rem;
+        width: 0;
+        height: 0;
+        margin-left: -0.32rem;
+        border-left: 0.32rem solid transparent;
+        border-right: 0.32rem solid transparent;
+        border-top: 0.45rem solid #c45c2a;
+      }
+
       .thumb-nostr {
         background:
           radial-gradient(ellipse 70% 50% at 80% 0%, #d8efe6 0%, transparent 55%),
@@ -445,6 +492,24 @@
             <p>
               Short haiku with a language selector. Uses
               <code>ipa-tools</code> <code>complete</code> to translate the poem.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./avatar/">
+          <div class="thumb thumb-avatar" aria-hidden="true">
+            <div class="disc">
+              <div class="eye l"></div>
+              <div class="eye r"></div>
+              <div class="beak"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <h2>Avatar</h2>
+            <p>
+              Describe a character, generate an SVG avatar with
+              <code>ipa-tools</code> <code>complete</code>, then download PNG.
             </p>
             <span class="cta">Open demo →</span>
           </div>
