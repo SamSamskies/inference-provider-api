@@ -51,6 +51,7 @@
         display: flex;
         align-items: baseline;
         justify-content: space-between;
+        flex-wrap: wrap;
         gap: 1rem;
         margin-bottom: 1.25rem;
       }
@@ -75,6 +76,19 @@
         gap: 0.75rem;
       }
 
+      .gallery {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-decoration: none;
+        white-space: nowrap;
+        border-radius: 2px;
+      }
+
+      .gallery:hover {
+        color: var(--accent);
+      }
+
       .source {
         display: inline-flex;
         color: var(--muted);
@@ -91,6 +105,7 @@
         color: var(--accent);
       }
 
+      .gallery:focus-visible,
       .source:focus-visible,
       textarea:focus-visible,
       button:focus-visible {
@@ -511,6 +526,7 @@
       <header>
         <h1 class="app-title">IPA Avatar<span>ipa-tools · complete</span></h1>
         <div class="header-meta">
+          <a class="gallery" href="../">All examples</a>
           <a
             class="source"
             href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/avatar"
