@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-27
+
 ### Added
 
 - SPEC-aligned image content parts: `ImagePart` / `TextPart` / `ContentPart`, `output.images` on `InferenceRequest`, and `imageInput` / `imageOutput` on `InferenceFeatures` ([#42](https://github.com/SamSamskies/inference-provider-api/issues/42)).
