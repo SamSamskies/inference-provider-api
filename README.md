@@ -136,6 +136,37 @@ if (features.toolCalling) {
     }
   }
 }
+
+if (features.imageInput) {
+  for await (const chunk of window.inference.request({
+    method: "chat",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "What is in this photo?" },
+          { type: "image", url: "https://example.com/photo.png" },
+        ],
+      },
+    ],
+  })) {
+    if (chunk.type === "delta") {
+      // append chunk.content
+    }
+  }
+}
+
+if (features.imageOutput) {
+  for await (const chunk of window.inference.request({
+    method: "chat",
+    messages: [{ role: "user", content: "a red fox sticker" }],
+    output: { images: true },
+  })) {
+    if (chunk.type === "done") {
+      // message.content may include ImageParts, or text only if the model did not draw
+    }
+  }
+}
 ```
 
 Request `options` can be sent without feature detection — unsupported keys are ignored:
@@ -155,16 +186,20 @@ for await (const chunk of window.inference.request({
 ```
 
 Any multi-round function-tool loop is application code. Function tools without
-`toolCalling`, and `{ type: "web_search" }` without `webSearch`, are
-`invalid_request`. The two flags are independent: search-only requests must not
-require `toolCalling`. Unsupported `options` keys are ignored (not rejected) so
+`toolCalling`, `{ type: "web_search" }` without `webSearch`, image parts without
+`imageInput`, and `output.images` without `imageOutput`, are
+`invalid_request`. The flags are independent: search-only requests must not
+require `toolCalling`; one-shot generate does not require `imageInput`.
+Unsupported `options` keys are ignored (not rejected) so
 apps may send them for forward compatibility. For a ready-made function-tool
 loop (plus types and `complete`), see the non-normative
 [`ipa-tools`](./packages/ipa-tools) package (`npm install ipa-tools`).
 
-Prefer `getFeatures().toolCalling` before sending function tools, and
-`getFeatures().webSearch` before sending `{ type: "web_search" }`;
-see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-or-websearch-is-not-advertised).
+Prefer `getFeatures().toolCalling` before sending function tools,
+`getFeatures().webSearch` before sending `{ type: "web_search" }`,
+`getFeatures().imageInput` before sending image parts, and
+`getFeatures().imageOutput` before `output.images`;
+see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-websearch-imageinput-or-imageoutput-is-not-advertised).
 The extension prompts the user for permission:
 
 ```text
@@ -191,25 +226,30 @@ Allow once, or deny only this request.
 Request preview is optional extension UX for this draft, not part of the API
 contract. When the request includes function tools, the permission UI must
 list the function names; when it includes `{ type: "web_search" }`, it must
-list a hosted-search label (and disclose public-web lookup / fetch). A
-persistent chat grant does not silently cover a later tools request, and a
-function-tools grant does not cover hosted search. A follow-up that only
+list a hosted-search label (and disclose public-web lookup / fetch); when it
+includes image parts, it must list an image-input label; when it sets
+`output.images`, it must list an image-output label. A persistent chat grant
+does not silently cover a later tools, search, or images request, and those
+identities are independent of each other. A follow-up that only
 appends `role: "tool"` results may not re-prompt and may not appear in any
 preview, so applications should disclose what data those tools will send to
 the provider **before** Allow (in the first `messages`, the tool description,
-or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling) and
-[Hosted web search](./SPEC.md#hosted-web-search).
+or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling),
+[Hosted web search](./SPEC.md#hosted-web-search), and
+[Images](./SPEC.md#images).
 
 The user chooses the provider and model. With “Remember for this site” checked, Allow
 persists access for that origin together with the chosen provider and model; Deny
 permanently blocks it. Changing the extension’s global default does not alter
 existing origin grants.
 
-Text chat is required. Tool calling and hosted web search are optional:
-implementations advertise them with `{ toolCalling: true }` and
-`{ webSearch: true }` from `getFeatures`. The page defines and executes function
-tools; `{ type: "web_search" }` is implementation- or provider-executed and
-does not produce page-side `toolCalls`. Optional `options` (for example
+Text chat is required. Tool calling, hosted web search, and image input/output
+are optional: implementations advertise them with `{ toolCalling: true }`,
+`{ webSearch: true }`, `{ imageInput: true }`, and `{ imageOutput: true }` from
+`getFeatures`. The page defines and executes function tools;
+`{ type: "web_search" }` is implementation- or provider-executed and
+does not produce page-side `toolCalls`. Image generation stays on chat via
+`output.images` (not a page-facing hosted tool). Optional `options` (for example
 `options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`,
 `options.temperature`: number in `[0, 2]`) lets apps prefer generation settings
 when the matching `getFeatures().options` key is true — not a permission change;
@@ -228,6 +268,7 @@ user override or clamp controls are optional extension UX. See
 - Optional capability discovery (`getFeatures`)
 - Optional function tools, executed by the page
 - Optional hosted web search (`webSearch`, `{ type: "web_search" }`)
+- Optional image input and output (`imageInput` / `imageOutput`, content parts)
 - Optional request `options` (for example `reasoningEffort`, `temperature`)
 
 ## Non-goals
@@ -301,7 +342,7 @@ Some topics that still need community discussion:
 - Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
 - Which further keys belong under `options` (for example `maxTokens`), and should clamp/override UX stay optional?
 - Should model selection always remain under user control?
-- Should images, embeddings, and speech use this API or separate APIs?
+- Should embeddings and speech use this API or separate APIs? (Images: this API — content parts on chat plus `output.images`.)
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
 - Should `getFeatures` add a nested object later (for example for MCP), or stay one key per capability as with `toolCalling` and `webSearch`?
 - Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?

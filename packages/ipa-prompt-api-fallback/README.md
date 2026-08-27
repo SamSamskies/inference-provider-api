@@ -75,6 +75,7 @@ const promptApi = await getPromptApiAvailability();
 | `delta` / `done` | From `promptStreaming()` (lossy) |
 | `usage` | Omitted |
 | `tools` / `toolCalling` / `webSearch` | Unsupported (`getFeatures().toolCalling === false`; `webSearch` absent) |
+| `imageInput` / `imageOutput` / `output.images` | Unsupported (`imageInput` / `imageOutput` absent; image parts and `output.images` are `invalid_request`) |
 | Provider / model picker | None — `done.model` is `"on-device"` |
 
 ## API

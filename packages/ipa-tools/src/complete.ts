@@ -1,5 +1,7 @@
 import {
   createResolver,
+  requestNeedsImageInput,
+  requestNeedsImageOutput,
   requestNeedsTools,
   requestNeedsWebSearch,
   type FallbackInput,
@@ -45,6 +47,8 @@ export async function complete(
       const inference = await resolver.resolve({
         needsTools: requestNeedsTools(request),
         needsWebSearch: requestNeedsWebSearch(request),
+        needsImageInput: requestNeedsImageInput(request),
+        needsImageOutput: requestNeedsImageOutput(request),
         signal,
       });
       requestFn = inference.request.bind(inference);

@@ -1,6 +1,8 @@
 import {
   createResolver,
   normalizeFallbacks,
+  requestNeedsImageInput,
+  requestNeedsImageOutput,
   requestNeedsTools,
   requestNeedsWebSearch,
   type FallbackInput,
@@ -98,6 +100,8 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
       const inference = await resolver.resolve({
         needsTools: requestNeedsTools(runOptions),
         needsWebSearch: requestNeedsWebSearch(runOptions),
+        needsImageInput: requestNeedsImageInput(runOptions),
+        needsImageOutput: requestNeedsImageOutput(runOptions),
         signal: runOptions.signal,
       });
       return runTools({
@@ -111,18 +115,29 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
 function requestWithResolver(
   resolver: InferenceResolver,
   request: InferenceRequest,
-  resolveHints?: { needsTools?: boolean; needsWebSearch?: boolean }
+  resolveHints?: {
+    needsTools?: boolean;
+    needsWebSearch?: boolean;
+    needsImageInput?: boolean;
+    needsImageOutput?: boolean;
+  }
 ): AsyncIterable<InferenceChunk> {
   const needsTools =
     resolveHints?.needsTools === true || requestNeedsTools(request);
   const needsWebSearch =
     resolveHints?.needsWebSearch === true || requestNeedsWebSearch(request);
+  const needsImageInput =
+    resolveHints?.needsImageInput === true || requestNeedsImageInput(request);
+  const needsImageOutput =
+    resolveHints?.needsImageOutput === true || requestNeedsImageOutput(request);
 
   return {
     async *[Symbol.asyncIterator]() {
       const inference = await resolver.resolve({
         needsTools,
         needsWebSearch,
+        needsImageInput,
+        needsImageOutput,
         signal: request.signal,
       });
       const bound = inference.request.bind(inference) as Inference["request"];

@@ -8,7 +8,10 @@
 import "./types.js";
 
 export type {
+  ContentPart,
   DoneChunk,
+  ImageMediaType,
+  ImagePart,
   Inference,
   InferenceChunk,
   InferenceError,
@@ -18,6 +21,7 @@ export type {
   InferenceRequest,
   Message,
   ReasoningEffort,
+  TextPart,
   Tool,
   ToolCall,
   ToolChoice,

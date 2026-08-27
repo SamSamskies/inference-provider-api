@@ -30,8 +30,8 @@ export type InferenceBackend = {
   }): Promise<Inference>;
   /**
    * Optional feature snapshot used to skip `create()` when the call needs
-   * `toolCalling` or `webSearch` that this backend does not advertise
-   * (avoids download / session side effects).
+   * `toolCalling`, `webSearch`, `imageInput`, or `imageOutput` that this
+   * backend does not advertise (avoids download / session side effects).
    */
   getFeatures?(): InferenceFeatures;
 };
@@ -57,6 +57,10 @@ export type ResolveOptions = {
   needsTools?: boolean;
   /** When true, skip a fallback whose `getFeatures().webSearch` is not true. */
   needsWebSearch?: boolean;
+  /** When true, skip a fallback whose `getFeatures().imageInput` is not true. */
+  needsImageInput?: boolean;
+  /** When true, skip a fallback whose `getFeatures().imageOutput` is not true. */
+  needsImageOutput?: boolean;
 };
 
 export type ProbeStatus = {
@@ -72,12 +76,6 @@ export const MAX_FALLBACKS = 1;
 /** Thrown when every fallback was skipped for lacking toolCalling. */
 const NO_TOOLS_BACKEND_MESSAGE =
   "No configured backend supports tool calling.";
-/** Thrown when every fallback was skipped for lacking webSearch. */
-const NO_WEB_SEARCH_BACKEND_MESSAGE =
-  "No configured backend supports web search.";
-/** Thrown when every fallback was skipped for lacking both capabilities. */
-const NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE =
-  "No configured backend supports tool calling and web search.";
 
 function isBackendObject(value: unknown): value is InferenceBackend {
   return (
@@ -145,6 +143,31 @@ export function normalizeFallbacks(
   return normalized;
 }
 
+type CapabilityNeeds = {
+  tools: boolean;
+  webSearch: boolean;
+  imageInput: boolean;
+  imageOutput: boolean;
+};
+
+function capabilityNeedsFrom(resolveOptions?: {
+  needsTools?: boolean;
+  needsWebSearch?: boolean;
+  needsImageInput?: boolean;
+  needsImageOutput?: boolean;
+}): CapabilityNeeds {
+  return {
+    tools: resolveOptions?.needsTools === true,
+    webSearch: resolveOptions?.needsWebSearch === true,
+    imageInput: resolveOptions?.needsImageInput === true,
+    imageOutput: resolveOptions?.needsImageOutput === true,
+  };
+}
+
+function needsAnyCapability(needs: CapabilityNeeds): boolean {
+  return needs.tools || needs.webSearch || needs.imageInput || needs.imageOutput;
+}
+
 function supportsTools(inference: Inference): boolean {
   return inference.getFeatures?.().toolCalling === true;
 }
@@ -153,44 +176,61 @@ function supportsWebSearch(inference: Inference): boolean {
   return inference.getFeatures?.().webSearch === true;
 }
 
+function supportsImageInput(inference: Inference): boolean {
+  return inference.getFeatures?.().imageInput === true;
+}
+
+function supportsImageOutput(inference: Inference): boolean {
+  return inference.getFeatures?.().imageOutput === true;
+}
+
 function supportsNeeded(
   inference: Inference,
-  needsTools: boolean,
-  needsWebSearch: boolean
+  needs: CapabilityNeeds
 ): boolean {
-  if (needsTools && !supportsTools(inference)) return false;
-  if (needsWebSearch && !supportsWebSearch(inference)) return false;
+  if (needs.tools && !supportsTools(inference)) return false;
+  if (needs.webSearch && !supportsWebSearch(inference)) return false;
+  if (needs.imageInput && !supportsImageInput(inference)) return false;
+  if (needs.imageOutput && !supportsImageOutput(inference)) return false;
   return true;
 }
 
 /** Prefer backend-advertised features so we can skip `create()` for tools. */
 function backendSupportsNeeded(
   backend: InferenceBackend,
-  needsTools: boolean,
-  needsWebSearch: boolean
+  needs: CapabilityNeeds
 ): boolean | undefined {
   if (typeof backend.getFeatures !== "function") return undefined;
   const features = backend.getFeatures();
-  if (needsTools && features.toolCalling !== true) return false;
-  if (needsWebSearch && features.webSearch !== true) return false;
+  if (needs.tools && features.toolCalling !== true) return false;
+  if (needs.webSearch && features.webSearch !== true) return false;
+  if (needs.imageInput && features.imageInput !== true) return false;
+  if (needs.imageOutput && features.imageOutput !== true) return false;
   return true;
 }
 
-function capabilitySkipMessage(
-  needsTools: boolean,
-  needsWebSearch: boolean
-): string {
-  if (needsTools && needsWebSearch) {
-    return NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE;
+function capabilitySkipMessage(needs: CapabilityNeeds): string {
+  const labels: string[] = [];
+  if (needs.tools) labels.push("tool calling");
+  if (needs.webSearch) labels.push("web search");
+  if (needs.imageInput) labels.push("image input");
+  if (needs.imageOutput) labels.push("image output");
+  if (labels.length === 0) {
+    return NO_TOOLS_BACKEND_MESSAGE;
   }
-  if (needsWebSearch) return NO_WEB_SEARCH_BACKEND_MESSAGE;
-  return NO_TOOLS_BACKEND_MESSAGE;
+  if (labels.length === 1) {
+    return `No configured backend supports ${labels[0]}.`;
+  }
+  if (labels.length === 2) {
+    return `No configured backend supports ${labels[0]} and ${labels[1]}.`;
+  }
+  const last = labels[labels.length - 1];
+  return `No configured backend supports ${labels.slice(0, -1).join(", ")}, and ${last}.`;
 }
 
 function shouldRetryCapabilitySkip(
   error: unknown,
-  needsTools: boolean,
-  needsWebSearch: boolean
+  needs: CapabilityNeeds
 ): boolean {
   if (
     !isInferenceError(error) ||
@@ -198,13 +238,28 @@ function shouldRetryCapabilitySkip(
   ) {
     return false;
   }
-  if (error.message === NO_TOOLS_BACKEND_MESSAGE) return !needsTools;
-  if (error.message === NO_WEB_SEARCH_BACKEND_MESSAGE) {
-    return !needsWebSearch;
+  const message = error.message;
+  if (!message.startsWith("No configured backend supports ") || !message.endsWith(".")) {
+    return false;
   }
-  if (error.message === NO_TOOLS_AND_WEB_SEARCH_BACKEND_MESSAGE) {
-    return !needsTools || !needsWebSearch;
+  const skipped = {
+    tools: message.includes("tool calling"),
+    webSearch: message.includes("web search"),
+    imageInput: message.includes("image input"),
+    imageOutput: message.includes("image output"),
+  };
+  if (
+    !skipped.tools &&
+    !skipped.webSearch &&
+    !skipped.imageInput &&
+    !skipped.imageOutput
+  ) {
+    return false;
   }
+  if (skipped.tools && !needs.tools) return true;
+  if (skipped.webSearch && !needs.webSearch) return true;
+  if (skipped.imageInput && !needs.imageInput) return true;
+  if (skipped.imageOutput && !needs.imageOutput) return true;
   return false;
 }
 
@@ -236,6 +291,8 @@ export type InferenceResolver = {
   resolve(options?: {
     needsTools?: boolean;
     needsWebSearch?: boolean;
+    needsImageInput?: boolean;
+    needsImageOutput?: boolean;
     signal?: AbortSignal;
   }): Promise<Inference>;
 };
@@ -260,10 +317,11 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
   async function resolveOnce(resolveOptions?: {
     needsTools?: boolean;
     needsWebSearch?: boolean;
+    needsImageInput?: boolean;
+    needsImageOutput?: boolean;
     signal?: AbortSignal;
   }): Promise<Inference> {
-    const needsTools = resolveOptions?.needsTools === true;
-    const needsWebSearch = resolveOptions?.needsWebSearch === true;
+    const needs = capabilityNeedsFrom(resolveOptions);
     const signal = resolveOptions?.signal ?? options?.signal;
     const throwIfAborted = () => {
       if (signal?.aborted) {
@@ -279,7 +337,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
 
     if (
       cachedFallback &&
-      supportsNeeded(cachedFallback, needsTools, needsWebSearch)
+      supportsNeeded(cachedFallback, needs)
     ) {
       return cachedFallback;
     }
@@ -293,7 +351,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       if (
         cachedFallback &&
         entry === cachedFallbackEntry &&
-        !supportsNeeded(cachedFallback, needsTools, needsWebSearch)
+        !supportsNeeded(cachedFallback, needs)
       ) {
         // Already resolved this exact entry; it lacks a required capability.
         skippedForCapabilities = true;
@@ -315,7 +373,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       }
 
       if (
-        backendSupportsNeeded(backend, needsTools, needsWebSearch) === false
+        backendSupportsNeeded(backend, needs) === false
       ) {
         skippedForCapabilities = true;
         continue;
@@ -357,7 +415,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
         return getInference();
       }
 
-      if (!supportsNeeded(inference, needsTools, needsWebSearch)) {
+      if (!supportsNeeded(inference, needs)) {
         // Cache so later capability requests skip recreate via cachedFallbackEntry.
         skippedForCapabilities = true;
         cachedFallback = inference;
@@ -378,13 +436,10 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       throw lastCreateError;
     }
 
-    if (
-      (needsTools || needsWebSearch) &&
-      skippedForCapabilities
-    ) {
+    if (needsAnyCapability(needs) && skippedForCapabilities) {
       throw makeInferenceError(
         "invalid_request",
-        capabilitySkipMessage(needsTools, needsWebSearch)
+        capabilitySkipMessage(needs)
       );
     }
 
@@ -402,8 +457,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
     },
 
     async resolve(resolveOptions) {
-      const needsTools = resolveOptions?.needsTools === true;
-      const needsWebSearch = resolveOptions?.needsWebSearch === true;
+      const needs = capabilityNeedsFrom(resolveOptions);
       const signal = resolveOptions?.signal ?? options?.signal;
       const throwIfAborted = () => {
         if (signal?.aborted) {
@@ -419,7 +473,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
       }
       if (
         cachedFallback &&
-        supportsNeeded(cachedFallback, needsTools, needsWebSearch)
+        supportsNeeded(cachedFallback, needs)
       ) {
         return cachedFallback;
       }
@@ -447,7 +501,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           if (isInferenceAvailable()) {
             return getInference();
           }
-          if (supportsNeeded(shared, needsTools, needsWebSearch)) {
+          if (supportsNeeded(shared, needs)) {
             return shared;
           }
           // Shared result lacks a capability this caller needs. Drop the
@@ -461,7 +515,7 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
           // resolve this caller would not also produce — not
           // create()/validation invalid_request, which would loop forever
           // when no backend succeeds.
-          if (shouldRetryCapabilitySkip(error, needsTools, needsWebSearch)) {
+          if (shouldRetryCapabilitySkip(error, needs)) {
             resolveInFlight = undefined;
             continue;
           }
@@ -491,4 +545,34 @@ export function requestNeedsWebSearch(request: {
     Array.isArray(request.tools) &&
     request.tools.some((tool) => tool?.type === "web_search")
   );
+}
+
+function isImagePart(value: unknown): boolean {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    (value as { type?: unknown }).type === "image"
+  );
+}
+
+/** True when user or assistant `content` includes an ImagePart. */
+export function requestNeedsImageInput(request: {
+  messages?: InferenceRequest["messages"];
+}): boolean {
+  if (!Array.isArray(request.messages)) return false;
+  for (const message of request.messages) {
+    if (message == null || typeof message !== "object") continue;
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    const content = message.content;
+    if (!Array.isArray(content)) continue;
+    if (content.some(isImagePart)) return true;
+  }
+  return false;
+}
+
+/** True when the request sets `output.images: true`. */
+export function requestNeedsImageOutput(request: {
+  output?: InferenceRequest["output"];
+}): boolean {
+  return request.output?.images === true;
 }

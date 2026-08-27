@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reject image parts and `output.images` with `invalid_request`. This backend does not advertise `imageInput` / `imageOutput` (Prompt API output is still text).
+
 ## [0.1.0] - 2026-08-20
 
 ### Added

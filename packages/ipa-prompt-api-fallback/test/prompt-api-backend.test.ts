@@ -302,6 +302,63 @@ describe("createPromptApiBackend", () => {
     });
   });
 
+  it("rejects image output on request", async () => {
+    setLanguageModel({
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["x"]),
+          destroy: vi.fn(),
+        })
+      ),
+    });
+    const inference = await createPromptApiBackend().create({});
+    const iter = inference.request({
+      method: "chat",
+      messages: [{ role: "user", content: "a fox sticker" }],
+      output: { images: true },
+    })[Symbol.asyncIterator]();
+
+    await expect(iter.next()).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "Prompt API backend does not support image output.",
+    });
+  });
+
+  it("rejects image parts on request", async () => {
+    setLanguageModel({
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () =>
+        makeSession({
+          promptStreaming: () => asyncStream(["x"]),
+          destroy: vi.fn(),
+        })
+      ),
+    });
+    const inference = await createPromptApiBackend().create({});
+    const iter = inference.request({
+      method: "chat",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "what is this?" },
+            {
+              type: "image",
+              mediaType: "image/png",
+              data: "AAAA",
+            },
+          ],
+        },
+      ],
+    })[Symbol.asyncIterator]();
+
+    await expect(iter.next()).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "Prompt API backend does not support image input.",
+    });
+  });
+
   it("maps AbortError to aborted", async () => {
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
@@ -409,5 +466,37 @@ describe("createInference + promptApi backend", () => {
       expect(isInferenceError(error)).toBe(true);
       expect((error as { code: string }).code).toBe("invalid_request");
     }
+  });
+
+  it("skips Prompt API for image input (feature gate)", async () => {
+    setLanguageModel({
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () => {
+        throw new Error("should not create");
+      }),
+    });
+    (globalThis as { window: { inference?: unknown } }).window = {};
+
+    const inference = createInference({
+      fallbacks: [createPromptApiBackend()],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "what is this?" },
+              { type: "image", mediaType: "image/png", data: "AAAA" },
+            ],
+          },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports image input.",
+    });
   });
 });
