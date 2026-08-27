@@ -444,8 +444,6 @@ Hosted web search is implementation- or provider-executed, not page-executed. Th
 
 ### Out of scope for this draft
 
-Hosted `{ type: "web_search" }` is specified above. This draft does **not** specify:
-
 - Images, embeddings, or speech
 - Other hosted / provider-executed tools (for example MCP)
 - Options on `{ type: "web_search" }` such as search filters, recency, or location
