@@ -3,6 +3,8 @@ import {
   createResolver,
   normalizeFallbacks,
   probeFallbacks,
+  requestNeedsImageInput,
+  requestNeedsImageOutput,
   requestNeedsTools,
   requestNeedsWebSearch,
   type InferenceBackend,
@@ -19,10 +21,42 @@ function stubInference(inference: Inference) {
   };
 }
 
+function featureSnapshot(options: {
+  toolCalling?: boolean;
+  webSearch?: boolean;
+  imageInput?: boolean;
+  imageOutput?: boolean;
+}): Inference["getFeatures"] {
+  if (
+    options.toolCalling === undefined &&
+    options.webSearch === undefined &&
+    options.imageInput === undefined &&
+    options.imageOutput === undefined
+  ) {
+    return undefined;
+  }
+  return () => ({
+    ...(options.toolCalling !== undefined
+      ? { toolCalling: options.toolCalling }
+      : {}),
+    ...(options.webSearch !== undefined
+      ? { webSearch: options.webSearch }
+      : {}),
+    ...(options.imageInput !== undefined
+      ? { imageInput: options.imageInput }
+      : {}),
+    ...(options.imageOutput !== undefined
+      ? { imageOutput: options.imageOutput }
+      : {}),
+  });
+}
+
 function fakeInference(options?: {
   id?: string;
   toolCalling?: boolean;
   webSearch?: boolean;
+  imageInput?: boolean;
+  imageOutput?: boolean;
   message?: string;
 }): Inference {
   const content = options?.message ?? `from:${options?.id ?? "ipa"}`;
@@ -35,17 +69,7 @@ function fakeInference(options?: {
         message: { role: "assistant", content },
       };
     },
-    getFeatures:
-      options?.toolCalling === undefined && options?.webSearch === undefined
-        ? undefined
-        : () => ({
-            ...(options.toolCalling !== undefined
-              ? { toolCalling: options.toolCalling }
-              : {}),
-            ...(options.webSearch !== undefined
-              ? { webSearch: options.webSearch }
-              : {}),
-          }),
+    getFeatures: featureSnapshot(options ?? {}),
   };
 }
 
@@ -54,6 +78,8 @@ function fakeBackend(options: {
   availability?: "unavailable" | "downloadable" | "downloading" | "available";
   toolCalling?: boolean;
   webSearch?: boolean;
+  imageInput?: boolean;
+  imageOutput?: boolean;
   onCreate?: () => void;
 }): InferenceBackend {
   const availability = options.availability ?? "available";
@@ -62,35 +88,33 @@ function fakeBackend(options: {
     async probe() {
       return availability;
     },
-    getFeatures:
-      options.toolCalling === undefined && options.webSearch === undefined
-        ? undefined
-        : () => ({
-            ...(options.toolCalling !== undefined
-              ? { toolCalling: options.toolCalling }
-              : {}),
-            ...(options.webSearch !== undefined
-              ? { webSearch: options.webSearch }
-              : {}),
-          }),
+    getFeatures: featureSnapshot(options),
     async create() {
       options.onCreate?.();
       return fakeInference({
         id: options.id,
         toolCalling: options.toolCalling,
         webSearch: options.webSearch,
+        imageInput: options.imageInput,
+        imageOutput: options.imageOutput,
         message: `from:${options.id}`,
       });
     },
   };
 }
 
+const pngPart = {
+  type: "image" as const,
+  mediaType: "image/png" as const,
+  data: "AAAA",
+};
+
 afterEach(() => {
   delete (globalThis as { window?: unknown }).window;
   delete (globalThis as { inference?: unknown }).inference;
 });
 
-describe("requestNeedsTools / requestNeedsWebSearch", () => {
+describe("requestNeedsTools / requestNeedsWebSearch / requestNeedsImageInput / requestNeedsImageOutput", () => {
   it("treats function tools and hosted search as independent", () => {
     expect(requestNeedsTools({})).toBe(false);
     expect(requestNeedsWebSearch({})).toBe(false);
@@ -124,6 +148,51 @@ describe("requestNeedsTools / requestNeedsWebSearch", () => {
         ],
       })
     ).toBe(true);
+  });
+
+  it("detects image parts in messages and output.images independently", () => {
+    expect(requestNeedsImageInput({})).toBe(false);
+    expect(requestNeedsImageOutput({})).toBe(false);
+    expect(
+      requestNeedsImageInput({
+        messages: [{ role: "user", content: "hi" }],
+      })
+    ).toBe(false);
+    expect(
+      requestNeedsImageInput({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "what is this?" },
+              pngPart,
+            ],
+          },
+        ],
+      })
+    ).toBe(true);
+    expect(
+      requestNeedsImageInput({
+        messages: [
+          {
+            role: "assistant",
+            content: [pngPart],
+          },
+        ],
+      })
+    ).toBe(true);
+    expect(requestNeedsImageOutput({ output: { images: true } })).toBe(true);
+    expect(requestNeedsImageOutput({ output: { images: false } })).toBe(false);
+    expect(
+      requestNeedsImageOutput({
+        messages: [
+          {
+            role: "user",
+            content: [pngPart],
+          },
+        ],
+      })
+    ).toBe(false);
   });
 });
 
@@ -371,6 +440,103 @@ describe("createInference / resolver", () => {
     ).rejects.toMatchObject({
       code: "invalid_request",
       message: "No configured backend supports tool calling and web search.",
+    });
+  });
+
+  it("does not call create on a backend that advertises no imageInput", async () => {
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "no-vision",
+          toolCalling: true,
+          imageInput: false,
+          onCreate: () => {
+            created = true;
+          },
+        }),
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "what is this?" },
+              pngPart,
+            ],
+          },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports image input.",
+    });
+
+    expect(created).toBe(false);
+  });
+
+  it("does not call create on a backend that advertises no imageOutput", async () => {
+    let created = false;
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "no-draw",
+          imageOutput: false,
+          onCreate: () => {
+            created = true;
+          },
+        }),
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [{ role: "user", content: "a red fox sticker" }],
+        output: { images: true },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message: "No configured backend supports image output.",
+    });
+
+    expect(created).toBe(false);
+  });
+
+  it("requires both image capabilities to iterate on a generated image", async () => {
+    const inference = createInference({
+      fallbacks: [
+        fakeBackend({
+          id: "generate-only",
+          imageInput: false,
+          imageOutput: true,
+        }),
+      ],
+    });
+
+    await expect(
+      inference.complete({
+        method: "chat",
+        messages: [
+          {
+            role: "user",
+            content: "make it bluer",
+          },
+          {
+            role: "assistant",
+            content: [pngPart],
+          },
+        ],
+        output: { images: true },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      message:
+        "No configured backend supports image input and image output.",
     });
   });
 

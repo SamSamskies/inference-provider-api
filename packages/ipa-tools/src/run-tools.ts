@@ -1,5 +1,7 @@
 import {
   createResolver,
+  requestNeedsImageInput,
+  requestNeedsImageOutput,
   requestNeedsTools,
   requestNeedsWebSearch,
   type FallbackInput,
@@ -29,6 +31,8 @@ export type RunToolsOptions = {
   toolChoice?: ToolChoice;
   /** Forwarded on every round. Same object each provider call. */
   options?: InferenceOptions;
+  /** Forwarded on every round when requesting image output. */
+  output?: InferenceRequest["output"];
   /** Default 5; max provider calls. Must be a positive finite number. */
   maxRounds?: number;
   onAccepted?: () => void;
@@ -123,6 +127,7 @@ export async function runTools(
     maxRounds = 5,
     toolChoice,
     options: requestOptions,
+    output,
     onAccepted,
     onDelta,
     onReasoningDelta,
@@ -158,6 +163,8 @@ export async function runTools(
       const inference = await resolver.resolve({
         needsTools: requestNeedsTools(options),
         needsWebSearch: requestNeedsWebSearch(options),
+        needsImageInput: requestNeedsImageInput(options),
+        needsImageOutput: requestNeedsImageOutput(options),
         signal,
       });
       request = inference.request.bind(inference);
@@ -189,6 +196,7 @@ export async function runTools(
     if (tools !== undefined) req.tools = tools;
     if (toolChoice !== undefined) req.toolChoice = toolChoice;
     if (requestOptions !== undefined) req.options = requestOptions;
+    if (output !== undefined) req.output = output;
 
     let done: DoneChunk | undefined;
     for await (const chunk of request(req)) {

@@ -147,6 +147,12 @@ function createInferenceFromSession(
               "Prompt API backend does not support tools."
             );
           }
+          if (request.output?.images === true) {
+            throw makeInferenceError(
+              "invalid_request",
+              "Prompt API backend does not support image output."
+            );
+          }
 
           const signal = request.signal;
           throwIfAborted(signal);

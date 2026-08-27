@@ -3,6 +3,33 @@
  * Importing this module augments `Window` with optional `inference`.
  */
 
+export type ImageMediaType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/gif";
+
+export type TextPart = {
+  type: "text";
+  text: string;
+};
+
+/**
+ * Image bytes (`data`) or a page-side URL (`url`), never both.
+ * `done.message` image parts always use `{ mediaType, data }` as a base64 string.
+ * On the page-facing API, `data` may be a `Blob`; injectors encode before an
+ * isolated-world hop. `{ url }` is resolved in the page (same CORS as the site).
+ */
+export type ImagePart =
+  | {
+      type: "image";
+      mediaType: ImageMediaType;
+      data: string | Blob;
+    }
+  | { type: "image"; url: string };
+
+export type ContentPart = TextPart | ImagePart;
+
 export type InferenceRequest = {
   method: "chat";
   messages: Message[];
@@ -13,6 +40,14 @@ export type InferenceRequest = {
    */
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  /**
+   * Image generation for this turn.
+   * `output.images` only when getFeatures().imageOutput is true.
+   * Extra keys under `output` are ignored (forward compatible).
+   */
+  output?: {
+    images?: boolean;
+  };
   /** Generation preferences for this request. See InferenceOptions. */
   options?: InferenceOptions;
   signal?: AbortSignal;
@@ -36,12 +71,16 @@ export type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
 
 export type Message =
   | {
-      role: "system" | "user";
+      role: "system";
       content: string;
     }
   | {
+      role: "user";
+      content: string | ContentPart[];
+    }
+  | {
       role: "assistant";
-      content: string | null;
+      content: string | ContentPart[] | null;
       /** Model reasoning / chain-of-thought, when the provider exposes it. */
       reasoning?: string;
       toolCalls?: ToolCall[];
@@ -74,6 +113,17 @@ export type InferenceFeatures = {
    * Absent or false means unsupported. Independent of `toolCalling`.
    */
   webSearch?: boolean;
+  /**
+   * Implementation accepts ImageParts in `messages` (user uploads and
+   * round-tripped assistant images). Absent or false means unsupported.
+   * Independent of `imageOutput`.
+   */
+  imageInput?: boolean;
+  /**
+   * Implementation accepts `output.images`; `done.message` may contain
+   * ImageParts. Absent or false means unsupported. Independent of `imageInput`.
+   */
+  imageOutput?: boolean;
   /**
    * Which InferenceOptions keys this implementation accepts.
    * Absent keys (and an absent options object) mean ignore those fields.

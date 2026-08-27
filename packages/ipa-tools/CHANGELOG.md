@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SPEC-aligned image content parts: `ImagePart` / `TextPart` / `ContentPart`, `output.images` on `InferenceRequest`, and `imageInput` / `imageOutput` on `InferenceFeatures` ([#42](https://github.com/SamSamskies/inference-provider-api/issues/42)).
+- `createInference` fallbacks skip backends that do not advertise `imageInput` / `imageOutput` when the request includes image parts or `output.images`.
+
 ## [0.5.0] - 2026-08-24
 
 ### Added
