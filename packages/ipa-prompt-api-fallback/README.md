@@ -12,7 +12,7 @@ npm install ipa-tools ipa-prompt-api-fallback
 
 [![npm](https://img.shields.io/npm/v/ipa-prompt-api-fallback)](https://www.npmjs.com/package/ipa-prompt-api-fallback)
 
-Peer dependency: `ipa-tools` `>=0.3.0`. Zero other runtime deps. Browser ESM only.
+Peer dependency: `ipa-tools` `>=0.6.0`. Zero other runtime deps. Browser ESM only.
 
 `ipa-tools` does **not** import this package. Your app imports both and passes the backend object into `fallbacks`.
 
