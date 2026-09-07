@@ -351,6 +351,60 @@
         padding: 0.28rem 0.55rem;
       }
 
+      .thumb-charts {
+        background:
+          radial-gradient(ellipse 60% 50% at 15% 10%, #d8efe6 0%, transparent 55%),
+          linear-gradient(180deg, #f3f7f4 0%, #e7eee9 100%);
+      }
+
+      .thumb-charts .bars {
+        position: absolute;
+        left: 1.2rem;
+        right: 1.2rem;
+        bottom: 1.35rem;
+        height: 4.2rem;
+        display: flex;
+        align-items: flex-end;
+        gap: 0.45rem;
+      }
+
+      .thumb-charts .bar {
+        flex: 1;
+        border-radius: 3px 3px 0 0;
+        background: var(--accent);
+        opacity: 0.85;
+      }
+
+      .thumb-charts .bar.b1 {
+        height: 42%;
+      }
+
+      .thumb-charts .bar.b2 {
+        height: 68%;
+        background: #0a6d7c;
+      }
+
+      .thumb-charts .bar.b3 {
+        height: 55%;
+      }
+
+      .thumb-charts .bar.b4 {
+        height: 88%;
+        background: #0a6d7c;
+      }
+
+      .thumb-charts .chip {
+        position: absolute;
+        left: 1.2rem;
+        top: 1.1rem;
+        font-family: var(--mono);
+        font-size: 0.55rem;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 999px;
+        padding: 0.28rem 0.55rem;
+      }
+
       .card-body {
         padding: 1rem 1.05rem 1.15rem;
         display: flex;
@@ -474,6 +528,26 @@
             <p>
               A feed of Nostr notes. Uses IPA tool calling to filter notes
               using natural language.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./charts/">
+          <div class="thumb thumb-charts" aria-hidden="true">
+            <div class="chip">render_chart</div>
+            <div class="bars">
+              <div class="bar b1"></div>
+              <div class="bar b2"></div>
+              <div class="bar b3"></div>
+              <div class="bar b4"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <h2>Charts</h2>
+            <p>
+              Ask for a chart in plain language. IPA tool calling draws bar,
+              line, or pie charts from a fixed dataset.
             </p>
             <span class="cta">Open demo →</span>
           </div>

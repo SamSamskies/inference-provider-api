@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Charts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --accent-soft: #d8efe6;
+        --signal: #0a6d7c;
+        --danger: #a61e1e;
+        --danger-soft: #f8e4e4;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
+        --radius: 14px;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #e4f2ec 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #eef1e8 0%, transparent 50%),
+          var(--paper);
+      }
+
+      .shell {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 3rem;
+      }
+
+      header.app-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 0.85rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1 span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        margin-left: 0.4rem;
+      }
+
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .gallery {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-decoration: none;
+        white-space: nowrap;
+        border-radius: 2px;
+      }
+
+      .gallery:hover {
+        color: var(--accent);
+      }
+
+      .source {
+        display: inline-flex;
+        color: var(--muted);
+        line-height: 0;
+        border-radius: 2px;
+      }
+
+      .source svg {
+        width: 1.15rem;
+        height: 1.15rem;
+      }
+
+      .source:hover {
+        color: var(--accent);
+      }
+
+      .source:focus-visible,
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      #status {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      #status.ready {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: transparent;
+      }
+
+      #status.missing {
+        color: var(--warn);
+        background: var(--warn-soft);
+        border-color: transparent;
+      }
+
+      .lede {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .lede a {
+        color: var(--accent);
+      }
+
+      .dataset {
+        margin: 0 0 1.1rem;
+        padding: 0.85rem 0.95rem 1rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .dataset-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 0 0 0.65rem;
+      }
+
+      .dataset-title {
+        margin: 0;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      .dataset-note {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--muted);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        margin: 0 -0.15rem;
+      }
+
+      table.data {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+
+      table.data th,
+      table.data td {
+        padding: 0.4rem 0.55rem;
+        text-align: right;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+
+      table.data th:first-child,
+      table.data td:first-child {
+        text-align: left;
+      }
+
+      table.data th {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      table.data tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .search {
+        margin-bottom: 0.35rem;
+      }
+
+      .search-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+      }
+
+      .search-field {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+      }
+
+      #query {
+        width: 100%;
+        font: inherit;
+        font-size: 0.95rem;
+        padding: 0.7rem 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .search-field:has(.field-icon:not([hidden])) #query {
+        padding-right: 2.55rem;
+      }
+
+      #query:read-only {
+        color: var(--muted);
+      }
+
+      .field-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.35rem;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.95rem;
+        height: 1.95rem;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .field-icon[hidden] {
+        display: none;
+      }
+
+      .field-icon svg {
+        display: block;
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+
+      .field-icon:hover {
+        color: var(--ink);
+        background: var(--surface);
+      }
+
+      #abort:hover {
+        color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      .primary {
+        font: inherit;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 0.7rem 0.95rem;
+        cursor: pointer;
+        min-height: 2.6rem;
+        border: none;
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .primary:hover:not(:disabled) {
+        background: #111612;
+      }
+
+      .primary:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .samples {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 0.65rem 0 0;
+      }
+
+      .sample {
+        font: inherit;
+        font-size: 0.78rem;
+        line-height: 1.3;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .sample:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--ink);
+      }
+
+      .sample:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .run-meta-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 1rem 0 0.65rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .run-meta {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-align: right;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .model-panel {
+        margin: 0 0 1rem;
+        padding: 0.75rem 0.9rem 0.85rem;
+        background: var(--accent-soft);
+        border: 1px solid #9dccbb;
+        border-radius: 10px;
+      }
+
+      .model-panel[hidden] {
+        display: none;
+      }
+
+      .model-kicker {
+        margin: 0 0 0.45rem;
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .model-panel-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .model-phase {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      .model-spin {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        border: 2px solid #b7d9cc;
+        border-top-color: var(--accent);
+        animation: model-spin 0.7s linear infinite;
+        flex: none;
+      }
+
+      .model-elapsed {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      .model-sub {
+        margin: 0.35rem 0 0;
+        color: #3d5a50;
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+
+      .model-log {
+        margin: 0.65rem 0 0;
+        padding: 0.5rem 0.6rem;
+        list-style: none;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: #3d5a50;
+        display: flex;
+        flex-direction: column;
+        gap: 0.28rem;
+        background: rgba(255, 255, 255, 0.45);
+        border-radius: 6px;
+      }
+
+      .model-log li[data-current="true"] {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      @keyframes model-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .model-spin {
+          animation: none;
+          border-top-color: var(--accent);
+        }
+      }
+
+      #error {
+        display: none;
+        margin: 0.65rem 0;
+        padding: 0.7rem 0.85rem;
+        background: var(--danger-soft);
+        color: var(--danger);
+        border-radius: 10px;
+        font-size: 0.88rem;
+        line-height: 1.4;
+      }
+
+      #error[data-show="true"] {
+        display: block;
+      }
+
+      .chart-panel {
+        margin: 0;
+        padding: 1rem 1.05rem 1.15rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--signal);
+        border-radius: var(--radius);
+        min-height: 16rem;
+      }
+
+      .chart-empty {
+        margin: 3.5rem 0;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .chart-empty[hidden],
+      .chart-body[hidden] {
+        display: none;
+      }
+
+      .chart-title {
+        margin: 0 0 0.85rem;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .chart-canvas-wrap {
+        position: relative;
+        width: 100%;
+        height: 16rem;
+      }
+
+      .chart-canvas-wrap canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem 1rem;
+        margin: 0.85rem 0 0;
+        padding: 0;
+        list-style: none;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      .chart-legend li {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .swatch {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 2px;
+        flex: none;
+      }
+
+      @media (max-width: 560px) {
+        .search-row {
+          flex-direction: column;
+        }
+
+        .primary {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="app-header">
+        <h1>Charts <span>generative UI</span></h1>
+        <div class="header-meta">
+          <a class="gallery" href="../">All examples</a>
+          <a
+            class="source"
+            href="https://github.com/SamSamskies/inference-provider-api"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Source on GitHub"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"
+              />
+            </svg>
+          </a>
+          <span id="status" class="missing">unavailable</span>
+        </div>
+      </header>
+
+      <p class="lede">
+        Ask for a chart in plain language.
+      </p>
+
+      <section class="dataset" aria-labelledby="dataset-title">
+        <div class="dataset-head">
+          <h2 class="dataset-title" id="dataset-title">Loading dataset…</h2>
+          <p class="dataset-note" id="dataset-note"></p>
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="data-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <form class="search" id="search-form">
+        <div class="search-row">
+          <div class="search-field">
+            <input
+              id="query"
+              type="text"
+              name="query"
+              autocomplete="off"
+              required
+              placeholder="e.g. bar chart of espresso by quarter"
+              aria-label="Chart request"
+            />
+            <button
+              type="button"
+              class="field-icon"
+              id="abort"
+              hidden
+              aria-label="Stop"
+              title="Stop"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="field-icon"
+              id="clear"
+              hidden
+              aria-label="Clear chart"
+              title="Clear chart"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  d="M6 6l12 12M18 6L6 18"
+                />
+              </svg>
+            </button>
+          </div>
+          <button type="submit" class="primary" id="chart-btn">Chart</button>
+        </div>
+        <div class="samples" id="samples"></div>
+      </form>
+
+      <div class="run-meta-row">
+        <span id="chart-status">No chart yet.</span>
+        <span class="run-meta" id="run-meta"></span>
+      </div>
+      <div class="model-panel" id="model-panel" hidden>
+        <p class="model-kicker">Model run</p>
+        <div class="model-panel-head">
+          <p class="model-phase">
+            <span class="model-spin" aria-hidden="true"></span>
+            <span id="model-phase">Waiting for permission…</span>
+          </p>
+          <span class="model-elapsed" id="model-elapsed"></span>
+        </div>
+        <p class="model-sub" id="model-sub">
+          Approve the request in Inference Bridge if a prompt appears.
+        </p>
+        <ol class="model-log" id="model-log"></ol>
+      </div>
+      <div id="error" role="alert" data-show="false"></div>
+
+      <section class="chart-panel" aria-live="polite">
+        <p class="chart-empty" id="chart-empty">
+          Charts appear here when the model calls <code>render_chart</code>.
+        </p>
+        <div class="chart-body" id="chart-body" hidden>
+          <h2 class="chart-title" id="chart-title"></h2>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-canvas" width="640" height="360" aria-label="Chart"></canvas>
+          </div>
+          <ul class="chart-legend" id="chart-legend"></ul>
+        </div>
+      </section>
+    </div>
+
+    <script type="module">
+      import {
+        getFeatures,
+        isInferenceAvailable,
+        isInferenceError,
+        runTools,
+        waitForInference,
+      } from "https://esm.sh/ipa-tools@0.6.0";
+
+      const NO_TOOL_CALLING =
+        "This injector does not advertise tool calling (getFeatures().toolCalling).";
+
+      const SAMPLE_QUERIES = [
+        "bar chart of espresso by quarter",
+        "line chart comparing drip and pastries",
+        "pie of Q4 product mix",
+        "show me an interesting insight",
+      ];
+
+      const SERIES_COLORS = [
+        "#0d7a5f",
+        "#0a6d7c",
+        "#c45c2a",
+        "#5b4db8",
+        "#8a5a00",
+        "#2f6fed",
+      ];
+
+      const REQUEST_OPTIONS = {
+        reasoningEffort: "none",
+        temperature: 0,
+      };
+
+      const statusEl = document.getElementById("status");
+      const queryEl = document.getElementById("query");
+      const chartBtn = document.getElementById("chart-btn");
+      const clearBtn = document.getElementById("clear");
+      const abortBtn = document.getElementById("abort");
+      const samplesEl = document.getElementById("samples");
+      const chartStatusEl = document.getElementById("chart-status");
+      const runMetaEl = document.getElementById("run-meta");
+      const modelPanelEl = document.getElementById("model-panel");
+      const modelPhaseEl = document.getElementById("model-phase");
+      const modelSubEl = document.getElementById("model-sub");
+      const modelElapsedEl = document.getElementById("model-elapsed");
+      const modelLogEl = document.getElementById("model-log");
+      const errorEl = document.getElementById("error");
+      const formEl = document.getElementById("search-form");
+      const datasetTitleEl = document.getElementById("dataset-title");
+      const datasetNoteEl = document.getElementById("dataset-note");
+      const dataTableEl = document.getElementById("data-table");
+      const chartEmptyEl = document.getElementById("chart-empty");
+      const chartBodyEl = document.getElementById("chart-body");
+      const chartTitleEl = document.getElementById("chart-title");
+      const chartCanvas = document.getElementById("chart-canvas");
+      const chartLegendEl = document.getElementById("chart-legend");
+
+      /** @type {{ title: string, description?: string, columns: Array<{key: string, label: string, type: string}>, rows: Array<Record<string, string | number>> } | null} */
+      let dataset = null;
+      /** @type {AbortController | null} */
+      let activeController = null;
+      /** @type {ReturnType<typeof setInterval> | null} */
+      let elapsedTimer = null;
+      let filterStartedAt = 0;
+      let lastLogLine = "";
+      let hasChart = false;
+      /** @type {Record<string, unknown> | null} */
+      let lastChartSpec = null;
+      /** @type {{ model: string, inputTokens: number, outputTokens: number, sawInput: boolean, sawOutput: boolean }} */
+      let runStats = {
+        model: "",
+        inputTokens: 0,
+        outputTokens: 0,
+        sawInput: false,
+        sawOutput: false,
+      };
+
+      function clearError() {
+        errorEl.dataset.show = "false";
+        errorEl.textContent = "";
+      }
+
+      function showError(err) {
+        const code =
+          isInferenceError(err) && err.code
+            ? err.code
+            : err && err.code
+              ? err.code
+              : "unknown";
+        const message =
+          err && err.message ? err.message : String(err ?? "Unknown error");
+        errorEl.textContent = `${code}: ${message}`;
+        errorEl.dataset.show = "true";
+      }
+
+      function truncate(text, max) {
+        if (text.length <= max) return text;
+        return `${text.slice(0, max - 1)}…`;
+      }
+
+      function hasToolCalling() {
+        return isInferenceAvailable() && getFeatures().toolCalling === true;
+      }
+
+      function refreshAvailability() {
+        if (hasToolCalling()) {
+          statusEl.textContent = "ready";
+          statusEl.className = "ready";
+          return true;
+        }
+        if (isInferenceAvailable()) {
+          statusEl.textContent = "no tools";
+          statusEl.className = "missing";
+          return false;
+        }
+        statusEl.textContent = "unavailable";
+        statusEl.className = "missing";
+        return false;
+      }
+
+      function setBusy(busy) {
+        chartBtn.disabled = busy || !dataset;
+        queryEl.readOnly = busy;
+        abortBtn.hidden = !busy;
+        clearBtn.hidden = busy || !hasChart;
+        modelPanelEl.hidden = !busy;
+        for (const btn of samplesEl.querySelectorAll("button")) {
+          btn.disabled = busy || !dataset;
+        }
+        if (busy) {
+          startElapsedTimer();
+        } else {
+          stopElapsedTimer();
+        }
+      }
+
+      function stopElapsedTimer() {
+        if (elapsedTimer != null) {
+          clearInterval(elapsedTimer);
+          elapsedTimer = null;
+        }
+      }
+
+      function startElapsedTimer() {
+        if (elapsedTimer != null) return;
+        filterStartedAt = Date.now();
+        const tick = () => {
+          const seconds = Math.floor((Date.now() - filterStartedAt) / 1000);
+          modelElapsedEl.textContent =
+            seconds < 2 ? "" : `${seconds}s elapsed`;
+        };
+        tick();
+        elapsedTimer = setInterval(tick, 1000);
+      }
+
+      function appendModelLog(line) {
+        if (!line || line === lastLogLine) return;
+        lastLogLine = line;
+        for (const item of modelLogEl.querySelectorAll("li")) {
+          item.dataset.current = "false";
+        }
+        const li = document.createElement("li");
+        li.dataset.current = "true";
+        li.textContent = line;
+        modelLogEl.appendChild(li);
+      }
+
+      /**
+       * @param {"permission" | "accepted" | "thinking" | "writing" | "tool" | "drawing"} phase
+       */
+      function setChartPhase(phase) {
+        const copy = {
+          permission: {
+            title: "Waiting for permission…",
+            sub: "Approve the request in Inference Bridge if a prompt appears.",
+            log: "Waiting for permission",
+          },
+          accepted: {
+            title: "Model is working…",
+            sub: "Permission granted. The model is reading the query and dataset.",
+            log: "Permission granted — calling the model",
+          },
+          thinking: {
+            title: "Thinking…",
+            sub: "The model is choosing a chart layout.",
+            log: "Thinking",
+          },
+          writing: {
+            title: "Generating…",
+            sub: "The model is preparing chart arguments.",
+            log: "Choosing chart",
+          },
+          tool: {
+            title: "Calling render_chart…",
+            sub: "The model chose a chart. Drawing it on the page.",
+            log: "Calling render_chart",
+          },
+          drawing: {
+            title: "Drawing chart…",
+            sub: "Updating the chart panel.",
+            log: "Drawn chart",
+          },
+        };
+        const next = copy[phase];
+        if (!next) return;
+        modelPhaseEl.textContent = next.title;
+        modelSubEl.textContent = next.sub;
+        appendModelLog(next.log);
+      }
+
+      function resetRunStats() {
+        runStats = {
+          model: "",
+          inputTokens: 0,
+          outputTokens: 0,
+          sawInput: false,
+          sawOutput: false,
+        };
+        runMetaEl.textContent = "";
+      }
+
+      function recordRunChunk(chunk) {
+        if (typeof chunk.model === "string" && chunk.model) {
+          runStats.model = chunk.model;
+        }
+        const usage = chunk.usage;
+        if (!usage || typeof usage !== "object") return;
+        if (typeof usage.inputTokens === "number") {
+          runStats.inputTokens += usage.inputTokens;
+          runStats.sawInput = true;
+        }
+        if (typeof usage.outputTokens === "number") {
+          runStats.outputTokens += usage.outputTokens;
+          runStats.sawOutput = true;
+        }
+      }
+
+      function renderRunMeta() {
+        const parts = [];
+        if (runStats.model) parts.push(runStats.model);
+        if (runStats.sawInput) parts.push(`in ${runStats.inputTokens}`);
+        if (runStats.sawOutput) parts.push(`out ${runStats.outputTokens}`);
+        runMetaEl.textContent = parts.join(" · ");
+      }
+
+      function formatNumber(value) {
+        return new Intl.NumberFormat("en-US").format(value);
+      }
+
+      function columnByKey(key) {
+        return dataset?.columns.find((col) => col.key === key) ?? null;
+      }
+
+      function categoryKeys() {
+        return (dataset?.columns ?? [])
+          .filter((col) => col.type === "category")
+          .map((col) => col.key);
+      }
+
+      function numberKeys() {
+        return (dataset?.columns ?? [])
+          .filter((col) => col.type === "number")
+          .map((col) => col.key);
+      }
+
+      function datasetForModel() {
+        if (!dataset) return null;
+        return {
+          title: dataset.title,
+          columns: dataset.columns.map((col) => ({
+            key: col.key,
+            type: col.type,
+          })),
+          rows: dataset.rows,
+        };
+      }
+
+      function renderTable() {
+        const thead = dataTableEl.querySelector("thead");
+        const tbody = dataTableEl.querySelector("tbody");
+        thead.replaceChildren();
+        tbody.replaceChildren();
+        if (!dataset) return;
+
+        datasetTitleEl.textContent = dataset.title;
+        datasetNoteEl.textContent = dataset.description ?? "";
+
+        const headRow = document.createElement("tr");
+        for (const col of dataset.columns) {
+          const th = document.createElement("th");
+          th.scope = "col";
+          th.textContent = col.label;
+          headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+
+        for (const row of dataset.rows) {
+          const tr = document.createElement("tr");
+          for (const col of dataset.columns) {
+            const td = document.createElement("td");
+            const value = row[col.key];
+            td.textContent =
+              col.type === "number" && typeof value === "number"
+                ? formatNumber(value)
+                : String(value ?? "");
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+      }
+
+      function clearChart() {
+        hasChart = false;
+        lastChartSpec = null;
+        chartEmptyEl.hidden = false;
+        chartBodyEl.hidden = true;
+        chartTitleEl.textContent = "";
+        chartLegendEl.replaceChildren();
+        const ctx = chartCanvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+        }
+        chartStatusEl.textContent = "No chart yet.";
+        clearBtn.hidden = true;
+      }
+
+      function resizeCanvas() {
+        const wrap = chartCanvas.parentElement;
+        if (!wrap) return;
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(320, Math.floor(wrap.clientWidth));
+        const height = Math.max(220, Math.floor(wrap.clientHeight));
+        chartCanvas.width = Math.floor(width * dpr);
+        chartCanvas.height = Math.floor(height * dpr);
+        const ctx = chartCanvas.getContext("2d");
+        if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { width, height, ctx };
+      }
+
+      function drawBarChart(ctx, width, height, labels, series) {
+        const pad = { top: 16, right: 16, bottom: 36, left: 52 };
+        const plotW = width - pad.left - pad.right;
+        const plotH = height - pad.top - pad.bottom;
+        const maxVal = Math.max(
+          1,
+          ...series.flatMap((s) => s.values.map((v) => Math.max(0, v)))
+        );
+        const groups = labels.length;
+        const seriesCount = series.length;
+        const groupW = plotW / Math.max(1, groups);
+        const barGap = Math.min(10, groupW * 0.12);
+        const barW =
+          (groupW - barGap * 2) / Math.max(1, seriesCount) - 2;
+
+        ctx.strokeStyle = "#d4ddd6";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, pad.top);
+        ctx.lineTo(pad.left, pad.top + plotH);
+        ctx.lineTo(pad.left + plotW, pad.top + plotH);
+        ctx.stroke();
+
+        ctx.fillStyle = "#5c6760";
+        ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (let i = 0; i <= 4; i++) {
+          const y = pad.top + plotH - (plotH * i) / 4;
+          const val = Math.round((maxVal * i) / 4);
+          ctx.fillText(formatNumber(val), pad.left - 8, y);
+          if (i > 0) {
+            ctx.strokeStyle = "#eef2ef";
+            ctx.beginPath();
+            ctx.moveTo(pad.left, y);
+            ctx.lineTo(pad.left + plotW, y);
+            ctx.stroke();
+          }
+        }
+
+        labels.forEach((label, gi) => {
+          const gx = pad.left + gi * groupW + barGap;
+          series.forEach((s, si) => {
+            const value = Math.max(0, s.values[gi] ?? 0);
+            const h = (value / maxVal) * plotH;
+            const x = gx + si * (barW + 2);
+            const y = pad.top + plotH - h;
+            ctx.fillStyle = s.color;
+            ctx.fillRect(x, y, Math.max(2, barW), h);
+          });
+          ctx.fillStyle = "#5c6760";
+          ctx.font = "12px IBM Plex Sans, system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(
+            String(label),
+            pad.left + gi * groupW + groupW / 2,
+            pad.top + plotH + 10
+          );
+        });
+      }
+
+      function drawLineChart(ctx, width, height, labels, series) {
+        const pad = { top: 16, right: 16, bottom: 36, left: 52 };
+        const plotW = width - pad.left - pad.right;
+        const plotH = height - pad.top - pad.bottom;
+        const maxVal = Math.max(
+          1,
+          ...series.flatMap((s) => s.values.map((v) => Math.max(0, v)))
+        );
+        const n = labels.length;
+
+        ctx.strokeStyle = "#d4ddd6";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, pad.top);
+        ctx.lineTo(pad.left, pad.top + plotH);
+        ctx.lineTo(pad.left + plotW, pad.top + plotH);
+        ctx.stroke();
+
+        ctx.fillStyle = "#5c6760";
+        ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (let i = 0; i <= 4; i++) {
+          const y = pad.top + plotH - (plotH * i) / 4;
+          const val = Math.round((maxVal * i) / 4);
+          ctx.fillText(formatNumber(val), pad.left - 8, y);
+          if (i > 0) {
+            ctx.strokeStyle = "#eef2ef";
+            ctx.beginPath();
+            ctx.moveTo(pad.left, y);
+            ctx.lineTo(pad.left + plotW, y);
+            ctx.stroke();
+          }
+        }
+
+        const xAt = (i) =>
+          pad.left + (n <= 1 ? plotW / 2 : (plotW * i) / (n - 1));
+        const yAt = (v) => pad.top + plotH - (Math.max(0, v) / maxVal) * plotH;
+
+        for (const s of series) {
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          s.values.forEach((value, i) => {
+            const x = xAt(i);
+            const y = yAt(value);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          s.values.forEach((value, i) => {
+            ctx.fillStyle = s.color;
+            ctx.beginPath();
+            ctx.arc(xAt(i), yAt(value), 3.5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+
+        labels.forEach((label, i) => {
+          ctx.fillStyle = "#5c6760";
+          ctx.font = "12px IBM Plex Sans, system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(String(label), xAt(i), pad.top + plotH + 10);
+        });
+      }
+
+      function drawPieChart(ctx, width, height, slices) {
+        const cx = width / 2;
+        const cy = height / 2 - 4;
+        const radius = Math.min(width, height) * 0.34;
+        const total = slices.reduce((sum, s) => sum + Math.max(0, s.value), 0);
+        let angle = -Math.PI / 2;
+
+        if (total <= 0) {
+          ctx.fillStyle = "#d4ddd6";
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.fill();
+          return;
+        }
+
+        for (const slice of slices) {
+          const value = Math.max(0, slice.value);
+          const sweep = (value / total) * Math.PI * 2;
+          ctx.fillStyle = slice.color;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, radius, angle, angle + sweep);
+          ctx.closePath();
+          ctx.fill();
+          angle += sweep;
+        }
+
+        ctx.fillStyle = "#fafcf9";
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.48, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      /**
+       * @param {{ chartType: string, title: string, xKey: string, yKeys: string[], rowFilter?: string | null }} spec
+       * @param {{ silent?: boolean }} [opts]
+       */
+      function drawChart(spec, opts = {}) {
+        if (!dataset) return { error: "Dataset not loaded" };
+
+        const chartType = String(spec.chartType ?? "").toLowerCase();
+        if (!["bar", "line", "pie"].includes(chartType)) {
+          return { error: "chartType must be bar, line, or pie" };
+        }
+
+        const title =
+          typeof spec.title === "string" && spec.title.trim()
+            ? spec.title.trim()
+            : "Chart";
+        const xKey = String(spec.xKey ?? "");
+        const yKeys = Array.isArray(spec.yKeys)
+          ? spec.yKeys.map((k) => String(k))
+          : [];
+
+        if (!columnByKey(xKey) || columnByKey(xKey)?.type !== "category") {
+          return {
+            error: `xKey must be a category column (${categoryKeys().join(", ")})`,
+          };
+        }
+        if (yKeys.length === 0) {
+          return { error: "yKeys must include at least one numeric column" };
+        }
+        for (const key of yKeys) {
+          if (!columnByKey(key) || columnByKey(key)?.type !== "number") {
+            return {
+              error: `yKeys must be numeric columns (${numberKeys().join(", ")})`,
+            };
+          }
+        }
+
+        let rows = dataset.rows;
+        const rowFilter =
+          typeof spec.rowFilter === "string" && spec.rowFilter.trim()
+            ? spec.rowFilter.trim()
+            : null;
+        if (rowFilter) {
+          rows = rows.filter((row) => String(row[xKey]) === rowFilter);
+          if (rows.length === 0) {
+            return { error: `No row matches rowFilter "${rowFilter}"` };
+          }
+        }
+
+        if (!opts.silent) setChartPhase("drawing");
+        hasChart = true;
+        lastChartSpec = {
+          chartType,
+          title,
+          xKey,
+          yKeys,
+          rowFilter,
+        };
+        chartEmptyEl.hidden = true;
+        chartBodyEl.hidden = false;
+        chartTitleEl.textContent = title;
+        chartStatusEl.textContent = `${chartType} · ${yKeys.length} series`;
+
+        const { width, height, ctx } = resizeCanvas();
+        if (!ctx) return { error: "Canvas unavailable" };
+        ctx.clearRect(0, 0, width, height);
+
+        chartLegendEl.replaceChildren();
+
+        if (chartType === "pie") {
+          const row = rows[rows.length - 1];
+          const slices = yKeys.map((key, i) => ({
+            key,
+            label: columnByKey(key)?.label ?? key,
+            value: Number(row[key]) || 0,
+            color: SERIES_COLORS[i % SERIES_COLORS.length],
+          }));
+          drawPieChart(ctx, width, height, slices);
+          for (const slice of slices) {
+            const li = document.createElement("li");
+            const swatch = document.createElement("span");
+            swatch.className = "swatch";
+            swatch.style.background = slice.color;
+            li.append(
+              swatch,
+              document.createTextNode(
+                `${slice.label} · ${formatNumber(slice.value)}`
+              )
+            );
+            chartLegendEl.appendChild(li);
+          }
+          return {
+            drawn: true,
+            chartType,
+            title,
+            slices: slices.length,
+            row: String(row[xKey]),
+          };
+        }
+
+        const labels = rows.map((row) => String(row[xKey]));
+        const series = yKeys.map((key, i) => ({
+          key,
+          label: columnByKey(key)?.label ?? key,
+          color: SERIES_COLORS[i % SERIES_COLORS.length],
+          values: rows.map((row) => Number(row[key]) || 0),
+        }));
+
+        if (chartType === "bar") {
+          drawBarChart(ctx, width, height, labels, series);
+        } else {
+          drawLineChart(ctx, width, height, labels, series);
+        }
+
+        for (const s of series) {
+          const li = document.createElement("li");
+          const swatch = document.createElement("span");
+          swatch.className = "swatch";
+          swatch.style.background = s.color;
+          li.append(swatch, document.createTextNode(s.label));
+          chartLegendEl.appendChild(li);
+        }
+
+        return {
+          drawn: true,
+          chartType,
+          title,
+          points: labels.length,
+          series: series.length,
+        };
+      }
+
+      const tools = [
+        {
+          type: "function",
+          function: {
+            name: "render_chart",
+            description:
+              "Draw a chart from the dataset in the user message. Use only the provided column keys. For pie charts of one quarter, set rowFilter to that quarter label (e.g. Q4).",
+            parameters: {
+              type: "object",
+              properties: {
+                chartType: {
+                  type: "string",
+                  enum: ["bar", "line", "pie"],
+                  description: "Chart kind to draw",
+                },
+                title: {
+                  type: "string",
+                  description: "Short chart title for the UI",
+                },
+                xKey: {
+                  type: "string",
+                  description: "Category column key for the x-axis (or pie row label)",
+                },
+                yKeys: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Numeric column keys to plot as series / pie slices",
+                },
+                rowFilter: {
+                  type: "string",
+                  description:
+                    "Optional exact category value to keep a single row (useful for pie)",
+                },
+              },
+              required: ["chartType", "title", "xKey", "yKeys"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ];
+
+      async function runChart(query) {
+        clearError();
+        lastLogLine = "";
+        modelLogEl.replaceChildren();
+        resetRunStats();
+        activeController = new AbortController();
+        setBusy(true);
+        setChartPhase("permission");
+
+        const payload = datasetForModel();
+        const messages = [
+          {
+            role: "system",
+            content: [
+              "You turn natural-language chart requests into one render_chart tool call.",
+              "Use only column keys from the dataset. Prefer a tool call over a prose reply.",
+              "bar/line: plot over all rows unless the user asks for one category.",
+              "pie: set rowFilter to one category value (e.g. Q4) and put product columns in yKeys.",
+              "For open-ended asks like an interesting insight, pick a chart that highlights a notable pattern (growth, contrast, mix) and use a title that states the insight.",
+              "If the request is impossible with this dataset, still call render_chart with your best valid guess.",
+            ].join(" "),
+          },
+          {
+            role: "user",
+            content: [
+              `Request: ${query}`,
+              "",
+              "Dataset:",
+              JSON.stringify(payload),
+            ].join("\n"),
+          },
+        ];
+
+        try {
+          let applied = false;
+          let applyError = null;
+
+          const { final } = await runTools({
+            messages,
+            tools,
+            execute: {
+              render_chart(args) {
+                const result = drawChart(args ?? {});
+                if (result?.error) applyError = result.error;
+                else applied = true;
+                return result;
+              },
+            },
+            options: REQUEST_OPTIONS,
+            maxRounds: 1,
+            signal: activeController.signal,
+            onAccepted() {
+              setChartPhase("accepted");
+            },
+            onReasoningDelta() {
+              setChartPhase("thinking");
+            },
+            onDelta() {
+              setChartPhase("writing");
+            },
+            onToolCall() {
+              setChartPhase("tool");
+            },
+          });
+
+          recordRunChunk(final);
+
+          if (!applied) {
+            const text =
+              typeof final?.message?.content === "string"
+                ? final.message.content.trim()
+                : "";
+            showError({
+              code: "provider_error",
+              message: applyError
+                ? `render_chart failed: ${applyError}`
+                : `The model did not call render_chart.${
+                    text
+                      ? ` It said: ${truncate(text, 240)}`
+                      : " Try another model in Inference Bridge."
+                  }`,
+            });
+            if (!hasChart) chartStatusEl.textContent = "No chart yet.";
+          }
+
+          renderRunMeta();
+        } catch (err) {
+          if (isInferenceError(err) && err.code === "aborted") {
+            chartStatusEl.textContent = hasChart
+              ? chartStatusEl.textContent
+              : "Stopped.";
+          } else {
+            showError(err);
+          }
+        } finally {
+          activeController = null;
+          setBusy(false);
+        }
+      }
+
+      async function loadDataset() {
+        chartStatusEl.textContent = "Loading dataset…";
+        try {
+          const res = await fetch("./data.json");
+          if (!res.ok) {
+            throw new Error(`Could not load data.json (${res.status})`);
+          }
+          const data = await res.json();
+          if (
+            !data ||
+            !Array.isArray(data.columns) ||
+            !Array.isArray(data.rows) ||
+            data.rows.length === 0
+          ) {
+            throw new Error("data.json is missing columns or rows.");
+          }
+          dataset = data;
+          renderTable();
+          chartStatusEl.textContent = "No chart yet.";
+          setBusy(false);
+        } catch (err) {
+          dataset = null;
+          datasetTitleEl.textContent = "Could not load dataset";
+          showError({
+            code: "provider_error",
+            message:
+              err && err.message ? err.message : "Failed to load data.json.",
+          });
+          chartStatusEl.textContent = "Dataset unavailable.";
+          setBusy(false);
+        }
+      }
+
+      for (const sample of SAMPLE_QUERIES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sample";
+        btn.textContent = sample;
+        btn.addEventListener("click", () => {
+          queryEl.value = sample;
+          queryEl.focus();
+        });
+        samplesEl.appendChild(btn);
+      }
+
+      formEl.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (activeController) return;
+        const query = queryEl.value.trim();
+        if (!query || !dataset) return;
+        if (!isInferenceAvailable()) {
+          showError({
+            code: "unavailable",
+            message:
+              "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
+          });
+          return;
+        }
+        if (!hasToolCalling()) {
+          showError({ code: "unavailable", message: NO_TOOL_CALLING });
+          return;
+        }
+        runChart(query);
+      });
+
+      clearBtn.addEventListener("click", () => {
+        if (activeController) return;
+        queryEl.value = "";
+        clearError();
+        resetRunStats();
+        clearChart();
+        setBusy(false);
+        queryEl.focus();
+      });
+
+      abortBtn.addEventListener("click", () => {
+        if (activeController) activeController.abort();
+      });
+
+      let resizeTimer = 0;
+      window.addEventListener("resize", () => {
+        if (!hasChart || !lastChartSpec) return;
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          resizeTimer = 0;
+          drawChart(lastChartSpec, { silent: true });
+        }, 120);
+      });
+
+      refreshAvailability();
+      setBusy(false);
+      if (!hasToolCalling()) {
+        void waitForInference()
+          .then(() => {
+            refreshAvailability();
+            setBusy(false);
+          })
+          .catch(() => {
+            /* stay unavailable */
+          });
+      }
+
+      void loadDataset();
+    </script>
+  </body>
+</html>

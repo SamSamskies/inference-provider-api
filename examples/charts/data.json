@@ -1,0 +1,41 @@
+{
+  "title": "Acme Coffee — quarterly sales (USD)",
+  "description": "Fictional regional café chain. Units are dollars.",
+  "columns": [
+    { "key": "quarter", "label": "Quarter", "type": "category" },
+    { "key": "espresso", "label": "Espresso", "type": "number" },
+    { "key": "drip", "label": "Drip", "type": "number" },
+    { "key": "pastries", "label": "Pastries", "type": "number" },
+    { "key": "merch", "label": "Merch", "type": "number" }
+  ],
+  "rows": [
+    {
+      "quarter": "Q1",
+      "espresso": 42000,
+      "drip": 31000,
+      "pastries": 18000,
+      "merch": 6500
+    },
+    {
+      "quarter": "Q2",
+      "espresso": 45500,
+      "drip": 29800,
+      "pastries": 21200,
+      "merch": 7200
+    },
+    {
+      "quarter": "Q3",
+      "espresso": 48200,
+      "drip": 27500,
+      "pastries": 24100,
+      "merch": 9100
+    },
+    {
+      "quarter": "Q4",
+      "espresso": 51000,
+      "drip": 33200,
+      "pastries": 26800,
+      "merch": 12400
+    }
+  ]
+}
