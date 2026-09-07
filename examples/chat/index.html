@@ -24,6 +24,7 @@
         --warn: #8a5a00;
         --warn-soft: #f5edd8;
         --radius: 10px;
+        --composer-radius: 1.35rem;
         --font: "IBM Plex Sans", system-ui, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, monospace;
       }
@@ -329,75 +330,204 @@
         }
       }
 
-      form {
+      .composer {
+        margin-top: auto;
+        padding-top: 0.5rem;
+      }
+
+      .composer-shell {
         display: flex;
-        gap: 0.5rem;
-        align-items: flex-end;
-        padding-top: 0.75rem;
-        border-top: 1px solid var(--line);
+        flex-direction: column;
+        gap: 0.45rem;
+        padding: 0.7rem 0.75rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: var(--composer-radius);
+        background: #fff;
+        box-shadow:
+          0 1px 2px rgba(26, 31, 28, 0.04),
+          0 8px 24px rgba(26, 31, 28, 0.04);
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .composer-shell:focus-within {
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+        box-shadow:
+          0 1px 2px rgba(26, 31, 28, 0.04),
+          0 8px 24px rgba(13, 122, 95, 0.08),
+          0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
       }
 
       textarea {
-        flex: 1;
+        display: block;
+        width: 100%;
         resize: none;
-        min-height: 2.75rem;
-        max-height: 8rem;
-        padding: 0.7rem 0.85rem;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: #fff;
+        min-height: 1.5rem;
+        max-height: 10rem;
+        padding: 0.35rem 0.4rem 0.15rem;
+        border: none;
+        background: transparent;
         font: inherit;
         color: inherit;
-        line-height: 1.4;
+        line-height: 1.45;
+        field-sizing: content;
       }
 
       textarea:focus {
-        outline: 2px solid var(--accent);
-        outline-offset: 1px;
-        border-color: transparent;
+        outline: none;
       }
 
       textarea:disabled {
         opacity: 0.6;
       }
 
-      button {
+      textarea::placeholder {
+        color: color-mix(in srgb, var(--muted) 75%, transparent);
+      }
+
+      .composer-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .composer-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+      }
+
+      .composer-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-shrink: 0;
+      }
+
+      .tool-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
         font: inherit;
+        font-size: 0.8rem;
         font-weight: 500;
-        font-size: 0.9rem;
-        padding: 0.7rem 1rem;
-        border-radius: var(--radius);
-        border: none;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
         cursor: pointer;
-        background: var(--accent);
-        color: #fff;
-        min-height: 2.75rem;
+        line-height: 1.2;
+        white-space: nowrap;
       }
 
-      button:hover:not(:disabled) {
-        filter: brightness(1.05);
+      .tool-toggle svg {
+        width: 0.95rem;
+        height: 0.95rem;
+        flex-shrink: 0;
       }
 
-      button:focus-visible {
+      .tool-toggle:hover:not(:disabled) {
+        background: var(--surface);
+        color: var(--ink);
+      }
+
+      .tool-toggle[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+        color: var(--accent);
+      }
+
+      .tool-toggle[aria-pressed="true"]:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--accent-soft) 80%, #fff);
+        color: var(--accent);
+      }
+
+      .tool-toggle:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
       }
 
-      button:disabled {
-        opacity: 0.45;
+      .tool-toggle:disabled {
+        opacity: 0.4;
         cursor: not-allowed;
       }
 
-      button.secondary {
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.15rem;
+        height: 2.15rem;
+        padding: 0;
+        border: none;
+        border-radius: 999px;
         background: transparent;
         color: var(--muted);
-        border: 1px solid var(--line);
+        cursor: pointer;
+        flex-shrink: 0;
       }
 
-      button.secondary:hover:not(:disabled) {
-        filter: none;
+      .icon-btn svg {
+        width: 1.1rem;
+        height: 1.1rem;
+      }
+
+      .icon-btn svg[hidden] {
+        display: none;
+      }
+
+      .icon-btn:hover:not(:disabled) {
         background: var(--surface);
         color: var(--ink);
+      }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .icon-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .icon-btn.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .icon-btn.primary:hover:not(:disabled) {
+        filter: brightness(1.06);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .icon-btn.primary:disabled {
+        opacity: 0.4;
+        filter: none;
+      }
+
+      .icon-btn.primary[data-mode="stop"] {
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .icon-btn.primary[data-mode="stop"]:hover:not(:disabled) {
+        filter: brightness(1.1);
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .hint {
+        margin: 0.45rem 0.15rem 0;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        color: var(--muted);
+        text-align: center;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -438,18 +568,59 @@
     <main>
       <div id="log" aria-live="polite"></div>
 
-      <form id="form">
-        <textarea
-          id="input"
-          rows="1"
-          placeholder="Message…"
-          autocomplete="off"
-          disabled
-        ></textarea>
-        <button type="button" id="clear" class="secondary" disabled>Clear</button>
-        <button type="button" id="abort" class="secondary" hidden>Stop</button>
-        <button type="submit" id="send" disabled>Send</button>
-      </form>
+      <div class="composer">
+        <form id="form" class="composer-shell">
+          <textarea
+            id="input"
+            rows="1"
+            placeholder="Message…"
+            autocomplete="off"
+            disabled
+          ></textarea>
+          <div class="composer-toolbar">
+            <div class="composer-tools">
+              <button
+                type="button"
+                id="web-search"
+                class="tool-toggle"
+                aria-pressed="false"
+                disabled
+                title="Hosted web search unavailable"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0M1.5 8a6.5 6.5 0 0 1 .23-1.7h2.85a13 13 0 0 0-.1 1.7c0 .58.03 1.15.1 1.7H1.73A6.5 6.5 0 0 1 1.5 8m1.06 3.2h2.5c.24.9.57 1.72.97 2.4A6.52 6.52 0 0 1 2.56 11.2m0-6.4a6.52 6.52 0 0 1 3.47-2.4c-.4.68-.73 1.5-.97 2.4zm3.66 3.2c0-.55.03-1.08.09-1.6h2.38c.06.52.09 1.05.09 1.6s-.03 1.08-.09 1.6H6.31A12 12 0 0 1 6.22 8m.2 3.2h2.16c-.25.95-.6 1.78-1.08 2.4-.48-.62-.83-1.45-1.08-2.4m0-6.4c.25-.95.6-1.78 1.08-2.4.48.62.83 1.45 1.08 2.4zm3.47 0h2.5a6.52 6.52 0 0 0-3.47-2.4c.4.68.73 1.5.97 2.4m0 6.4c-.24.9-.57 1.72-.97 2.4a6.52 6.52 0 0 0 3.47-2.4zm.85-4.8h2.85A6.5 6.5 0 0 1 14.5 8a6.5 6.5 0 0 1-.23 1.7h-2.85a13 13 0 0 0 .1-1.7 13 13 0 0 0-.1-1.7"
+                  />
+                </svg>
+                Search
+              </button>
+            </div>
+            <div class="composer-actions">
+              <button
+                type="submit"
+                id="primary"
+                class="icon-btn primary"
+                data-mode="send"
+                disabled
+                aria-label="Send message"
+                title="Send"
+              >
+                <svg class="icon-send" viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M8 13.75a.75.75 0 0 1-.75-.75V5.31L4.53 8.03a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 1 1-1.06 1.06L8.75 5.31V13a.75.75 0 0 1-.75.75"
+                  />
+                </svg>
+                <svg class="icon-stop" viewBox="0 0 16 16" aria-hidden="true" hidden>
+                  <rect x="4" y="4" width="8" height="8" rx="1.25" fill="currentColor" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </form>
+        <p class="hint" id="composer-hint">Enter to send · Shift+Enter for a new line</p>
+      </div>
     </main>
 
     <script>
@@ -457,9 +628,11 @@
       const logEl = document.getElementById("log");
       const form = document.getElementById("form");
       const input = document.getElementById("input");
-      const sendBtn = document.getElementById("send");
-      const clearBtn = document.getElementById("clear");
-      const abortBtn = document.getElementById("abort");
+      const primaryBtn = document.getElementById("primary");
+      const webSearchBtn = document.getElementById("web-search");
+      const composerHint = document.getElementById("composer-hint");
+      const sendIcon = primaryBtn.querySelector(".icon-send");
+      const stopIcon = primaryBtn.querySelector(".icon-stop");
 
       /** @type {AbortController | null} */
       let activeController = null;
@@ -467,22 +640,78 @@
       /** @type {{ role: "user" | "assistant"; content: string }[]} */
       const history = [];
 
-      function setBusy(busy) {
-        const available = Boolean(window.inference);
-        sendBtn.disabled = busy || !available;
-        input.disabled = busy || !available;
-        clearBtn.disabled =
-          busy || (history.length === 0 && !logEl.firstChild);
-        abortBtn.hidden = !busy;
-        if (!busy) activeController = null;
+      let webSearchEnabled = false;
+      let webSearchAvailable = false;
+
+      function getFeatures() {
+        try {
+          return window.inference?.getFeatures?.() ?? {};
+        } catch {
+          return {};
+        }
       }
 
-      function clearChat() {
-        if (activeController) return;
-        history.length = 0;
-        logEl.replaceChildren();
-        setBusy(false);
-        input.focus();
+      function buildWebSearchSystemPrompt() {
+        const now = new Date();
+        const localDateTime = now.toLocaleString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+          timeZoneName: "short",
+        });
+        return (
+          `The user's local date and time is ${localDateTime}. ` +
+          "You have access to hosted web search. " +
+          "For questions about current events, news, weather, what is happening \"today\" / \"this week\" / \"right now\" / \"recently\", live data, or anything that may have changed since your training cutoff, you must use web search before answering. " +
+          "Do not answer those from memory alone — search first, then summarize what you found. " +
+          "When stating a time, use the search results (or say the time is approximate) — do not invent a clock time. " +
+          "Cite sources when you search."
+        );
+      }
+
+      function syncWebSearchControl() {
+        webSearchAvailable =
+          Boolean(window.inference) && getFeatures().webSearch === true;
+        if (!webSearchAvailable) webSearchEnabled = false;
+        webSearchBtn.disabled = !webSearchAvailable || Boolean(activeController);
+        webSearchBtn.setAttribute(
+          "aria-pressed",
+          webSearchEnabled ? "true" : "false",
+        );
+        webSearchBtn.title = webSearchAvailable
+          ? webSearchEnabled
+            ? "Web search on — model may use hosted search"
+            : "Web search off — click to allow hosted search"
+          : "Hosted web search unavailable (getFeatures().webSearch)";
+        composerHint.textContent = webSearchEnabled
+          ? "Search on · model may use hosted web search if needed"
+          : "Enter to send · Shift+Enter for a new line";
+      }
+
+      function setPrimaryMode(mode) {
+        const stopping = mode === "stop";
+        primaryBtn.dataset.mode = mode;
+        primaryBtn.type = stopping ? "button" : "submit";
+        primaryBtn.setAttribute(
+          "aria-label",
+          stopping ? "Stop generating" : "Send message",
+        );
+        primaryBtn.title = stopping ? "Stop" : "Send";
+        sendIcon.hidden = stopping;
+        stopIcon.hidden = !stopping;
+      }
+
+      function setBusy(busy) {
+        const available = Boolean(window.inference);
+        setPrimaryMode(busy ? "stop" : "send");
+        primaryBtn.disabled = busy ? false : !available;
+        input.disabled = busy || !available;
+        if (!busy) activeController = null;
+        syncWebSearchControl();
       }
 
       function appendMessage(role, text, { pending = false } = {}) {
@@ -601,9 +830,10 @@
         }
         statusEl.textContent = "unavailable";
         statusEl.className = "missing";
-        sendBtn.disabled = true;
+        primaryBtn.disabled = true;
+        setPrimaryMode("send");
         input.disabled = true;
-        clearBtn.disabled = history.length === 0 && !logEl.firstChild;
+        syncWebSearchControl();
         return false;
       }
 
@@ -614,9 +844,11 @@
             message:
               "window.inference is missing. Install Inference Bridge and open this page over https or localhost.",
           });
-          clearBtn.disabled = false;
           return;
         }
+
+        // Re-check after refresh — toggle may have been cleared if unsupported.
+        const useWebSearch = webSearchEnabled && getFeatures().webSearch === true;
 
         // Clear only after availability succeeds so a failed check keeps the draft.
         input.value = "";
@@ -629,12 +861,29 @@
         activeController = new AbortController();
         setBusy(true);
 
+        /** @type {{ role: string; content: string }[]} */
+        const messages = useWebSearch
+          ? [
+              {
+                role: "system",
+                content: buildWebSearchSystemPrompt(),
+              },
+              ...history,
+            ]
+          : history;
+
+        /** @type {Record<string, unknown>} */
+        const request = {
+          method: "chat",
+          messages,
+          signal: activeController.signal,
+        };
+        if (useWebSearch) {
+          request.tools = [{ type: "web_search" }];
+        }
+
         try {
-          for await (const chunk of window.inference.request({
-            method: "chat",
-            messages: history,
-            signal: activeController.signal,
-          })) {
+          for await (const chunk of window.inference.request(request)) {
             if (chunk.type === "accepted") {
               setPendingLabel(assistantBody, "Generating");
             } else if (chunk.type === "reasoning_delta") {
@@ -657,6 +906,7 @@
                 content: chunk.message.content,
               });
               const parts = [`model ${chunk.model}`];
+              if (useWebSearch) parts.push("search on");
               if (chunk.usage) {
                 const { inputTokens, outputTokens } = chunk.usage;
                 if (inputTokens != null) parts.push(`in ${inputTokens}`);
@@ -698,10 +948,16 @@
         sendMessage(content);
       });
 
-      clearBtn.addEventListener("click", clearChat);
+      primaryBtn.addEventListener("click", () => {
+        if (primaryBtn.dataset.mode === "stop" && activeController) {
+          activeController.abort();
+        }
+      });
 
-      abortBtn.addEventListener("click", () => {
-        if (activeController) activeController.abort();
+      webSearchBtn.addEventListener("click", () => {
+        if (!webSearchAvailable || activeController) return;
+        webSearchEnabled = !webSearchEnabled;
+        syncWebSearchControl();
       });
 
       input.addEventListener("keydown", (event) => {
@@ -713,14 +969,13 @@
 
       input.addEventListener("input", () => {
         input.style.height = "auto";
-        input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
+        input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
       });
 
       if (!refreshAvailability()) {
         appendMeta(
           "window.inference is missing — install Inference Bridge and open this page over https or localhost.",
         );
-        clearBtn.disabled = false;
       }
     </script>
   </body>
