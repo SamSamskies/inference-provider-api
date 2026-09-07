@@ -2,7 +2,7 @@
 
 A sample feed of real Nostr notes.
 
-Filtering uses **Inference Bridge experimental tool calling** through [`ipa-tools`](https://www.npmjs.com/package/ipa-tools) `runTools`. Stable `window.inference.request` still rejects `tools` until `getFeatures().toolCalling` is true, so this demo passes `window.inference.experimental.request` into `runTools`. That experimental surface is Inference Bridge–specific and will go away once tools graduate onto IPA `request`.
+Filtering uses [`ipa-tools`](https://www.npmjs.com/package/ipa-tools) `runTools` on stable IPA `request` when `getFeatures().toolCalling` is true. The model calls a page-executed `show_notes` tool with matching note numbers.
 
 ## Try it
 

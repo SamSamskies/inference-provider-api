@@ -150,16 +150,6 @@
         color: var(--accent);
       }
 
-      .callout {
-        margin: 0 0 1.1rem;
-        padding: 0.75rem 0.9rem;
-        font-size: 0.82rem;
-        line-height: 1.45;
-        color: var(--warn);
-        background: var(--warn-soft);
-        border-radius: 10px;
-      }
-
       .search {
         margin-bottom: 0.35rem;
       }
@@ -795,12 +785,6 @@
         Filter notes in plain language with a model through IPA.
       </p>
 
-      <p class="callout">
-        Tool calling is still experimental on Inference Bridge
-        (<code>window.inference.experimental.request</code>). Other IPA injectors will not
-        work for Filter until tools graduate onto stable <code>request</code>.
-      </p>
-
       <form class="search" id="search-form">
         <div class="search-row">
           <div class="search-field">
@@ -935,18 +919,19 @@
 
     <script type="module">
       import {
+        getFeatures,
         isInferenceAvailable,
         isInferenceError,
         runTools,
         waitForInference,
-      } from "https://esm.sh/ipa-tools@0.4.0";
+      } from "https://esm.sh/ipa-tools@0.6.0";
       import { nip19 } from "https://esm.sh/nostr-tools@2.24.2";
 
       const TRENDING_RELAY = "wss://trending.relays.land";
       const CONTENT_MAX = 480;
       const MAX_RELAY_HINTS = 3;
-      const IB_ONLY =
-        "This demo's tool calling currently works only with Inference Bridge.";
+      const NO_TOOL_CALLING =
+        "This injector does not advertise tool calling (getFeatures().toolCalling).";
 
       const SAMPLE_QUERIES = [
         "asking a question",
@@ -1082,37 +1067,6 @@
       };
       let appliedFilter = false;
       let copyResetTimer = 0;
-
-      /**
-       * Tool calling is not on stable IPA `request` yet (Inference Bridge
-       * advertises getFeatures().toolCalling === false). Until it graduates,
-       * pass `window.inference.experimental.request` into `runTools`.
-       *
-       * Bind so `this` stays the experimental namespace. If another injector
-       * ships a different experimental shape, the TypeError / non-iterable
-       * path shows IB_ONLY.
-       */
-      function getExperimentalRequest() {
-        const experimental = window.inference?.experimental;
-        if (typeof experimental?.request !== "function") {
-          const err = new Error(
-            "window.inference.experimental.request is missing. " + IB_ONLY
-          );
-          err.code = "unavailable";
-          err.ipaExperimental = true;
-          throw err;
-        }
-        return experimental.request.bind(experimental);
-      }
-
-      function isExperimentalSurfaceError(err) {
-        if (err && err.ipaExperimental) return true;
-        if (err instanceof TypeError) return true;
-        const message = err && typeof err.message === "string" ? err.message : "";
-        return /is not async iterable|experimental\.request|is not a function/i.test(
-          message
-        );
-      }
 
       function detectClientPlatform(userAgent = navigator.userAgent) {
         if (/android/i.test(userAgent)) return "android";
@@ -1280,11 +1234,6 @@
       }
 
       function showError(err) {
-        if (isExperimentalSurfaceError(err)) {
-          errorEl.textContent = IB_ONLY;
-          errorEl.dataset.show = "true";
-          return;
-        }
         const code =
           isInferenceError(err) && err.code
             ? err.code
@@ -1297,12 +1246,12 @@
         errorEl.dataset.show = "true";
       }
 
-      function hasExperimentalRequest() {
-        return typeof window.inference?.experimental?.request === "function";
+      function hasToolCalling() {
+        return isInferenceAvailable() && getFeatures().toolCalling === true;
       }
 
       function refreshAvailability() {
-        if (isInferenceAvailable() && hasExperimentalRequest()) {
+        if (hasToolCalling()) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
           return true;
@@ -1766,7 +1715,6 @@
           let applyError = null;
 
           const { final } = await runTools({
-            request: getExperimentalRequest(),
             messages,
             tools,
             execute: {
@@ -1891,8 +1839,8 @@
           });
           return;
         }
-        if (!hasExperimentalRequest()) {
-          showError({ code: "unavailable", message: IB_ONLY });
+        if (!hasToolCalling()) {
+          showError({ code: "unavailable", message: NO_TOOL_CALLING });
           return;
         }
         filterFeed(query);
@@ -1946,7 +1894,7 @@
 
       refreshAvailability();
       setBusy(false);
-      if (!isInferenceAvailable() || !hasExperimentalRequest()) {
+      if (!hasToolCalling()) {
         void waitForInference()
           .then(() => {
             refreshAvailability();
