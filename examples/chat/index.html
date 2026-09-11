@@ -852,9 +852,6 @@
       function syncAttachControl() {
         imageInputAvailable =
           Boolean(window.inference) && getFeatures().imageInput === true;
-        if (!imageInputAvailable && pendingAttachments.length) {
-          clearAttachments();
-        }
         attachBtn.disabled = !imageInputAvailable || Boolean(activeController);
         attachBtn.title = imageInputAvailable
           ? "Attach images (jpeg, png, webp, gif)"
