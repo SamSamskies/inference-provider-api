@@ -1332,17 +1332,18 @@
       });
 
       form.addEventListener("dragenter", (event) => {
-        if (!imageInputAvailable || activeController) return;
         if (![...event.dataTransfer.items].some((i) => i.kind === "file")) return;
         event.preventDefault();
+        if (!imageInputAvailable || activeController) return;
         dragDepth += 1;
         form.classList.add("dragover");
       });
 
       form.addEventListener("dragover", (event) => {
-        if (!imageInputAvailable || activeController) return;
+        if (![...event.dataTransfer.types].includes("Files")) return;
         event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
+        event.dataTransfer.dropEffect =
+          imageInputAvailable && !activeController ? "copy" : "none";
       });
 
       form.addEventListener("dragleave", (event) => {
@@ -1353,10 +1354,15 @@
       });
 
       form.addEventListener("drop", (event) => {
-        if (!imageInputAvailable || activeController) return;
-        event.preventDefault();
+        if (
+          event.dataTransfer.files?.length ||
+          [...event.dataTransfer.types].includes("Files")
+        ) {
+          event.preventDefault();
+        }
         dragDepth = 0;
         form.classList.remove("dragover");
+        if (!imageInputAvailable || activeController) return;
         addImageFiles(event.dataTransfer.files);
       });
 
