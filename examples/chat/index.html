@@ -1312,13 +1312,22 @@
         /** @type {File[]} */
         const files = [];
         for (const item of items) {
-          if (item.kind === "file" && item.type.startsWith("image/")) {
-            const file = item.getAsFile();
-            if (file) files.push(file);
-          }
+          if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+          const file = item.getAsFile();
+          if (file && isAcceptedImageFile(file)) files.push(file);
         }
         if (!files.length) return;
         event.preventDefault();
+        const text = event.clipboardData.getData("text/plain");
+        if (text) {
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          input.value =
+            input.value.slice(0, start) + text + input.value.slice(end);
+          const caret = start + text.length;
+          input.setSelectionRange(caret, caret);
+          input.dispatchEvent(new Event("input"));
+        }
         addImageFiles(files);
       });
 
