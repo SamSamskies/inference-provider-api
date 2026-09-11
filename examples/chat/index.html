@@ -386,6 +386,99 @@
         color: color-mix(in srgb, var(--muted) 75%, transparent);
       }
 
+      .attach-preview {
+        display: none;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        padding: 0 0.15rem 0.15rem;
+      }
+
+      .attach-preview:not(:empty) {
+        display: flex;
+      }
+
+      .attach-thumb {
+        position: relative;
+        width: 4.25rem;
+        height: 4.25rem;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+
+      .attach-thumb img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .attach-remove {
+        position: absolute;
+        top: 0.2rem;
+        right: 0.2rem;
+        width: 1.25rem;
+        height: 1.25rem;
+        padding: 0;
+        border: none;
+        border-radius: 999px;
+        background: rgba(26, 31, 28, 0.72);
+        color: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+
+      .attach-remove svg {
+        width: 0.7rem;
+        height: 0.7rem;
+      }
+
+      .attach-remove:hover {
+        background: rgba(26, 31, 28, 0.9);
+      }
+
+      .attach-remove:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      .msg-images {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 0.15rem 0 0.45rem;
+      }
+
+      .msg-images:empty {
+        display: none;
+      }
+
+      .msg-images img {
+        display: block;
+        max-width: min(12rem, 100%);
+        max-height: 10rem;
+        border-radius: 6px;
+        object-fit: cover;
+        border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+      }
+
+      .msg.user .msg-images img {
+        border-color: rgba(250, 252, 249, 0.2);
+      }
+
+      .composer-shell.dragover {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        box-shadow:
+          0 1px 2px rgba(26, 31, 28, 0.04),
+          0 8px 24px rgba(13, 122, 95, 0.1),
+          0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+
       .composer-toolbar {
         display: flex;
         align-items: center;
@@ -570,6 +663,7 @@
 
       <div class="composer">
         <form id="form" class="composer-shell">
+          <div id="attach-preview" class="attach-preview" aria-live="polite"></div>
           <textarea
             id="input"
             rows="1"
@@ -579,6 +673,29 @@
           ></textarea>
           <div class="composer-toolbar">
             <div class="composer-tools">
+              <input
+                type="file"
+                id="attach-input"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                multiple
+                hidden
+              />
+              <button
+                type="button"
+                id="attach"
+                class="tool-toggle"
+                disabled
+                aria-label="Attach images"
+                title="Image input unavailable"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M4.75 2.5a2.75 2.75 0 0 0-2.75 2.75v5.5a4.25 4.25 0 0 0 8.5 0V4.75a.75.75 0 0 1 1.5 0v5.999a5.75 5.75 0 1 1-11.5 0v-5.5a4.25 4.25 0 0 1 8.5 0v5.5a2.75 2.75 0 1 1-5.5 0V5.5a.75.75 0 0 1 1.5 0v4.75a1.25 1.25 0 1 0 2.5 0v-5.5A2.75 2.75 0 0 0 4.75 2.5"
+                  />
+                </svg>
+                Attach
+              </button>
               <button
                 type="button"
                 id="web-search"
@@ -629,19 +746,38 @@
       const form = document.getElementById("form");
       const input = document.getElementById("input");
       const primaryBtn = document.getElementById("primary");
+      const attachBtn = document.getElementById("attach");
+      const attachInput = document.getElementById("attach-input");
+      const attachPreview = document.getElementById("attach-preview");
       const webSearchBtn = document.getElementById("web-search");
       const composerHint = document.getElementById("composer-hint");
       const sendIcon = primaryBtn.querySelector(".icon-send");
       const stopIcon = primaryBtn.querySelector(".icon-stop");
 
+      const ACCEPTED_IMAGE_TYPES = new Set([
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+      ]);
+      const MAX_ATTACHMENTS = 8;
+
       /** @type {AbortController | null} */
       let activeController = null;
 
-      /** @type {{ role: "user" | "assistant"; content: string }[]} */
+      /** @type {{ role: "user" | "assistant"; content: string | object[] }[]} */
       const history = [];
+
+      /**
+       * Pending uploads for the next send.
+       * @type {{ id: string; file: File; mediaType: string; objectUrl: string }[]}
+       */
+      let pendingAttachments = [];
 
       let webSearchEnabled = false;
       let webSearchAvailable = false;
+      let imageInputAvailable = false;
+      let dragDepth = 0;
 
       function getFeatures() {
         try {
@@ -649,6 +785,16 @@
         } catch {
           return {};
         }
+      }
+
+      function normalizeMediaType(type) {
+        const t = (type || "").toLowerCase();
+        if (t === "image/jpg") return "image/jpeg";
+        return t;
+      }
+
+      function isAcceptedImageFile(file) {
+        return ACCEPTED_IMAGE_TYPES.has(normalizeMediaType(file.type));
       }
 
       function buildWebSearchSystemPrompt() {
@@ -673,6 +819,19 @@
         );
       }
 
+      function updateComposerHint() {
+        const parts = [];
+        if (webSearchEnabled) {
+          parts.push("Search on · model may use hosted web search if needed");
+        } else {
+          parts.push("Enter to send · Shift+Enter for a new line");
+        }
+        if (imageInputAvailable) {
+          parts.push("attach, paste, or drop images");
+        }
+        composerHint.textContent = parts.join(" · ");
+      }
+
       function syncWebSearchControl() {
         webSearchAvailable =
           Boolean(window.inference) && getFeatures().webSearch === true;
@@ -687,9 +846,132 @@
             ? "Web search on — model may use hosted search"
             : "Web search off — click to allow hosted search"
           : "Hosted web search unavailable (getFeatures().webSearch)";
-        composerHint.textContent = webSearchEnabled
-          ? "Search on · model may use hosted web search if needed"
-          : "Enter to send · Shift+Enter for a new line";
+        updateComposerHint();
+      }
+
+      function syncAttachControl() {
+        imageInputAvailable =
+          Boolean(window.inference) && getFeatures().imageInput === true;
+        attachBtn.disabled = !imageInputAvailable || Boolean(activeController);
+        attachBtn.title = imageInputAvailable
+          ? "Attach images (jpeg, png, webp, gif)"
+          : "Image input unavailable (getFeatures().imageInput)";
+        attachBtn.setAttribute(
+          "aria-label",
+          imageInputAvailable ? "Attach images" : "Image input unavailable",
+        );
+        updateComposerHint();
+      }
+
+      function renderAttachments() {
+        attachPreview.replaceChildren();
+        for (const item of pendingAttachments) {
+          const wrap = document.createElement("div");
+          wrap.className = "attach-thumb";
+          const img = document.createElement("img");
+          img.src = item.objectUrl;
+          img.alt = item.file.name || "Attached image";
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "attach-remove";
+          remove.setAttribute("aria-label", `Remove ${item.file.name || "image"}`);
+          remove.innerHTML =
+            '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06"/></svg>';
+          remove.addEventListener("click", () => removeAttachment(item.id));
+          wrap.append(img, remove);
+          attachPreview.appendChild(wrap);
+        }
+      }
+
+      function clearAttachments() {
+        for (const item of pendingAttachments) {
+          URL.revokeObjectURL(item.objectUrl);
+        }
+        pendingAttachments = [];
+        renderAttachments();
+      }
+
+      function removeAttachment(id) {
+        const next = [];
+        for (const item of pendingAttachments) {
+          if (item.id === id) URL.revokeObjectURL(item.objectUrl);
+          else next.push(item);
+        }
+        pendingAttachments = next;
+        renderAttachments();
+      }
+
+      function addImageFiles(fileList) {
+        if (!imageInputAvailable || activeController) return;
+        const files = Array.from(fileList || []).filter(isAcceptedImageFile);
+        if (!files.length) return;
+        const room = MAX_ATTACHMENTS - pendingAttachments.length;
+        if (room <= 0) {
+          appendError({
+            code: "invalid_request",
+            message: `At most ${MAX_ATTACHMENTS} images per message.`,
+          });
+          return;
+        }
+        const accepted = files.slice(0, room);
+        for (const file of accepted) {
+          pendingAttachments.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            file,
+            mediaType: normalizeMediaType(file.type),
+            objectUrl: URL.createObjectURL(file),
+          });
+        }
+        if (files.length > accepted.length) {
+          appendError({
+            code: "invalid_request",
+            message: `Only ${MAX_ATTACHMENTS} images can be attached; extra files were skipped.`,
+          });
+        }
+        renderAttachments();
+      }
+
+      /** @param {string | object[]} content */
+      function contentText(content) {
+        if (typeof content === "string") return content;
+        if (!Array.isArray(content)) return "";
+        return content
+          .filter((part) => part && part.type === "text" && typeof part.text === "string")
+          .map((part) => part.text)
+          .join("\n");
+      }
+
+      /** @param {string | object[]} content */
+      function contentImageSrcs(content) {
+        if (!Array.isArray(content)) return [];
+        /** @type {string[]} */
+        const srcs = [];
+        for (const part of content) {
+          if (!part || part.type !== "image") continue;
+          if (typeof part.url === "string") {
+            srcs.push(part.url);
+          } else if (part.data instanceof Blob) {
+            srcs.push(URL.createObjectURL(part.data));
+          } else if (typeof part.data === "string" && part.mediaType) {
+            srcs.push(`data:${part.mediaType};base64,${part.data}`);
+          }
+        }
+        return srcs;
+      }
+
+      function buildUserContent(text, attachments) {
+        if (!attachments.length) return text;
+        /** @type {object[]} */
+        const parts = [];
+        if (text) parts.push({ type: "text", text });
+        for (const item of attachments) {
+          parts.push({
+            type: "image",
+            mediaType: item.mediaType,
+            data: item.file,
+          });
+        }
+        return parts;
       }
 
       function setPrimaryMode(mode) {
@@ -712,9 +994,10 @@
         input.disabled = busy || !available;
         if (!busy) activeController = null;
         syncWebSearchControl();
+        syncAttachControl();
       }
 
-      function appendMessage(role, text, { pending = false } = {}) {
+      function appendMessage(role, content, { pending = false } = {}) {
         const el = document.createElement("div");
         el.className = `msg ${role}`;
         if (pending) el.classList.add("pending");
@@ -743,9 +1026,18 @@
             '<span class="typing-label">Waiting</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>';
           el.appendChild(typing);
         }
+        const images = document.createElement("div");
+        images.className = "msg-images";
+        for (const src of contentImageSrcs(content)) {
+          const img = document.createElement("img");
+          img.src = src;
+          img.alt = "Attached image";
+          images.appendChild(img);
+        }
+        el.appendChild(images);
         const body = document.createElement("span");
         body.className = "body";
-        body.textContent = text;
+        body.textContent = contentText(content);
         el.appendChild(body);
         logEl.appendChild(el);
         logEl.scrollTop = logEl.scrollHeight;
@@ -834,6 +1126,7 @@
         setPrimaryMode("send");
         input.disabled = true;
         syncWebSearchControl();
+        syncAttachControl();
         return false;
       }
 
@@ -849,10 +1142,21 @@
 
         // Re-check after refresh — toggle may have been cleared if unsupported.
         const useWebSearch = webSearchEnabled && getFeatures().webSearch === true;
+        const useImageInput =
+          Array.isArray(content) && getFeatures().imageInput === true;
+        if (Array.isArray(content) && !useImageInput) {
+          appendError({
+            code: "unavailable",
+            message:
+              "Image input is unavailable (getFeatures().imageInput). Remove attachments or enable a vision-capable injector.",
+          });
+          return;
+        }
 
         // Clear only after availability succeeds so a failed check keeps the draft.
         input.value = "";
         input.style.height = "auto";
+        clearAttachments();
 
         history.push({ role: "user", content });
         const userBody = appendMessage("user", content);
@@ -861,7 +1165,7 @@
         activeController = new AbortController();
         setBusy(true);
 
-        /** @type {{ role: string; content: string }[]} */
+        /** @type {{ role: string; content: string | object[] }[]} */
         const messages = useWebSearch
           ? [
               {
@@ -896,17 +1200,25 @@
               logEl.scrollTop = logEl.scrollHeight;
             } else if (chunk.type === "done") {
               clearPending(assistantBody);
-              assistantBody.textContent = chunk.message.content;
+              const doneContent = chunk.message.content;
+              assistantBody.textContent =
+                typeof doneContent === "string"
+                  ? doneContent
+                  : contentText(doneContent ?? "");
               if (chunk.message.reasoning) {
                 setReasoning(assistantBody, chunk.message.reasoning);
                 sawReasoning = true;
               }
               history.push({
                 role: "assistant",
-                content: chunk.message.content,
+                content:
+                  typeof doneContent === "string" || Array.isArray(doneContent)
+                    ? doneContent
+                    : assistantBody.textContent,
               });
               const parts = [`model ${chunk.model}`];
               if (useWebSearch) parts.push("search on");
+              if (useImageInput) parts.push("image input");
               if (chunk.usage) {
                 const { inputTokens, outputTokens } = chunk.usage;
                 if (inputTokens != null) parts.push(`in ${inputTokens}`);
@@ -943,15 +1255,33 @@
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const content = input.value.trim();
-        if (!content || activeController) return;
-        sendMessage(content);
+        const text = input.value.trim();
+        const attachments = pendingAttachments.slice();
+        if ((!text && !attachments.length) || activeController) return;
+        if (attachments.length && !imageInputAvailable) {
+          appendError({
+            code: "unavailable",
+            message: "Image input unavailable (getFeatures().imageInput).",
+          });
+          return;
+        }
+        sendMessage(buildUserContent(text, attachments));
       });
 
       primaryBtn.addEventListener("click", () => {
         if (primaryBtn.dataset.mode === "stop" && activeController) {
           activeController.abort();
         }
+      });
+
+      attachBtn.addEventListener("click", () => {
+        if (!imageInputAvailable || activeController) return;
+        attachInput.click();
+      });
+
+      attachInput.addEventListener("change", () => {
+        addImageFiles(attachInput.files);
+        attachInput.value = "";
       });
 
       webSearchBtn.addEventListener("click", () => {
@@ -970,6 +1300,67 @@
       input.addEventListener("input", () => {
         input.style.height = "auto";
         input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+      });
+
+      input.addEventListener("paste", (event) => {
+        if (!imageInputAvailable || activeController) return;
+        const items = event.clipboardData?.items;
+        if (!items?.length) return;
+        /** @type {File[]} */
+        const files = [];
+        for (const item of items) {
+          if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+          const file = item.getAsFile();
+          if (file && isAcceptedImageFile(file)) files.push(file);
+        }
+        if (!files.length) return;
+        event.preventDefault();
+        const text = event.clipboardData.getData("text/plain");
+        if (text) {
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          input.value =
+            input.value.slice(0, start) + text + input.value.slice(end);
+          const caret = start + text.length;
+          input.setSelectionRange(caret, caret);
+          input.dispatchEvent(new Event("input"));
+        }
+        addImageFiles(files);
+      });
+
+      form.addEventListener("dragenter", (event) => {
+        if (![...event.dataTransfer.items].some((i) => i.kind === "file")) return;
+        event.preventDefault();
+        if (!imageInputAvailable || activeController) return;
+        dragDepth += 1;
+        form.classList.add("dragover");
+      });
+
+      form.addEventListener("dragover", (event) => {
+        if (![...event.dataTransfer.types].includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect =
+          imageInputAvailable && !activeController ? "copy" : "none";
+      });
+
+      form.addEventListener("dragleave", (event) => {
+        if (!imageInputAvailable) return;
+        event.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) form.classList.remove("dragover");
+      });
+
+      form.addEventListener("drop", (event) => {
+        if (
+          event.dataTransfer.files?.length ||
+          [...event.dataTransfer.types].includes("Files")
+        ) {
+          event.preventDefault();
+        }
+        dragDepth = 0;
+        form.classList.remove("dragover");
+        if (!imageInputAvailable || activeController) return;
+        addImageFiles(event.dataTransfer.files);
       });
 
       if (!refreshAvailability()) {
