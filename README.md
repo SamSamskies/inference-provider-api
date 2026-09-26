@@ -8,6 +8,16 @@
 
 ## Try It
 
+### Build an app with a coding agent
+
+Install the [build-with-ipa skill](./skills/build-with-ipa/SKILL.md) in your app project:
+
+```bash
+npx skills add SamSamskies/inference-provider-api --skill build-with-ipa
+```
+
+Then ask your agent to add an IPA-powered feature to your app. The skill guides integration with the browser API and points to the current spec, helpers, and examples. You can also give an agent [SPEC.md](./SPEC.md) directly for a one-off integration.
+
 ### Reference Implementation
 
 - [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) — official Chrome extension that injects `window.inference` and routes to OpenAI, Anthropic, OpenRouter, Ollama, or OpenAI-compatible servers ([source](https://github.com/SamSamskies/inference-bridge))
