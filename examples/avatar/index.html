@@ -1083,8 +1083,6 @@
         setBusy(true);
 
         try {
-          // Omit reasoningEffort: some models reject "none", and retrying
-          // would re-prompt Inference Bridge approval.
           const done = await complete({
             method: "chat",
             messages: [
@@ -1093,6 +1091,7 @@
             ],
             signal: activeController.signal,
             options: {
+              reasoningEffort: "none",
               temperature: 0.8,
             },
           });
