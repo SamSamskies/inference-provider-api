@@ -2,28 +2,31 @@
 
 The normative contract is [SPEC.md — Bounded speech](../SPEC.md#bounded-speech).
 Issue [#50](https://github.com/SamSamskies/inference-provider-api/issues/50)
-tracks its design. The spec now includes the optional methods; Inference Bridge
-graduation and package publication are separate steps. This document records
+tracks its design. The spec includes the optional methods; Inference Bridge
+[v0.17.0](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0)
+exposes them on stable `request`/`getFeatures`. This document records
 implementation evidence and checks, not a claim that live providers passed.
 
 ## Reference snapshot
 
-Compared on 2026-10-17 against the clean local Inference Bridge checkout at
-[`69bdcf66d6396bcb1f3a3c0955bed24d12ce4364`](https://github.com/SamSamskies/inference-bridge/tree/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364).
+Compared on 2026-10-17 against Inference Bridge
+[v0.17.0](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0)
+at
+[`f1613987d3e352aadb3ff119ebbc7fb0b7902d71`](https://github.com/SamSamskies/inference-bridge/tree/f1613987d3e352aadb3ff119ebbc7fb0b7902d71).
 Source links below are pinned so later implementation changes cannot silently
 change the evidence.
 
-| Contract | Bridge implementation at this snapshot | Graduation checks |
+| Contract | Bridge implementation at this snapshot | Verification notes |
 | --- | --- | --- |
-| One `request` function, method discrimination | [`content/inject.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/content/inject.js) accepts speech through `experimental.request`; stable request remains chat-only | Add speech to stable `request` and `getFeatures`; keep unadvertised methods fail-closed. `decide` remains experimental and outside this spec. |
-| Speech discovery | Experimental `methods.transcribe.acceptedMedia` contains six normalized MIME entries; `methods.synthesize` is independent; both default off | Expose enabled stable support without network, prompts, provider/model/voice IDs, or account state. No new `methods.chat` flag is required. |
+| One `request` function, method discrimination | [`content/inject.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/content/inject.js) accepts speech through stable `request`/`getFeatures`; `experimental.request` remains a deprecated compatibility alias. `decide` stays Bridge-experimental and outside this spec. | Keep unadvertised methods fail-closed; do not treat experimental aliases as the portable contract. |
+| Speech discovery | Stable `methods.transcribe.acceptedMedia` contains normalized MIME entries; `methods.synthesize` is independent | Expose enabled support without network, prompts, provider/model/voice IDs, or account state. No new `methods.chat` flag is required. |
 | Sources and CORS | Injector handles `media` Blob/base64/page-fetched URL; only source metadata crosses before approval | Keep source XOR based on property presence; verify declared/detected MIME conflicts, CORS failures, and no privileged URL fetch. |
-| Bounds and encoding | [`src/speech.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/src/speech.js): 24,000,000 input bytes, 4,096 synthesis Unicode code points, 32,000,000 output bytes, 256 KiB internal transfer chunks | These are Bridge limits, not permanent spec constants or public chunk sizes. Retest exact bounds and cancellation on both browsers. |
-| MIME/container/codec surface | [`src/providers/registry.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/src/providers/registry.js) filters MIME, then model-specific MIME support; discovery has no narrower container/codec arrays | Preserve concrete MIME claims and fail clearly on decoder rejection; add narrower filters when reliably known. Omitted constraints do not certify every codec. |
-| Transcription stream | [`background/service-worker.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/background/service-worker.js) forwards append-only text, verifies deltas against final text when present, permits final-only responses | Preserve exactly one `accepted` and `done`, clear no-speech/no-track errors, audio-only semantics, and valid language-hint behavior. |
+| Bounds and encoding | [`src/speech.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/src/speech.js): 24,000,000 input bytes, 4,096 synthesis Unicode code points, 32,000,000 output bytes, 256 KiB internal transfer chunks | These are Bridge limits, not permanent spec constants or public chunk sizes. Retest exact bounds and cancellation on both browsers. |
+| MIME/container/codec surface | [`src/providers/registry.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/src/providers/registry.js) filters MIME, then model-specific MIME support; discovery has no narrower container/codec arrays | Preserve concrete MIME claims and fail clearly on decoder rejection; add narrower filters when reliably known. Omitted constraints do not certify every codec. |
+| Transcription stream | [`background/service-worker.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/background/service-worker.js) forwards append-only text, verifies deltas against final text when present, permits final-only responses | Preserve exactly one `accepted` and `done`, clear no-speech/no-track errors, audio-only semantics, and valid language-hint behavior. |
 | Synthesis stream | Worker emits ordered byte chunks and checks exact final byte count; injector returns page-owned `Uint8Array`s | Preserve `audio/mpeg`, at least one `audio_delta`, metadata-only `done.audio`, backpressure, and no autoplay. |
-| Grants and privacy | [`src/permissions.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/src/permissions.js), [`src/storage.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/src/storage.js), and [`PRIVACY.md`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/PRIVACY.md) separate speech grants from chat and bind provider/model/voice | Verify old grants stay chat-only, route changes require approval, blocks cover every method, and metadata/whole-container disclosure stays accurate. |
-| Cross-browser transport | [`content/content-script.js`](https://github.com/SamSamskies/inference-bridge/blob/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/content/content-script.js) relays bounded base64/length chunks; page owns media buffers | Retest Firefox isolated-world boundaries, upload/download cancellation, iterator close, reload/navigation, and extension-worker reconnection. The transport encoding is not a page-facing API type. |
+| Grants and privacy | [`src/permissions.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/src/permissions.js), [`src/storage.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/src/storage.js), and [`PRIVACY.md`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/PRIVACY.md) separate speech grants from chat and bind provider/model/voice | Verify old grants stay chat-only, route changes require approval, blocks cover every method, and metadata/whole-container disclosure stays accurate. |
+| Cross-browser transport | [`content/content-script.js`](https://github.com/SamSamskies/inference-bridge/blob/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/content/content-script.js) relays bounded base64/length chunks; page owns media buffers | Retest Firefox isolated-world boundaries, upload/download cancellation, iterator close, reload/navigation, and extension-worker reconnection. The transport encoding is not a page-facing API type. |
 
 The OpenAI adapter uses dedicated transcription/speech endpoints. OpenRouter
 does too, with live operation-specific model/voice catalogs; video input is
@@ -32,7 +35,7 @@ after an installed model reports audio capability; its current conservative
 surface is WAV, plus MP3 for the specifically verified model in its adapter.
 Generic OpenAI-compatible naming, Prompt API audio hints, and Web Speech playback
 do not establish support. See the pinned
-[`src/providers/`](https://github.com/SamSamskies/inference-bridge/tree/69bdcf66d6396bcb1f3a3c0955bed24d12ce4364/src/providers)
+[`src/providers/`](https://github.com/SamSamskies/inference-bridge/tree/f1613987d3e352aadb3ff119ebbc7fb0b7902d71/src/providers)
 implementations for details; provider identifiers do not belong in the portable
 request or discovery types.
 
@@ -46,7 +49,7 @@ its tests use [checked-in media fixtures](../conformance/fixtures/README.md).
 No keys, provider calls, microphone capture, or playback are needed for these
 automated contract tests.
 
-To exercise a real implementation after it advertises stable speech, serve the
+To exercise a real implementation after it advertises speech, serve the
 repository over loopback HTTP or HTTPS and open its page with the injector.
 Paste this in that page's DevTools, then select an advertised audio fixture:
 
