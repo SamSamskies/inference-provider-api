@@ -107,8 +107,8 @@ async function display(ipa: Inference, request: InferenceRequest) {
 
 `complete()` and `runTools()` remain chat-only. No speech function or collector
 is added; iterate `request` and assemble MP3 bytes in page code. See the
-[browser examples](../../examples/speech/README.md). Older injectors, including
-Bridge before its separate stable graduation, may not advertise speech.
+[browser examples](../../examples/speech/README.md). Detect advertised speech
+methods before use; older injectors may omit them.
 
 ## `createInference`
 

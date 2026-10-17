@@ -800,14 +800,6 @@ autoplay speech. A page may use browser microphone permission to create a
 recording, stop recording, then submit the completed bounded `Blob` with separate
 IPA transcription approval; a live microphone stream is out of scope.
 
-This draft specifies the portable contract. Inference Bridge's existing speech
-prototype uses the same request/chunk shapes under `experimental.request` and
-`experimental.getFeatures`; those experimental methods do not advertise stable
-support. Its graduation must expose speech through stable `request`/`getFeatures`.
-See the [implementation alignment and conformance checklist](./docs/speech-conformance.md)
-for the dated source snapshot and remaining implementation checks. This spec
-update does not certify provider conformance or publish a package release.
-
 ### Security
 
 The API is available only to top-level pages in a secure context that have a

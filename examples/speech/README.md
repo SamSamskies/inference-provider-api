@@ -2,9 +2,9 @@
 
 These snippets use the normative `window.inference.request` methods from
 [SPEC.md](../../SPEC.md#bounded-speech). Run them in a top-level HTTPS or
-loopback HTTP page with an injector advertising stable speech. Current
-Inference Bridge exposes speech experimentally until its separate graduation;
-these examples deliberately detect stable support before use.
+loopback HTTP page with an injector advertising speech. Inference Bridge
+[v0.17.0+](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0)
+exposes them on stable `request`/`getFeatures`; detect method support before use.
 
 The user chooses provider/model/voice during approval. Existing chat grants do
 not authorize speech. Files can include sensitive bystander/background speech;
