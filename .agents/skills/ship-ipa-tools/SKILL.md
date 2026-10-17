@@ -2,17 +2,18 @@
 name: ship-ipa-tools
 description: >-
   Version, verify, and walk the user through publishing the ipa-tools npm
-  package from packages/ipa-tools. The agent must not npm login or npm publish;
-  ask the user to do both. Use when the user asks to ship, release, publish, or
-  deploy ipa-tools, bump its version, or cut an npm release for that package.
+  package from packages/ipa-tools in the inference-provider-api repo. The agent
+  must not npm login or npm publish; ask the user to do both. Use when the user
+  asks to ship, release, publish, or deploy ipa-tools, bump its version, or cut
+  an npm release for that package.
 disable-model-invocation: true
 ---
 
 # Ship ipa-tools
 
-Prepare `packages/ipa-tools` for a public npm release. The user publishes.
+Prepare `packages/ipa-tools` for a public npm release in this repository. The user publishes.
 
-npm auth does not persist for the agent (login/OTP). **Never** run `npm login` or `npm publish`. Do **not** read or print `~/.npmrc` / auth tokens. Do **not** use `npm whoami` as a gate.
+npm auth does not persist for coding agents (login/OTP). **Never** run `npm login` or `npm publish`. Do **not** read or print `~/.npmrc` / auth tokens. Do **not** use `npm whoami` as a gate.
 
 ## Preconditions
 
