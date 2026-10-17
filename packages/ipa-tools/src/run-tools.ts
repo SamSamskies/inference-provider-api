@@ -12,7 +12,8 @@ import type {
   DoneChunk,
   Inference,
   InferenceOptions,
-  InferenceRequest,
+  ChatRequest,
+  ChatChunk,
   Message,
   Tool,
   ToolCall,
@@ -32,7 +33,7 @@ export type RunToolsOptions = {
   /** Forwarded on every round. Same object each provider call. */
   options?: InferenceOptions;
   /** Forwarded on every round when requesting image output. */
-  output?: InferenceRequest["output"];
+  output?: ChatRequest["output"];
   /** Default 5; max provider calls. Must be a positive finite number. */
   maxRounds?: number;
   onAccepted?: () => void;
@@ -47,7 +48,7 @@ export type RunToolsOptions = {
   /** Default `"chat"`. */
   method?: "chat";
   /** Defaults to `window.inference.request`. */
-  request?: Inference["request"];
+  request?: (request: ChatRequest) => AsyncIterable<ChatChunk>;
   /**
    * Tried only after IPA is unavailable (at most one entry; see `MAX_FALLBACKS`).
    * Prefer `createInference` when sending more than once (caches the resolved
@@ -188,7 +189,7 @@ export async function runTools(
       throw makeInferenceError("aborted", "Request aborted");
     }
 
-    const req: InferenceRequest = {
+    const req: ChatRequest = {
       method,
       messages,
       signal,

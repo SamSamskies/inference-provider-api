@@ -1,0 +1,98 @@
+[
+  {
+    "file": "corrupt.wav",
+    "mediaType": "audio/wav",
+    "audioCodecs": [],
+    "hasVideo": false,
+    "byteLength": 29,
+    "sha256": "3a0d2f969543125a43a07a6937b8460a82e152e9cc74a488ced02594ded510b4"
+  },
+  {
+    "file": "no-audio.mp4",
+    "mediaType": "video/mp4",
+    "audioCodecs": [],
+    "hasVideo": true,
+    "byteLength": 1855,
+    "sha256": "869ee4ff61fad632858e1dfe984f5d8e3b58b43743704f5083ce2ab6828d61b7"
+  },
+  {
+    "file": "silence.wav",
+    "mediaType": "audio/wav",
+    "audioCodecs": [
+      "pcm_s16le"
+    ],
+    "hasVideo": false,
+    "byteLength": 32078,
+    "sha256": "f5551ebf85fa6c434634b18f3d8f6a3b95f48a10ceb90c864c26c7f7c893737e"
+  },
+  {
+    "file": "speech-blue.mp4",
+    "mediaType": "video/mp4",
+    "audioCodecs": [
+      "aac"
+    ],
+    "hasVideo": true,
+    "byteLength": 6833,
+    "sha256": "005da95774d10949d2baf5ddb035b6cba6342e4fd59df484196b28787280cf55"
+  },
+  {
+    "file": "speech-red.mp4",
+    "mediaType": "video/mp4",
+    "audioCodecs": [
+      "aac"
+    ],
+    "hasVideo": true,
+    "byteLength": 6833,
+    "sha256": "3db9abdf3651833fb04cdaf298b1f0f050700f7d62bda4e752ab10529d249154"
+  },
+  {
+    "file": "speech-video.webm",
+    "mediaType": "video/webm",
+    "audioCodecs": [
+      "opus"
+    ],
+    "hasVideo": true,
+    "byteLength": 3858,
+    "sha256": "7e033586d628dc0bd16ca2369760baeb24bda9818999c2ab1aba1a926643ee07"
+  },
+  {
+    "file": "speech.m4a",
+    "mediaType": "audio/mp4",
+    "audioCodecs": [
+      "aac"
+    ],
+    "hasVideo": false,
+    "byteLength": 5108,
+    "sha256": "ab001319a97354de7a607ff10dbdfadfc528ca602c27d33a5bf9509496af8171"
+  },
+  {
+    "file": "speech.mp3",
+    "mediaType": "audio/mpeg",
+    "audioCodecs": [
+      "mp3"
+    ],
+    "hasVideo": false,
+    "byteLength": 4176,
+    "sha256": "8154dbcf93513a2f28aed072015dbab4df7a329e2a62969f393520e6992c56b3"
+  },
+  {
+    "file": "speech.wav",
+    "mediaType": "audio/wav",
+    "audioCodecs": [
+      "pcm_s16le"
+    ],
+    "hasVideo": false,
+    "byteLength": 30558,
+    "sha256": "72ea66718adbc6e9735b5495a348146b44b7d001bf4783a291ee04047e84f3d3"
+  },
+  {
+    "file": "speech.webm",
+    "mediaType": "audio/webm",
+    "audioCodecs": [
+      "opus"
+    ],
+    "hasVideo": false,
+    "byteLength": 3512,
+    "sha256": "8ca8f4ca190ef6ebfd6441d8098d484bcf6fcc29deba1b8faac376c1ff5afe39"
+  }
+]

@@ -2,7 +2,8 @@ import {
   makeInferenceError,
   type Inference,
   type InferenceBackend,
-  type InferenceChunk,
+  type ChatChunk,
+  type InferenceChunkFor,
   type InferenceFeatures,
   type InferenceRequest,
   type BackendAvailability,
@@ -132,8 +133,8 @@ function createInferenceFromSession(
       return { toolCalling: false };
     },
 
-    request(request: InferenceRequest): AsyncIterable<InferenceChunk> {
-      return {
+    request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>> {
+      const stream: AsyncIterable<ChatChunk> = {
         async *[Symbol.asyncIterator]() {
           if (request.method !== "chat") {
             throw makeInferenceError(
@@ -206,6 +207,8 @@ function createInferenceFromSession(
           }
         },
       };
+      // The guard above rejects non-chat methods before yielding any chunks.
+      return stream as AsyncIterable<InferenceChunkFor<R>>;
     },
   };
 }

@@ -30,7 +30,7 @@ export type ImagePart =
 
 export type ContentPart = TextPart | ImagePart;
 
-export type InferenceRequest = {
+export type ChatRequest = {
   method: "chat";
   messages: Message[];
   /**
@@ -52,6 +52,30 @@ export type InferenceRequest = {
   options?: InferenceOptions;
   signal?: AbortSignal;
 };
+
+/** Exactly one page-owned source. String data is raw base64, never a data URL. */
+export type TranscriptionMediaSource =
+  | { mediaType: string; data: string; url?: never }
+  | { mediaType?: string; data: Blob; url?: never }
+  | { url: string; mediaType?: string; data?: never };
+
+export type TranscribeRequest = {
+  method: "transcribe";
+  media: TranscriptionMediaSource;
+  /** Structurally valid BCP 47 hint; omitted means detect. */
+  language?: string;
+  signal?: AbortSignal;
+};
+
+export type SynthesizeRequest = {
+  method: "synthesize";
+  text: string;
+  output?: { mediaType?: "audio/mpeg" };
+  signal?: AbortSignal;
+};
+
+export type InferenceRequest = ChatRequest | TranscribeRequest | SynthesizeRequest;
+export type InferenceMethod = InferenceRequest["method"];
 
 export type InferenceOptions = {
   /**
@@ -96,13 +120,65 @@ export type Usage = {
   outputTokens?: number;
 };
 
-export type InferenceChunk =
+export type ChatChunk =
   | { type: "accepted" }
   | { type: "reasoning_delta"; content: string }
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
+export type TranscriptionUsage = { inputSeconds?: number };
+export type SynthesisUsage = {
+  inputCharacters?: number;
+  outputSeconds?: number;
+};
+
+export type TranscriptionChunk =
+  | { type: "accepted" }
+  | { type: "delta"; content: string }
+  | {
+      type: "done";
+      model: string;
+      transcript: { text: string; language?: string };
+      usage?: TranscriptionUsage;
+    };
+
+export type SynthesisChunk =
+  | { type: "accepted" }
+  | { type: "audio_delta"; mediaType: "audio/mpeg"; data: Uint8Array }
+  | {
+      type: "done";
+      model: string;
+      audio: { mediaType: "audio/mpeg"; byteLength: number };
+      usage?: SynthesisUsage;
+    };
+
+export type InferenceChunk = ChatChunk | TranscriptionChunk | SynthesisChunk;
+
+/** Distributes over request unions while preserving concrete method inference. */
+export type InferenceChunkFor<R extends InferenceRequest> =
+  R extends ChatRequest ? ChatChunk :
+  R extends TranscribeRequest ? TranscriptionChunk :
+  R extends SynthesizeRequest ? SynthesisChunk : never;
+
+export type InferenceDoneFor<R extends InferenceRequest> =
+  Extract<InferenceChunkFor<R>, { type: "done" }>;
+export type ChatDoneChunk = InferenceDoneFor<ChatRequest>;
+export type TranscriptionDoneChunk = InferenceDoneFor<TranscribeRequest>;
+export type SynthesisDoneChunk = InferenceDoneFor<SynthesizeRequest>;
+
+export type TranscriptionInputConstraint = {
+  /** Normalized MIME essence; no wildcards. */
+  mediaType: string;
+  containers?: string[];
+  audioCodecs?: string[];
+};
+
 export type InferenceFeatures = {
+  /** Chat is required. Absent speech methods mean unsupported. */
+  methods?: {
+    transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
+    synthesize?: boolean;
+  };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
    * on request. Absent or false means unsupported.
@@ -174,11 +250,12 @@ export type InferenceError = Error & {
 };
 
 export type Inference = {
-  request(request: InferenceRequest): AsyncIterable<InferenceChunk>;
+  request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>>;
   getFeatures?(): InferenceFeatures;
 };
 
-export type DoneChunk = Extract<InferenceChunk, { type: "done" }>;
+/** Compatible chat-only alias; never widened to the all-method done union. */
+export type DoneChunk = ChatDoneChunk;
 
 declare global {
   interface Window {

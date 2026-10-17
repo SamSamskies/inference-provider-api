@@ -1,6 +1,6 @@
 {
   "name": "ipa-tools",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "description": "Application helpers and TypeScript types for the Inference Provider API",
   "type": "module",
   "license": "MIT",
@@ -36,7 +36,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:types",
+    "test:types": "tsc -p tsconfig.type-tests.json",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build && npm test"
   },

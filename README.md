@@ -35,7 +35,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Charts demo](https://samsamskies.github.io/inference-provider-api/charts/) — natural-language charts via IPA tool calling (`render_chart` generative UI) ([source](./examples/charts/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
-The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces.
+The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces. Bounded transcription and MP3 synthesis are now optional spec methods; the current Bridge implementation still exposes them experimentally until its separate graduation. Detect stable method support before use; see [speech examples](./examples/speech/README.md) and the [implementation checklist](./docs/speech-conformance.md).
 
 ## Motivation
 
@@ -180,6 +180,39 @@ if (features.imageOutput) {
 }
 ```
 
+## Bounded speech
+
+Speech stays on `window.inference.request`; implementations opt in independently
+through `getFeatures().methods`. Transcription accepts a completed media file
+and returns `done.transcript.text`. Synthesis returns MP3 bytes and never starts
+playback. Provider, model, and synthesis voice are chosen by the user.
+
+```js
+const ipa = window.inference;
+if (!ipa?.getFeatures?.().methods?.synthesize) {
+  throw new Error("This injector does not advertise stable MP3 synthesis.");
+}
+const parts = [];
+for await (const chunk of ipa.request({ method: "synthesize", text: "Hello from IPA." })) {
+  console.log(chunk);
+  if (chunk.type === "audio_delta") parts.push(chunk.data);
+}
+const audio = document.createElement("audio");
+audio.controls = true;
+audio.src = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
+document.body.append(audio); // Press Play explicitly. Revoke the URL when removing it.
+```
+
+Transcription detection uses
+`ipa.getFeatures?.().methods?.transcribe?.acceptedMedia`; the entries describe
+accepted MIME/container/audio-codec constraints, without provider identities.
+An absent method is unsupported. See [upload, bounded microphone recording,
+URL, and cancellation examples](./examples/speech/README.md). Existing chat
+grants authorize neither speech method. Video containers may be uploaded whole
+even though only their audio track is transcribed.
+
+### Chat request options
+
 Request `options` can be sent without feature detection — unsupported keys are ignored:
 
 ```ts
@@ -249,13 +282,13 @@ or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling),
 [Hosted web search](./SPEC.md#hosted-web-search), and
 [Images](./SPEC.md#images).
 
-The user chooses the provider and model. With “Remember for this site” checked, Allow
-persists access for that origin together with the chosen provider and model; Deny
+The user chooses the provider and model. For chat, with “Remember for this site” checked, Allow
+persists access for that origin and method together with the chosen provider and model; Deny
 permanently blocks it. Changing the extension’s global default does not alter
 existing origin grants.
 
-Text chat is required. Tool calling, hosted web search, and image input/output
-are optional: implementations advertise them with `{ toolCalling: true }`,
+Text chat is required. Bounded speech, tool calling, hosted web search, and image input/output
+are optional. Speech uses `methods.transcribe` / `methods.synthesize`; the chat capabilities use `{ toolCalling: true }`,
 `{ webSearch: true }`, `{ imageInput: true }`, and `{ imageOutput: true }` from
 `getFeatures`. The page defines and executes function tools;
 `{ type: "web_search" }` is implementation- or provider-executed and
@@ -281,6 +314,7 @@ user override or clamp controls are optional extension UX. See
 - Optional hosted web search (`webSearch`, `{ type: "web_search" }`)
 - Optional image input and output (`imageInput` / `imageOutput`, content parts)
 - Optional request `options` (for example `reasoningEffort`, `temperature`)
+- Optional bounded transcription and MP3 synthesis through the same `request` function
 
 ## Non-goals
 
@@ -353,7 +387,7 @@ Some topics that still need community discussion:
 - Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
 - Which further keys belong under `options` (for example `maxTokens`), and should clamp/override UX stay optional?
 - Should model selection always remain under user control?
-- Should embeddings and speech use this API or separate APIs? (Images: this API — content parts on chat plus `output.images`.)
+- Should embeddings use this API or a separate API? (Bounded speech: this API — `transcribe` / `synthesize` request variants. Realtime speech sessions remain separate future work. Images: content parts on chat plus `output.images`.)
 - How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
 - Should `getFeatures` add a nested object later (for example for MCP), or stay one key per capability as with `toolCalling` and `webSearch`?
 - Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?

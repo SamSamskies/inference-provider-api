@@ -8,11 +8,11 @@ import {
 } from "./backends.js";
 import { makeInferenceError } from "./errors.js";
 import { getInference } from "./inference.js";
-import type { DoneChunk, Inference, InferenceRequest } from "./types.js";
+import type { ChatRequest, ChatChunk, DoneChunk } from "./types.js";
 
 export type CompleteOptions = {
   /** Defaults to `window.inference.request`. */
-  request?: Inference["request"];
+  request?: (request: ChatRequest) => AsyncIterable<ChatChunk>;
   /**
    * Tried only after IPA is unavailable (at most one entry; see `MAX_FALLBACKS`).
    * Prefer `createInference` when sending more than once (caches the resolved
@@ -29,9 +29,12 @@ export type CompleteOptions = {
  * is aborted. Throws `provider_error` if the stream ends without a `done` chunk.
  */
 export async function complete(
-  request: InferenceRequest,
+  request: ChatRequest,
   options?: CompleteOptions
 ): Promise<DoneChunk> {
+  if (request.method !== "chat") {
+    throw makeInferenceError("invalid_request", 'complete() only supports method "chat".');
+  }
   const signal = request.signal;
   if (signal?.aborted) {
     throw makeInferenceError("aborted", "Request aborted");
