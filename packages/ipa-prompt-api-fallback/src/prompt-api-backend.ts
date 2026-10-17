@@ -8,11 +8,7 @@ import {
   type InferenceRequest,
   type BackendAvailability,
 } from "ipa-tools";
-import {
-  getLanguageModel,
-  mapPromptApiError,
-  toDelta,
-} from "./errors.js";
+import { getLanguageModel, mapPromptApiError } from "./errors.js";
 import type {
   LanguageModelCreateOptions,
   LanguageModelSession,
@@ -173,14 +169,12 @@ function createInferenceFromSession(
             yield { type: "accepted" };
 
             const stream = session.promptStreaming(prompts, { signal });
-            let previous = "";
             let full = "";
 
             for await (const raw of iteratePromptStream(stream)) {
               throwIfAborted(signal);
-              const chunk = typeof raw === "string" ? raw : String(raw ?? "");
-              const { delta, next } = toDelta(previous, chunk);
-              previous = next;
+              // Prompt API chunks are incremental, including repeated text.
+              const delta = typeof raw === "string" ? raw : String(raw ?? "");
               if (!delta) continue;
               full += delta;
               yield { type: "delta", content: delta };

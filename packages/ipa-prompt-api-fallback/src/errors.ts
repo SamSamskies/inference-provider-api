@@ -65,17 +65,3 @@ export function isAbortError(error: unknown): boolean {
   }
   return false;
 }
-
-/**
- * Normalize Prompt API stream chunks. Some Chrome builds yield incremental
- * deltas; others yield cumulative text. Emit IPA `delta` strings either way.
- */
-export function toDelta(previous: string, chunk: string): {
-  delta: string;
-  next: string;
-} {
-  if (chunk.startsWith(previous)) {
-    return { delta: chunk.slice(previous.length), next: chunk };
-  }
-  return { delta: chunk, next: previous + chunk };
-}
