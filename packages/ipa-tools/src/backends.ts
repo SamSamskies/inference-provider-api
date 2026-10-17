@@ -43,9 +43,8 @@ export type InferenceBackend = {
  * A fallback entry: a custom backend object (tests / hosted API / third-party).
  * `"ipa"` is invalid — IPA is always tried first.
  *
- * Built-in string aliases (e.g. `"promptApi"` → optional peer) are deferred
- * until those packages ship — a dynamic `import()` of a missing peer makes
- * Vite/Rollup warn or fail even when callers never request a fallback.
+ * Apps import backend packages themselves and pass an object. Keeping those
+ * imports out of ipa-tools avoids bundling optional backends for every app.
  */
 export type FallbackEntry = InferenceBackend;
 
@@ -55,6 +54,12 @@ export type FallbackInput = InferenceBackend;
 export type ResolveOptions = {
   fallbacks?: FallbackInput[];
   onDownloadProgress?: (loaded: number) => void;
+  signal?: AbortSignal;
+};
+
+type ResolveRequestOptions = {
+  method?: InferenceMethod;
+  mediaType?: string;
   signal?: AbortSignal;
   /** When true, skip a fallback whose `getFeatures().toolCalling` is not true. */
   needsTools?: boolean;
@@ -68,7 +73,7 @@ export type ResolveOptions = {
 
 export type ProbeStatus = {
   ipa: "available" | "unavailable";
-} & Record<string, BackendAvailability | "available" | "unavailable">;
+} & Record<string, BackendAvailability>;
 
 /**
  * Maximum entries allowed in `fallbacks`. Kept as an array so this can rise
@@ -155,14 +160,9 @@ type CapabilityNeeds = {
   imageOutput: boolean;
 };
 
-function capabilityNeedsFrom(resolveOptions?: {
-  method?: InferenceMethod;
-  mediaType?: string;
-  needsTools?: boolean;
-  needsWebSearch?: boolean;
-  needsImageInput?: boolean;
-  needsImageOutput?: boolean;
-}): CapabilityNeeds {
+function capabilityNeedsFrom(
+  resolveOptions?: ResolveRequestOptions
+): CapabilityNeeds {
   return {
     method: resolveOptions?.method ?? "chat",
     mediaType: resolveOptions?.mediaType,
@@ -180,49 +180,10 @@ function needsAnyCapability(needs: CapabilityNeeds): boolean {
   );
 }
 
-function supportsTools(inference: Inference): boolean {
-  return inference.getFeatures?.().toolCalling === true;
-}
-
-function supportsWebSearch(inference: Inference): boolean {
-  return inference.getFeatures?.().webSearch === true;
-}
-
-function supportsImageInput(inference: Inference): boolean {
-  return inference.getFeatures?.().imageInput === true;
-}
-
-function supportsImageOutput(inference: Inference): boolean {
-  return inference.getFeatures?.().imageOutput === true;
-}
-
-function supportsNeeded(
-  inference: Inference,
+function featuresSupportNeeded(
+  features: InferenceFeatures,
   needs: CapabilityNeeds
 ): boolean {
-  const features = inference.getFeatures?.() ?? {};
-  if (needs.method === "transcribe" && !supportsTranscription(features, needs.mediaType)) {
-    return false;
-  }
-  if (needs.method === "synthesize" && features.methods?.synthesize !== true) {
-    return false;
-  }
-  if (needs.tools && !supportsTools(inference)) return false;
-  if (needs.webSearch && !supportsWebSearch(inference)) return false;
-  if (needs.imageInput && !supportsImageInput(inference)) return false;
-  if (needs.imageOutput && !supportsImageOutput(inference)) return false;
-  return true;
-}
-
-/** Prefer advertised features so unsupported requests do not create sessions. */
-function backendSupportsNeeded(
-  backend: InferenceBackend,
-  needs: CapabilityNeeds
-): boolean | undefined {
-  if (typeof backend.getFeatures !== "function") {
-    return needs.method === "chat" ? undefined : false;
-  }
-  const features = backend.getFeatures();
   if (needs.method === "transcribe" && !supportsTranscription(features, needs.mediaType)) {
     return false;
   }
@@ -234,6 +195,21 @@ function backendSupportsNeeded(
   if (needs.imageInput && features.imageInput !== true) return false;
   if (needs.imageOutput && features.imageOutput !== true) return false;
   return true;
+}
+
+function supportsNeeded(inference: Inference, needs: CapabilityNeeds): boolean {
+  return featuresSupportNeeded(inference.getFeatures?.() ?? {}, needs);
+}
+
+/** Prefer advertised features so unsupported requests do not create sessions. */
+function backendSupportsNeeded(
+  backend: InferenceBackend,
+  needs: CapabilityNeeds
+): boolean | undefined {
+  if (typeof backend.getFeatures !== "function") {
+    return needs.method === "chat" ? undefined : false;
+  }
+  return featuresSupportNeeded(backend.getFeatures(), needs);
 }
 
 function capabilitySkipMessage(needs: CapabilityNeeds): string {
@@ -308,15 +284,7 @@ export async function probeFallbacks(
 
 export type InferenceResolver = {
   probe(): Promise<ProbeStatus>;
-  resolve(options?: {
-    method?: InferenceMethod;
-    mediaType?: string;
-    needsTools?: boolean;
-    needsWebSearch?: boolean;
-    needsImageInput?: boolean;
-    needsImageOutput?: boolean;
-    signal?: AbortSignal;
-  }): Promise<Inference>;
+  resolve(options?: ResolveRequestOptions): Promise<Inference>;
 };
 
 /**
@@ -336,15 +304,9 @@ export function createResolver(options?: ResolveOptions): InferenceResolver {
    */
   let resolveInFlight: Promise<Inference> | undefined;
 
-  async function resolveOnce(resolveOptions?: {
-    method?: InferenceMethod;
-    mediaType?: string;
-    needsTools?: boolean;
-    needsWebSearch?: boolean;
-    needsImageInput?: boolean;
-    needsImageOutput?: boolean;
-    signal?: AbortSignal;
-  }): Promise<Inference> {
+  async function resolveOnce(
+    resolveOptions?: ResolveRequestOptions
+  ): Promise<Inference> {
     const needs = capabilityNeedsFrom(resolveOptions);
     const signal = resolveOptions?.signal ?? options?.signal;
     const throwIfAborted = () => {
