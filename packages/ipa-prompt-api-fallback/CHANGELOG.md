@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed — next release: 0.3.0
+## [0.3.0] - 2026-10-17
+
+### Changed
 
 - Require `ipa-tools >=1.0.0` and implement its generic request-to-chunk signature. This backend stays chat-only: no speech methods are advertised, and direct speech requests fail with `invalid_request` before session work. Prompt API audio modality hints do not prove faithful transcription or MP3 synthesis support.
 
