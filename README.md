@@ -85,16 +85,10 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is required. `getFeatures` reports optional capabilities such as tool calling, hosted web search, and request `options` (for example `reasoningEffort`, `temperature`); implementations that omit it advertise none. If the app only needs the final message, drain to `done` (inline sketch — or use [`ipa-tools`](./packages/ipa-tools)’s `complete`):
+`request` is required. Check `window.inference?.request` before enabling inference UI; a compatible injector may be missing. Use [`ipa-tools`](./packages/ipa-tools) (`npm install ipa-tools`) when you only need the final chat result or a page-executed tool loop:
 
 ```ts
-async function complete(request) {
-  let done;
-  for await (const chunk of window.inference.request(request)) {
-    if (chunk.type === "done") done = chunk;
-  }
-  return done;
-}
+import { complete } from "ipa-tools";
 
 const { model, message, usage } = await complete({
   method: "chat",
@@ -102,203 +96,35 @@ const { model, message, usage } = await complete({
 });
 ```
 
-The helper is application code, not part of `window.inference`. It throws `InferenceError` the same way iterating `request` does.
+The helpers are application code. The injected API stays on `request` and optional `getFeatures`.
 
-Feature-detect optional capabilities before sending tools. Missing `getFeatures` means none:
+### Optional capabilities
+
+`getFeatures` returns a synchronous snapshot of supported API features. Missing flags mean unsupported; flags do not guarantee that the user's selected provider or model can fulfill a request.
 
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
-
-if (features.webSearch) {
-  for await (const chunk of window.inference.request({
-    method: "chat",
-    messages: [{ role: "user", content: "What's the weather in New York City today?" }],
-    tools: [{ type: "web_search" }],
-  })) {
-    if (chunk.type === "done") {
-      // search is folded into message.content; no page-side execute
-    }
-  }
-}
-
-if (features.toolCalling) {
-  const tools = [
-    {
-      type: "function",
-      function: {
-        name: "get_weather",
-        description: "Get the current weather for a city",
-        parameters: {
-          type: "object",
-          properties: { city: { type: "string" } },
-          required: ["city"],
-        },
-      },
-    },
-  ];
-
-  for await (const chunk of window.inference.request({
-    method: "chat",
-    messages: [{ role: "user", content: "What's the weather in Austin?" }],
-    tools,
-  })) {
-    if (chunk.type === "done" && chunk.message.toolCalls?.length) {
-      // page executes the function, appends role: "tool" results, calls request again
-    }
-  }
-}
-
-if (features.imageInput) {
-  for await (const chunk of window.inference.request({
-    method: "chat",
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "What is in this photo?" },
-          { type: "image", url: "https://example.com/photo.png" },
-        ],
-      },
-    ],
-  })) {
-    if (chunk.type === "delta") {
-      // append chunk.content
-    }
-  }
-}
-
-if (features.imageOutput) {
-  for await (const chunk of window.inference.request({
-    method: "chat",
-    messages: [{ role: "user", content: "a red fox sticker" }],
-    output: { images: true },
-  })) {
-    if (chunk.type === "done") {
-      // message.content may include ImageParts, or text only if the model did not draw
-    }
-  }
-}
 ```
 
-## Bounded speech
+| Capability | Feature gate | Request and result |
+| --- | --- | --- |
+| [Function tools](./SPEC.md#tool-calling) | `features.toolCalling` | Function tools in `tools`; the page executes `done.message.toolCalls`, or uses `ipa-tools`'s `runTools` |
+| [Hosted web search](./SPEC.md#hosted-web-search) | `features.webSearch` | `tools: [{ type: "web_search" }]`; the injector or provider executes search |
+| [Image input](./SPEC.md#images) | `features.imageInput` | Image parts in user or assistant messages |
+| [Image output](./SPEC.md#images) | `features.imageOutput` | `output: { images: true }`; image parts appear on `done.message.content` |
+| [Transcription](./SPEC.md#bounded-speech) | `features.methods?.transcribe?.acceptedMedia` | `method: "transcribe"` with completed `media`; text on `done.transcript` |
+| [MP3 synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 bytes in `audio_delta` chunks |
+| [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Speech stays on `window.inference.request`; implementations opt in independently
-through `getFeatures().methods`. Transcription accepts a completed media file
-and returns `done.transcript.text`. Synthesis returns MP3 bytes and never starts
-playback. Provider, model, and synthesis voice are chosen by the user.
+Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, bounded microphone recording, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls recording and playback.
 
-```js
-const ipa = window.inference;
-if (!ipa?.getFeatures?.().methods?.synthesize) {
-  throw new Error("This injector does not advertise stable MP3 synthesis.");
-}
-const parts = [];
-for await (const chunk of ipa.request({ method: "synthesize", text: "Hello from IPA." })) {
-  console.log(chunk);
-  if (chunk.type === "audio_delta") parts.push(chunk.data);
-}
-const audio = document.createElement("audio");
-audio.controls = true;
-audio.src = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
-document.body.append(audio); // Press Play explicitly. Revoke the URL when removing it.
-```
+### Permissions
 
-Transcription detection uses
-`ipa.getFeatures?.().methods?.transcribe?.acceptedMedia`; the entries describe
-accepted MIME/container/audio-codec constraints, without provider identities.
-An absent method is unsupported. See [upload, bounded microphone recording,
-URL, and cancellation examples](./examples/speech/README.md). Existing chat
-grants authorize neither speech method. Video containers may be uploaded whole
-even though only their audio track is transcribed.
+The injector obtains permission for the calling origin before sending content to a provider. The user chooses the provider and model. Remembered grants bind that route to the origin and method (plus voice for synthesis); changing a global default does not rewrite existing grants. A remembered denial blocks the origin.
 
-### Chat request options
+Function tools, hosted search, image input/output, and speech require their own approval; a plain chat grant does not cover them. The approval UI must identify offered tools and capabilities, but a request preview is optional. Applications should disclose what page tools may send before the first request because later tool results can be sent without another preview.
 
-Request `options` can be sent without feature detection — unsupported keys are ignored:
-
-```ts
-// Prefer less thinking / lower temperature for translation
-for await (const chunk of window.inference.request({
-  method: "chat",
-  messages: [{ role: "user", content: "Translate to Spanish: Hello" }],
-  options: {
-    reasoningEffort: "none",
-    temperature: 0.2,
-  },
-})) {
-  // ...
-}
-```
-
-Any multi-round function-tool loop is application code. Function tools without
-`toolCalling`, `{ type: "web_search" }` without `webSearch`, image parts without
-`imageInput`, and `output.images` without `imageOutput`, are
-`invalid_request`. The flags are independent: search-only requests must not
-require `toolCalling`; one-shot generate does not require `imageInput`.
-Unsupported `options` keys are ignored (not rejected) so
-apps may send them for forward compatibility. For a ready-made function-tool
-loop (plus types and `complete`), see the non-normative
-[`ipa-tools`](./packages/ipa-tools) package (`npm install ipa-tools`).
-
-Prefer `getFeatures().toolCalling` before sending function tools,
-`getFeatures().webSearch` before sending `{ type: "web_search" }`,
-`getFeatures().imageInput` before sending image parts, and
-`getFeatures().imageOutput` before `output.images`;
-see [`ipa-tools`](./packages/ipa-tools#when-toolcalling-websearch-imageinput-or-imageoutput-is-not-advertised).
-The extension prompts the user for permission:
-
-```text
-Allow inference?
-primal.net
-
-Provider
-[ Ollama ▼ ]
-
-Model
-[ Gemma 4 ▼ ]
-
-Request preview
-user: Is this true?:
-
-Nostr is dead.
-
-[ ] Remember for this site
-Allow once, or deny only this request.
-
-[Allow]  [Deny]
-```
-
-Request preview is optional extension UX for this draft, not part of the API
-contract. When the request includes function tools, the permission UI must
-list the function names; when it includes `{ type: "web_search" }`, it must
-list a hosted-search label (and disclose public-web lookup / fetch); when it
-includes image parts, it must list an image-input label; when it sets
-`output.images`, it must list an image-output label. A persistent chat grant
-does not silently cover a later tools, search, or images request, and those
-identities are independent of each other. A follow-up that only
-appends `role: "tool"` results may not re-prompt and may not appear in any
-preview, so applications should disclose what data those tools will send to
-the provider **before** Allow (in the first `messages`, the tool description,
-or the page UI). See [SPEC.md — Tool calling](./SPEC.md#tool-calling),
-[Hosted web search](./SPEC.md#hosted-web-search), and
-[Images](./SPEC.md#images).
-
-The user chooses the provider and model. For chat, with “Remember for this site” checked, Allow
-persists access for that origin and method together with the chosen provider and model; Deny
-permanently blocks it. Changing the extension’s global default does not alter
-existing origin grants.
-
-Text chat is required. Bounded speech, tool calling, hosted web search, and image input/output
-are optional. Speech uses `methods.transcribe` / `methods.synthesize`; the chat capabilities use `{ toolCalling: true }`,
-`{ webSearch: true }`, `{ imageInput: true }`, and `{ imageOutput: true }` from
-`getFeatures`. The page defines and executes function tools;
-`{ type: "web_search" }` is implementation- or provider-executed and
-does not produce page-side `toolCalls`. Image generation stays on chat via
-`output.images` (not a page-facing hosted tool). Optional `options` (for example
-`options.reasoningEffort`: `"auto" | "none" | "low" | "medium" | "high"`,
-`options.temperature`: number in `[0, 2]`) lets apps prefer generation settings
-when the matching `getFeatures().options` key is true — not a permission change;
-user override or clamp controls are optional extension UX. See
-[SPEC.md](./SPEC.md).
+An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
 
 ## Goals
 
@@ -309,12 +135,6 @@ user override or clamp controls are optional extension UX. See
 - Per-origin permissions
 - Streaming support
 - Zero backend required
-- Optional capability discovery (`getFeatures`)
-- Optional function tools, executed by the page
-- Optional hosted web search (`webSearch`, `{ type: "web_search" }`)
-- Optional image input and output (`imageInput` / `imageOutput`, content parts)
-- Optional request `options` (for example `reasoningEffort`, `temperature`)
-- Optional bounded transcription and MP3 synthesis through the same `request` function
 
 ## Non-goals
 

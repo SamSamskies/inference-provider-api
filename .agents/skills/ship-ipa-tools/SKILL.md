@@ -39,9 +39,9 @@ Ship ipa-tools:
 
 1. Read `packages/ipa-tools/package.json` `version` and `packages/ipa-tools/CHANGELOG.md`.
 2. For a **first publish** of the current version: keep the version if CHANGELOG already has that section and the version is unpublished.
-3. For a **new release**: bump SemVer in `package.json` (`0.x` while IPA is Experimental Draft — prefer minor/patch unless the user asks for major).
+3. For a **new release**: bump SemVer in `package.json` from the current published version. Use patch for compatible fixes, minor for compatible additions, and major for breaking changes; the spec's Experimental Draft status does not reset the package to `0.x`.
 4. Add a Keep a Changelog section for the new version (date = today UTC) before asking the user to publish.
-5. Align pinned CDN examples in `packages/ipa-tools/README.md` with the version being published when those pins would otherwise point at an old release.
+5. Review pinned CDN imports in `packages/ipa-tools/README.md` and `examples/**`, updating them when they should demonstrate the version being published.
 
 ## Build and test
 

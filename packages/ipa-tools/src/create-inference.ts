@@ -1,6 +1,5 @@
 import {
   createResolver,
-  normalizeFallbacks,
   requestNeedsImageInput,
   requestNeedsImageOutput,
   requestNeedsTools,
@@ -73,8 +72,7 @@ export type InferenceClient = {
 export function createInference(
   options?: CreateInferenceOptions
 ): InferenceClient {
-  // Validate fallbacks eagerly so typos fail at construction.
-  normalizeFallbacks(options?.fallbacks);
+  // The resolver validates fallbacks eagerly so typos fail at construction.
   const resolver = createResolver(options);
   return createClientFromResolver(resolver);
 }
@@ -117,23 +115,13 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
 
 function requestWithResolver<R extends InferenceRequest>(
   resolver: InferenceResolver,
-  request: R,
-  resolveHints?: {
-    needsTools?: boolean;
-    needsWebSearch?: boolean;
-    needsImageInput?: boolean;
-    needsImageOutput?: boolean;
-  }
+  request: R
 ): AsyncIterable<InferenceChunkFor<R>> {
   const chat = request.method === "chat" ? (request as ChatRequest) : undefined;
-  const needsTools =
-    resolveHints?.needsTools === true || requestNeedsTools(chat ?? {});
-  const needsWebSearch =
-    resolveHints?.needsWebSearch === true || requestNeedsWebSearch(chat ?? {});
-  const needsImageInput =
-    resolveHints?.needsImageInput === true || requestNeedsImageInput(chat ?? {});
-  const needsImageOutput =
-    resolveHints?.needsImageOutput === true || requestNeedsImageOutput(chat ?? {});
+  const needsTools = requestNeedsTools(chat ?? {});
+  const needsWebSearch = requestNeedsWebSearch(chat ?? {});
+  const needsImageInput = requestNeedsImageInput(chat ?? {});
+  const needsImageOutput = requestNeedsImageOutput(chat ?? {});
 
   return {
     async *[Symbol.asyncIterator]() {
