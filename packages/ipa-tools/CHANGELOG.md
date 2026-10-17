@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking — next release: 1.0.0
+## [1.0.0] - 2026-10-17
+
+### Breaking
 
 - `InferenceRequest` and `InferenceChunk` now cover chat, bounded transcription, and MP3 synthesis. Use `ChatRequest`, `ChatChunk`, and `ChatDoneChunk` for existing chat-only code; `DoneChunk` remains chat-only. Concrete `request()` calls infer their method-specific chunk stream. See the README migration guide ([#50](https://github.com/SamSamskies/inference-provider-api/issues/50)).
 - `Inference.request`, `createInference().request`, and backend clients use `InferenceChunkFor<R>`; custom backends must reject unadvertised methods before yielding. A backend's feature snapshot must advertise speech before it can be selected for speech. `complete()` and `runTools()` remain chat-only.

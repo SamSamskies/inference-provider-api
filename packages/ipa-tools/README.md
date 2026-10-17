@@ -16,11 +16,11 @@ Zero runtime dependencies. Browser ESM only (no Node APIs).
 
 ### CDN / no bundler
 
-Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@0.6.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
+Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@1.0.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
 
 ```html
 <script type="module">
-  import { complete, runTools } from "https://esm.sh/ipa-tools@0.6.0";
+  import { complete, runTools } from "https://esm.sh/ipa-tools@1.0.0";
 
   const { message } = await complete({
     method: "chat",
@@ -36,7 +36,7 @@ Import map equivalent:
 <script type="importmap">
   {
     "imports": {
-      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@0.6.0/+esm"
+      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@1.0.0/+esm"
     }
   }
 </script>
@@ -58,10 +58,6 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
 ### Migrating to 1.0.0
-
-This checkout prepares `ipa-tools@1.0.0`; publishing is a separate release step.
-The CDN examples above pin 0.6.0 and demonstrate chat. Build locally to
-try the new types before publication.
 
 `InferenceRequest` and `InferenceChunk` are now all-method unions. Code that
 previously used them to mean chat must use the narrow aliases:
