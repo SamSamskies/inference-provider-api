@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertSpeechStream } from "../../../conformance/speech.mjs";
+import { assertSpeechStream } from "./conformance/speech.mjs";
 
-const fixture = (file: string) => readFileSync(new URL(`../../../conformance/fixtures/${file}`, import.meta.url));
+const fixture = (file: string) => readFileSync(new URL(`./conformance/fixtures/${file}`, import.meta.url));
 const mp3 = new Uint8Array(fixture("speech.mp3"));
 const accepted = { type: "accepted" };
 const transcript = { type: "done", model: "fixture", transcript: { text: "The sky is blue." }, usage: { inputSeconds: 1 } };

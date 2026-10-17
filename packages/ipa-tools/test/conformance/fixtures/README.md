@@ -30,4 +30,4 @@ not advertise a MIME/container/codec combination should fail before upload.
 Provider-supported containers pass through unchanged. Unsupported codecs can
 be tested by excluding a fixture's manifest codec from the implementation's
 advertised constraints. Live semantic checks and exact provider/browser
-versions belong in the [conformance report](../../docs/speech-conformance.md).
+versions should be recorded separately when testing a real implementation.

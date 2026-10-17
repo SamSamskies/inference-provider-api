@@ -140,7 +140,7 @@ const ipa = window.inference;
 if (!ipa?.getFeatures?.().methods?.transcribe) throw new Error("Stable transcription is not advertised.");
 for await (const chunk of ipa.request({
   method: "transcribe",
-  media: { url: "/conformance/fixtures/speech.wav" },
+  media: { url: "/packages/ipa-tools/test/conformance/fixtures/speech.wav" },
   language: "en",
 })) {
   if (chunk.type === "done") console.log(chunk.transcript.text);
