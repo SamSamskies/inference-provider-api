@@ -46,6 +46,34 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("speech remains unsupported", () => {
+  it.each([
+    { method: "transcribe" as const, media: { data: new Blob(["audio"], { type: "audio/wav" }) } },
+    { method: "synthesize" as const, text: "Hello" },
+  ])("skips Prompt API for $method without a session/download", async (request) => {
+    const create = vi.fn();
+    setLanguageModel({ availability: vi.fn().mockResolvedValue("downloadable"), create });
+    const client = createInference({ fallbacks: [createPromptApiBackend()] });
+    const iterator = client.request(request)[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toMatchObject({ code: "invalid_request" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("rejects direct speech before cloning or prompting a warm session", async () => {
+    const clone = vi.fn();
+    const promptStreaming = vi.fn();
+    setLanguageModel({ availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn().mockResolvedValue(makeSession({ clone, promptStreaming })),
+    });
+    const inference = await createPromptApiBackend().create({});
+    expect(inference.getFeatures?.().methods).toBeUndefined();
+    await expect(inference.request({ method: "synthesize", text: "Hello" })[Symbol.asyncIterator]().next())
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(clone).not.toHaveBeenCalled();
+    expect(promptStreaming).not.toHaveBeenCalled();
+  });
+});
+
 describe("getPromptApiAvailability", () => {
   it("returns unavailable when LanguageModel is missing", async () => {
     setLanguageModel(undefined);

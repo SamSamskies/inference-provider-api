@@ -12,7 +12,9 @@ npm install ipa-tools ipa-prompt-api-fallback
 
 [![npm](https://img.shields.io/npm/v/ipa-prompt-api-fallback)](https://www.npmjs.com/package/ipa-prompt-api-fallback)
 
-Peer dependency: `ipa-tools` `>=0.6.0`. Zero other runtime deps. Browser ESM only.
+The next release (0.3.0) requires `ipa-tools >=1.0.0`; these versions are prepared in this checkout and have not been published by this change. Zero other runtime deps. Browser ESM only.
+
+This backend remains chat-only. It advertises neither `methods.transcribe` nor `methods.synthesize`, so `createInference` skips it for speech without creating a session or starting a download. Prompt API audio modality hints do not establish speech support. Direct speech requests also fail with `invalid_request`.
 
 `ipa-tools` does **not** import this package. Your app imports both and passes the backend object into `fallbacks`.
 

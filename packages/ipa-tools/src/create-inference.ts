@@ -10,6 +10,8 @@ import {
   type ProbeStatus,
 } from "./backends.js";
 import { complete } from "./complete.js";
+import { makeInferenceError } from "./errors.js";
+import { assertRequestMethod, transcriptionMediaType } from "./methods.js";
 import type { CompleteOptions } from "./complete.js";
 import {
   runTools,
@@ -19,7 +21,8 @@ import {
 import type {
   DoneChunk,
   Inference,
-  InferenceChunk,
+  ChatRequest,
+  InferenceChunkFor,
   InferenceRequest,
 } from "./types.js";
 
@@ -45,9 +48,9 @@ export type InferenceClient = {
    * Does not start downloads. Probe failures report `"unavailable"`.
    */
   probe(): Promise<ProbeStatus>;
-  request(request: InferenceRequest): AsyncIterable<InferenceChunk>;
+  request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>>;
   complete(
-    request: InferenceRequest,
+    request: ChatRequest,
     options?: Omit<CompleteOptions, "fallbacks" | "onDownloadProgress" | "request">
   ): Promise<DoneChunk>;
   runTools(
@@ -82,7 +85,7 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
       return resolver.probe();
     },
 
-    request(request: InferenceRequest): AsyncIterable<InferenceChunk> {
+    request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>> {
       return requestWithResolver(resolver, request);
     },
 
@@ -112,34 +115,41 @@ function createClientFromResolver(resolver: InferenceResolver): InferenceClient 
   };
 }
 
-function requestWithResolver(
+function requestWithResolver<R extends InferenceRequest>(
   resolver: InferenceResolver,
-  request: InferenceRequest,
+  request: R,
   resolveHints?: {
     needsTools?: boolean;
     needsWebSearch?: boolean;
     needsImageInput?: boolean;
     needsImageOutput?: boolean;
   }
-): AsyncIterable<InferenceChunk> {
+): AsyncIterable<InferenceChunkFor<R>> {
+  const chat = request.method === "chat" ? (request as ChatRequest) : undefined;
   const needsTools =
-    resolveHints?.needsTools === true || requestNeedsTools(request);
+    resolveHints?.needsTools === true || requestNeedsTools(chat ?? {});
   const needsWebSearch =
-    resolveHints?.needsWebSearch === true || requestNeedsWebSearch(request);
+    resolveHints?.needsWebSearch === true || requestNeedsWebSearch(chat ?? {});
   const needsImageInput =
-    resolveHints?.needsImageInput === true || requestNeedsImageInput(request);
+    resolveHints?.needsImageInput === true || requestNeedsImageInput(chat ?? {});
   const needsImageOutput =
-    resolveHints?.needsImageOutput === true || requestNeedsImageOutput(request);
+    resolveHints?.needsImageOutput === true || requestNeedsImageOutput(chat ?? {});
 
   return {
     async *[Symbol.asyncIterator]() {
+      if (!["chat", "transcribe", "synthesize"].includes(request.method)) {
+        throw makeInferenceError("invalid_request", `Unknown method "${request.method}".`);
+      }
       const inference = await resolver.resolve({
+        method: request.method,
+        mediaType: request.method === "transcribe" ? transcriptionMediaType(request) : undefined,
         needsTools,
         needsWebSearch,
         needsImageInput,
         needsImageOutput,
         signal: request.signal,
       });
+      assertRequestMethod(request, inference.getFeatures?.() ?? {});
       const bound = inference.request.bind(inference) as Inference["request"];
       yield* bound(request);
     },

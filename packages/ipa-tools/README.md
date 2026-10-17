@@ -57,6 +57,63 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
+### Migrating to 1.0.0
+
+This checkout prepares `ipa-tools@1.0.0`; publishing is a separate release step.
+The CDN examples above pin 0.6.0 and demonstrate chat. Build locally to
+try the new types before publication.
+
+`InferenceRequest` and `InferenceChunk` are now all-method unions. Code that
+previously used them to mean chat must use the narrow aliases:
+
+```ts
+import type { ChatRequest, ChatChunk, ChatDoneChunk, DoneChunk } from "ipa-tools";
+const request: ChatRequest = {
+  method: "chat", messages: [{ role: "user", content: "Hello" }],
+};
+// ChatChunk has done.message. DoneChunk remains exactly ChatDoneChunk.
+```
+
+Concrete requests infer their own chunks without casts:
+
+```ts
+import { createInference } from "ipa-tools";
+const client = createInference();
+for await (const chunk of client.request({ method: "synthesize", text: "Hello" })) {
+  if (chunk.type === "audio_delta") console.log(chunk.data); // Uint8Array
+  if (chunk.type === "done") console.log(chunk.audio.byteLength);
+}
+```
+
+`TranscribeRequest` uses `media: { data: Blob }`, `{ data: string, mediaType }`
+(raw base64), or `{ url, mediaType? }`. It yields `TranscriptionChunk` with
+`done.transcript`. `SynthesizeRequest` yields `SynthesisChunk` with MP3
+`audio_delta`s and metadata-only `done.audio`. Exported usage and done types are
+`TranscriptionUsage`, `SynthesisUsage`, `TranscriptionDoneChunk`, and
+`SynthesisDoneChunk`. `TranscriptionMediaSource` and
+`TranscriptionInputConstraint` describe sources and discovery constraints.
+
+For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
+`InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk
+by its payload, since `type: "done"` is shared:
+
+```ts
+import type { Inference, InferenceRequest } from "ipa-tools";
+async function display(ipa: Inference, request: InferenceRequest) {
+  for await (const chunk of ipa.request(request)) {
+    if (chunk.type !== "done") continue;
+    if ("message" in chunk) console.log(chunk.message.content);
+    else if ("transcript" in chunk) console.log(chunk.transcript.text);
+    else console.log(chunk.audio.byteLength);
+  }
+}
+```
+
+`complete()` and `runTools()` remain chat-only. No speech function or collector
+is added; iterate `request` and assemble MP3 bytes in page code. See the
+[browser examples](../../examples/speech/README.md). Older injectors, including
+Bridge before its separate stable graduation, may not advertise speech.
+
 ## `createInference`
 
 IPA-first client with `complete` / `request` / `runTools` / `probe()`. Omit options for IPA only (same `unavailable` when no extension is installed). Does not mutate `window.inference`.
@@ -76,6 +133,17 @@ sendButton.addEventListener("click", async () => {
 ```
 
 Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
+
+Speech requires a backend-level `getFeatures()` snapshot advertising the
+requested method before `create()` is called. Transcription also matches a
+known declared/Blob MIME essence to `acceptedMedia`; unknown URL MIME is left
+for page-side resolution and implementation validation. Selection does not
+fetch URLs or inspect media bytes. Container/codec constraints and conflicting
+declared/detected MIME types must be validated by the backend. Features on the
+created client are checked again, including for cached clients. An available
+injector always takes precedence: its unadvertised method is `invalid_request`,
+and an advertised route's `unavailable`, permission denial, or provider error
+is propagated without silently trying another provider.
 
 Apps import backend packages themselves (no string aliases in `ipa-tools`):
 
@@ -106,6 +174,8 @@ import {
   makeInferenceError,
   type InferenceBackend,
   type InferenceRequest,
+  type InferenceChunkFor,
+  type ChatChunk,
 } from "ipa-tools";
 
 /** Your `/api/infer` POST handler should return this JSON shape. */
@@ -131,29 +201,36 @@ function createGeminiApiBackend(): InferenceBackend {
     async create() {
       return {
         getFeatures: () => features,
-        async *request(req: InferenceRequest) {
-          const res = await fetch("/api/infer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: req.messages,
-              ...(req.options ? { options: req.options } : {}),
-            }),
-            signal: req.signal,
-          });
-          if (!res.ok) {
-            throw makeInferenceError("provider_error", `HTTP ${res.status}`);
-          }
+        request<R extends InferenceRequest>(req: R): AsyncIterable<InferenceChunkFor<R>> {
+          const stream: AsyncIterable<ChatChunk> = (async function* () {
+            if (req.method !== "chat") {
+              throw makeInferenceError("invalid_request", "This backend only supports chat.");
+            }
+            const res = await fetch("/api/infer", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messages: req.messages,
+                ...(req.options ? { options: req.options } : {}),
+              }),
+              signal: req.signal,
+            });
+            if (!res.ok) {
+              throw makeInferenceError("provider_error", `HTTP ${res.status}`);
+            }
 
-          // Trust the endpoint contract (see GeminiApiReply).
-          const { content, model } = (await res.json()) as GeminiApiReply;
+            // Trust the endpoint contract (see GeminiApiReply).
+            const { content, model } = (await res.json()) as GeminiApiReply;
 
-          yield { type: "accepted" as const };
-          yield {
-            type: "done" as const,
-            model,
-            message: { role: "assistant" as const, content },
-          };
+            yield { type: "accepted" as const };
+            yield {
+              type: "done" as const,
+              model,
+              message: { role: "assistant" as const, content },
+            };
+          })();
+          // Non-chat methods throw before yielding; TypeScript cannot narrow R.
+          return stream as AsyncIterable<InferenceChunkFor<R>>;
         },
       };
     },
@@ -169,7 +246,7 @@ This path is **not** IPA and must not be assigned to `window.inference`.
 
 ## `complete`
 
-Drain a stream to one `done` chunk:
+Drain a chat stream to one `done` chunk:
 
 ```ts
 import { complete } from "ipa-tools";
