@@ -202,12 +202,15 @@ describe("createPromptApiBackend", () => {
     expect(base.destroy).not.toHaveBeenCalled();
   });
 
-  it("normalizes cumulative stream chunks into deltas", async () => {
+  it.each([
+    { chunks: ["a", "a"], expected: "aa" },
+    { chunks: ["a", "ab"], expected: "aab" },
+  ])("preserves incremental chunks $chunks", async ({ chunks, expected }) => {
     setLanguageModel({
       availability: vi.fn().mockResolvedValue("available"),
       create: vi.fn(async () =>
         makeSession({
-          promptStreaming: () => asyncStream(["Hel", "Hello", "Hello!"]),
+          promptStreaming: () => asyncStream(chunks),
           destroy: vi.fn(),
         })
       ),
@@ -215,13 +218,16 @@ describe("createPromptApiBackend", () => {
 
     const inference = await createPromptApiBackend().create({});
     const deltas: string[] = [];
+    let content: unknown;
     for await (const chunk of inference.request({
       method: "chat",
       messages: [{ role: "user", content: "Hi" }],
     })) {
       if (chunk.type === "delta") deltas.push(chunk.content);
+      if (chunk.type === "done") content = chunk.message.content;
     }
-    expect(deltas).toEqual(["Hel", "lo", "!"]);
+    expect(deltas).toEqual(chunks);
+    expect(content).toBe(expected);
   });
 
   it("without clone, creates and destroys a one-shot session per request", async () => {
