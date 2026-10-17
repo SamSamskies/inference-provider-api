@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ship IPA Package"
+  short_description: "Prepare and verify releases of either IPA package"
+  default_prompt: "Use $ship-ipa-package to prepare the requested IPA package release."
+policy:
+  allow_implicit_invocation: false
