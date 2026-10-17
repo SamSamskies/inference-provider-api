@@ -9,16 +9,23 @@ Inference Provider API
 `window.inference` may be injected by a browser or extension. After checking that it exists, websites call:
 
 ```ts
-window.inference.request(request: InferenceRequest): AsyncIterable<InferenceChunk>
+window.inference.request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>>
 window.inference.getFeatures(): InferenceFeatures
 ```
 
 `request` is required. `getFeatures` reports optional capabilities (see Feature discovery). Implementations that omit `getFeatures` are treated as advertising none.
 
 ```ts
-type ImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+type ImageMediaType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/gif";
 
-type TextPart = { type: "text"; text: string };
+type TextPart = {
+  type: "text";
+  text: string;
+};
 
 /**
  * Image bytes (`data`) or a page-side URL (`url`), never both.
@@ -36,7 +43,7 @@ type ImagePart =
 
 type ContentPart = TextPart | ImagePart;
 
-type InferenceRequest = {
+type ChatRequest = {
   method: "chat";
   messages: Message[];
   /**
@@ -51,11 +58,37 @@ type InferenceRequest = {
    * `output.images` only when getFeatures().imageOutput is true.
    * Extra keys under `output` are ignored (forward compatible).
    */
-  output?: { images?: boolean };
-  /** Generation preferences for this request. See Request options. */
+  output?: {
+    images?: boolean;
+  };
+  /** Generation preferences for this request. See InferenceOptions. */
   options?: InferenceOptions;
   signal?: AbortSignal;
-}
+};
+
+/** Exactly one page-owned source. String data is raw base64, never a data URL. */
+type TranscriptionMediaSource =
+  | { mediaType: string; data: string; url?: never }
+  | { mediaType?: string; data: Blob; url?: never }
+  | { url: string; mediaType?: string; data?: never };
+
+type TranscribeRequest = {
+  method: "transcribe";
+  media: TranscriptionMediaSource;
+  /** Structurally valid BCP 47 hint; omitted means detect. */
+  language?: string;
+  signal?: AbortSignal;
+};
+
+type SynthesizeRequest = {
+  method: "synthesize";
+  text: string;
+  output?: { mediaType?: "audio/mpeg" };
+  signal?: AbortSignal;
+};
+
+type InferenceRequest = ChatRequest | TranscribeRequest | SynthesizeRequest;
+type InferenceMethod = InferenceRequest["method"];
 
 type InferenceOptions = {
   /**
@@ -68,7 +101,7 @@ type InferenceOptions = {
    * Omitted means the implementation / provider default.
    */
   temperature?: number;
-}
+};
 
 /** Omitted or `"auto"` means the implementation / provider default. */
 type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
@@ -93,20 +126,72 @@ type Message =
       role: "tool";
       toolCallId: string;
       content: string;
-    }
+    };
 
 type Usage = {
   inputTokens?: number;
   outputTokens?: number;
-}
+};
 
-type InferenceChunk =
+type ChatChunk =
   | { type: "accepted" }
   | { type: "reasoning_delta"; content: string }
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
+type TranscriptionUsage = { inputSeconds?: number };
+type SynthesisUsage = {
+  inputCharacters?: number;
+  outputSeconds?: number;
+};
+
+type TranscriptionChunk =
+  | { type: "accepted" }
+  | { type: "delta"; content: string }
+  | {
+      type: "done";
+      model: string;
+      transcript: { text: string; language?: string };
+      usage?: TranscriptionUsage;
+    };
+
+type SynthesisChunk =
+  | { type: "accepted" }
+  | { type: "audio_delta"; mediaType: "audio/mpeg"; data: Uint8Array }
+  | {
+      type: "done";
+      model: string;
+      audio: { mediaType: "audio/mpeg"; byteLength: number };
+      usage?: SynthesisUsage;
+    };
+
+type InferenceChunk = ChatChunk | TranscriptionChunk | SynthesisChunk;
+
+/** Distributes over request unions while preserving concrete method inference. */
+type InferenceChunkFor<R extends InferenceRequest> =
+  R extends ChatRequest ? ChatChunk :
+  R extends TranscribeRequest ? TranscriptionChunk :
+  R extends SynthesizeRequest ? SynthesisChunk : never;
+
+type InferenceDoneFor<R extends InferenceRequest> =
+  Extract<InferenceChunkFor<R>, { type: "done" }>;
+type ChatDoneChunk = InferenceDoneFor<ChatRequest>;
+type TranscriptionDoneChunk = InferenceDoneFor<TranscribeRequest>;
+type SynthesisDoneChunk = InferenceDoneFor<SynthesizeRequest>;
+
+type TranscriptionInputConstraint = {
+  /** Normalized MIME essence; no wildcards. */
+  mediaType: string;
+  containers?: string[];
+  audioCodecs?: string[];
+};
+
 type InferenceFeatures = {
+  /** Chat is required. Absent speech methods mean unsupported. */
+  methods?: {
+    transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
+    synthesize?: boolean;
+  };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
    * on request. Absent or false means unsupported.
@@ -136,7 +221,7 @@ type InferenceFeatures = {
     reasoningEffort?: boolean;
     temperature?: boolean;
   };
-}
+};
 
 type Tool =
   | {
@@ -164,21 +249,39 @@ type ToolCall = {
     /** JSON-encoded argument object. */
     arguments: string;
   };
-}
+};
+
+type InferenceErrorCode =
+  | "permission_denied"
+  | "invalid_request"
+  | "unavailable"
+  | "provider_error"
+  | "aborted";
 
 type InferenceError = Error & {
-  code:
-    | "permission_denied"
-    | "invalid_request"
-    | "unavailable"
-    | "provider_error"
-    | "aborted";
-}
+  code: InferenceErrorCode;
+};
+
+type Inference = {
+  request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>>;
+  getFeatures?(): InferenceFeatures;
+};
+
+/** Compatible chat-only alias; never widened to the all-method done union. */
+type DoneChunk = ChatDoneChunk;
 ```
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Bounded transcription (`method: "transcribe"`) and MP3 synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
+
+`request` is the only operation entry point. Do not add `transcribe()` or
+`synthesize()` functions to `window.inference`. The method determines the chunk
+union: chat yields `ChatChunk`, transcription yields `TranscriptionChunk`, and
+synthesis yields `SynthesisChunk`. The conditional mapping distributes over an
+`InferenceRequest` union. Equivalent overloads must also accept a union-typed
+request. `ChatRequest`, `ChatChunk`, and `ChatDoneChunk` retain the narrow chat
+contract; `DoneChunk` remains an alias of `ChatDoneChunk`.
 
 ### Example
 
@@ -202,11 +305,11 @@ for await (const chunk of window.inference.request({
 ### Behavior
 
 1. A request begins when the application starts iterating. The extension obtains permission for the calling origin before sending any content to a provider, prompting the user unless persistent permission already exists.
-2. The user chooses the provider and model, or the extension uses the provider and model previously saved for that origin.
+2. The user chooses the provider and model, or the extension uses the route previously saved for that origin and method. Synthesis also binds the user-selected voice; pages cannot select it.
 3. API keys never leave the extension. Applications never see them.
 4. If a request fails, iteration throws an `InferenceError`. A failed request does not yield a `done` chunk.
 5. `request` yields exactly one `accepted` chunk after the origin is permitted and the request is cleared to call a provider — including when a persistent grant already exists and no prompt is shown. `accepted` does not mean the user clicked Allow in a UI; applications must not assume a prompt occurred. Failures during permission or preflight do not yield `accepted`.
-6. After `accepted`, `request` yields zero or more `reasoning_delta` and/or `delta` chunks (in any order), then exactly one `done` chunk. No chunks follow `done`.
+6. After `accepted`, a successful request yields method-specific chunks, then exactly one `done` chunk. No chunks follow `done`. Chat yields zero or more `reasoning_delta` and/or `delta` chunks (in any order); the chat-specific rules below apply to `method: "chat"`. Speech follows [Bounded speech](#bounded-speech).
 7. Concatenating every `delta.content` produces `done.message.content` when the assistant reply is text. Reasoning is not included in `content`. On a tool turn with no `delta` chunks, `done.message.content` may be `null` or `""`; applications must treat both as no text reply. When the reply includes images, `done.message.content` is a `ContentPart[]`; concatenating every `delta.content` produces the concatenation of the `type: "text"` parts, in order. Image parts appear only on `done` (no `image_delta` in this draft). An image-only reply uses `content: [{ type: "image", ... }, ...]` with zero `delta`s — do not use `null` to mean “here is a PNG.”
 8. Concatenating every `reasoning_delta.content` produces `done.message.reasoning` when the provider exposed reasoning. If there were no `reasoning_delta` chunks, `done.message.reasoning` is omitted.
 9. Providers or models that do not expose reasoning yield no `reasoning_delta` chunks and omit `message.reasoning`. Applications must treat reasoning as optional.
@@ -223,6 +326,12 @@ Applications must feature-detect. Older injectors may omit the method:
 
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
+if (features.methods?.transcribe) {
+  // transcribe accepts the advertised acceptedMedia constraints
+}
+if (features.methods?.synthesize) {
+  // synthesize returns MP3 bytes; the page controls playback
+}
 if (features.toolCalling) {
   // request accepts function tools / toolChoice / tool messages
 }
@@ -248,7 +357,7 @@ Rules:
 1. `toolCalling: true` means `request` accepts function tools, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions, and it does not advertise `{ type: "web_search" }`.
 2. `webSearch: true` means `request` accepts `{ type: "web_search" }` in `tools`. It does not mean the selected provider can search, and not whether the origin has a grant. `webSearch` and `toolCalling` are independent: a search-only `tools` array must not require `toolCalling`; function tools must not require `webSearch`.
 3. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none. The same per-key rule applies to `options.temperature` and any later `options` keys.
-4. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under `options` and under `output`) so later capabilities can be added without breaking callers. Unknown keys already allow a later draft to add a nested object (for example for MCP) without breaking callers that check `features.webSearch`.
+4. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under chat `options` and chat `output`) so later capabilities can be added without breaking callers. Unknown keys already allow a later draft to add a nested object (for example for MCP) without breaking callers that check `features.webSearch`.
 5. The result must not include provider name, model id, or other user or account identity.
 6. Implementations that do not support tool calling must reject function tools, `toolChoice` values other than `"auto"` and `"none"`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`. A search-only `tools` array (`[{ type: "web_search" }]`) must not be rejected solely for lacking `toolCalling`. `"none"` and `"auto"` remain valid on a search-only request so the page can suppress hosted search without `toolCalling`.
 7. Implementations that do not support hosted web search must reject `{ type: "web_search" }` with `invalid_request` — including implementations that omit `getFeatures`. Function tools must not be rejected solely for lacking `webSearch`. Same reject rule as function tools, not the ignore rule used for `options`.
@@ -262,6 +371,10 @@ Rules:
 15. Implementations that do not support image input must reject `ImagePart`s in `messages` with `invalid_request` — including implementations that omit `getFeatures`. Do not drop image parts and answer as if they were seen. Same reject rule as function tools, not the ignore rule used for `options`.
 16. Implementations that do not support image output must reject `output.images: true` with `invalid_request` — including implementations that omit `getFeatures`. Extra keys under `output` are ignored (forward compatible). If the page does not set `output.images: true`, implementations must not put `ImagePart`s on `done.message` (text only, as today).
 17. Advertising `imageInput` / `imageOutput` does not guarantee that the user's provider or model can see or draw. Applications must still handle a text-only `done` when they set `output.images: true`. If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that, do not complete a normal chat reply — see Images.
+
+18. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` advertises MP3 synthesis. Missing entries mean unsupported; chat remains required without a `methods.chat` entry. Speech methods are independent of chat capability flags.
+19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`; do not substitute chat, drop media, or silently change the approved route.
+20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Discovery may describe the identity-free union of possible routes; approval must filter to matching routes. No provider/model/voice identities or account state belong in discovery.
 
 ### Request options
 
@@ -551,6 +664,150 @@ Use `unavailable` (not `invalid_request`) for this case:
 
 Prefer disabling Allow so the user never hits the error; if the request still proceeds, throw `unavailable`. Advertising `imageOutput` does not mean the model will draw. Applications must still handle a text-only `done`.
 
+### Bounded speech
+
+Transcription and synthesis are optional variants of the same `request` function.
+They use transcription and speech endpoints with operation-specific models and
+stream shapes. They are distinct from chat audio: transcription promises a
+faithful transcript, while chat may summarize or answer questions. STT and TTS
+are capability categories, not additional method names.
+
+#### Transcription sources and validation
+
+`transcribe` accepts a prerecorded, finite media file containing a supported,
+decodable audio track. Audio-only files and provider-supported video containers
+are valid. The `media` object must contain exactly one source, checked by
+property presence rather than truthiness:
+
+- `{ data: string, mediaType }`: non-empty raw base64, never a data URL. An
+  explicit advertised media type is required; malformed base64 is rejected.
+- `{ data: Blob, mediaType? }`: infer the media type from `Blob.type` when
+  omitted. If declared and detected types are present, their normalized values
+  must agree.
+- `{ url: string, mediaType? }`: fetch a non-empty URL in the page realm, under
+  normal page CORS, and convert the response to a bounded source. Use a usable
+  response `Content-Type`; a declaration may supply a missing type, but a
+  conflicting declared/detected type is `invalid_request`. URL/network/CORS
+  failures are `invalid_request`; cancellation is `aborted`.
+
+For example, `{ data: undefined, url: "..." }` violates source exclusivity. A
+privileged implementation must never fetch an arbitrary page-supplied media URL.
+Page-side URL resolution can occur before approval, once iteration starts; no
+media may be sent to a provider before approval.
+
+Normalize MIME parameters, casing, and unambiguous aliases before comparison
+(for example `audio/mp3` to `audio/mpeg`, `audio/x-m4a` to `audio/mp4`, and
+`audio/wave`, `audio/x-wav`, or `audio/vnd.wave` to `audio/wav`). Transcription
+formats are capability-driven, not a universal allowlist. Advertise concrete
+MIME types such as `audio/mpeg`, `audio/mp4`, `audio/wav`, `audio/webm`,
+`video/mp4`, and `video/webm` only when supported. Provider adapters must declare
+accepted types and should declare narrower container/audio-codec constraints
+when reliably documented. Do not claim generic `video/*` support. Detect and
+check narrower constraints when advertised; MIME/container acceptance alone
+does not guarantee every audio codec works.
+
+Malformed media, invalid base64, unsupported MIME/container/codec combinations
+outside the advertised surface, and inputs exceeding a documented implementation
+limit are `invalid_request`. A format mismatch specific to the selected route
+after a well-formed advertised request is `unavailable`. Fail before `accepted`
+whenever metadata makes the failure knowable; provider decoding can fail later.
+A file without a supported audio track must fail with `invalid_request` and a
+clear no-audio-track message. Provider-detected silence/no transcribable speech
+must fail with a clear `invalid_request`, never an unexplained empty transcript.
+Malformed provider responses or inconsistent stream results are `provider_error`.
+
+`language`, when supplied, must be a structurally valid BCP 47 tag. Omission
+means detect; it does not request translation. If the selected route cannot
+faithfully represent a valid hint, fail with `unavailable` rather than discard it.
+
+Only the audio track has transcription semantics. Visuals, subtitles, and other
+non-audio tracks must not influence the transcript; do not inspect frames or
+substitute multimodal chat/video understanding. Implementations may pass a
+provider-supported container through unchanged and are not required to demux,
+decode, extract, or transcode locally. If the selected route cannot accept the
+file as supplied, fail clearly instead of silently converting or dropping tracks.
+Ignoring visuals is a semantic guarantee, not a guarantee that visual bytes stay
+local: disclose when the complete container may leave the page.
+
+#### Synthesis input and output
+
+`synthesize.text` must be a string containing non-whitespace text. Implementations
+may set a documented maximum, measured in Unicode code points. The page supplies
+no provider, model, voice ID, or voice sample. Those choices belong to the user
+and implementation. Speech requests accept only their method-specific fields;
+chat fields, page-selected route/voice fields, and unknown speech request or
+`media`/`output` fields are `invalid_request` in this draft.
+
+Omitting `output` or `output.mediaType` means `audio/mpeg`; any other synthesis
+format is `invalid_request`. MP3 is the only portable output in this version.
+This avoids prematurely specifying raw PCM layout or streamed container headers.
+Implementations must document conservative input/output limits and reject before
+approval when source metadata makes that possible. The standard fixes no
+provider-derived byte cap. Never truncate text or audio to fit a limit silently.
+
+#### Speech stream invariants
+
+The common lazy iteration, permission, error, and cancellation rules apply.
+Permission and preflight failures precede `accepted`. A successful stream yields
+exactly one `accepted`, then method-specific chunks, then exactly one `done`;
+nothing follows `done`. Media bytes may remain in the page through approval;
+metadata needed for approval may cross earlier. Implementations may begin a
+flow-controlled page-to-implementation upload after `accepted`. A failure during
+transfer or provider work throws an `InferenceError` and yields no `done`.
+Aborting before or after `accepted`, returning from the iterator, navigation,
+and page closure must cancel active transfer/provider work.
+
+Transcription yields zero or more append-only `delta` chunks, then
+`done.transcript.text`. When deltas are emitted, their concatenation must equal
+the final text exactly. Providers without streaming may return only the final
+`done` after `accepted`; this is the explicit exception to delta concatenation.
+Do not expose replacement/interim corrections, timestamps, or segment objects.
+`done.transcript.language` is optional provider-reported language information.
+`usage.inputSeconds` is optional input duration in seconds.
+
+Synthesis yields one or more `audio_delta` chunks, even for a non-streaming
+upstream response. Every chunk contains `Uint8Array` encoded bytes and
+`mediaType: "audio/mpeg"`. Concatenating bytes in order must reproduce the MP3
+exactly. `done.audio.byteLength` must equal that byte count; `done.audio` is
+metadata and must not duplicate bytes. `usage.inputCharacters`, when reported,
+counts input Unicode code points; `usage.outputSeconds` optionally reports output
+duration. Usage is optional and must not be fabricated. Counts and durations
+must be finite and nonnegative; byte lengths must be positive safe integers.
+
+IPA returns bytes and never starts playback. Pages may construct an
+`audio/mpeg` `Blob`, attach controls, and play only following an explicit user
+action, subject to browser autoplay policy. See the browser-only
+[speech examples](./examples/speech/README.md).
+
+#### Speech permission and privacy
+
+Existing grants are chat-only. Transcription and synthesis require separate
+origin-and-method grants. A persistent grant binds the exact provider/model
+and, for synthesis, voice. Changing that route requires fresh approval; changing
+global defaults must not silently rewrite a saved grant. Blocking an origin
+continues to block every method.
+
+Transcription approval must identify the operation, provider/model, media type,
+byte size, and container/audio codec/duration when known. For a video container,
+disclose that the complete file may be uploaded even though only audio is
+transcribed. Synthesis approval must identify generated speech and show the
+provider/model/voice. A page cannot override that choice.
+
+Implementations must update privacy disclosures before shipping speech. Recordings
+can contain biometric voice data, bystander speech, location/health information,
+and background conversations. Extensions must not capture the microphone or
+autoplay speech. A page may use browser microphone permission to create a
+recording, stop recording, then submit the completed bounded `Blob` with separate
+IPA transcription approval; a live microphone stream is out of scope.
+
+This draft specifies the portable contract. Inference Bridge's existing speech
+prototype uses the same request/chunk shapes under `experimental.request` and
+`experimental.getFeatures`; those experimental methods do not advertise stable
+support. Its graduation must expose speech through stable `request`/`getFeatures`.
+See the [implementation alignment and conformance checklist](./docs/speech-conformance.md)
+for the dated source snapshot and remaining implementation checks. This spec
+update does not certify provider conformance or publish a package release.
+
 ### Security
 
 The API is available only to top-level pages in a secure context that have a
@@ -559,8 +816,11 @@ tuple origin — typically `https:` and loopback `http:` (`localhost`,
 supported: permission is scoped to the page's origin, and those contexts do not
 provide a stable site identity for grants or blocks.
 
-A persistent allow grant records the provider and model chosen at approval time;
-later requests for that origin reuse that saved choice. Changing a global
+A persistent allow grant records the provider and model chosen at approval time,
+scoped by origin and method (and voice for synthesis); later requests reuse that
+approved route. Existing grants migrate as chat-only and authorize neither speech
+method. Changing the approved route requires fresh approval. Blocking an origin
+blocks every method. Changing a global
 default provider or model does not rewrite existing origin grants.
 Implementations must validate requests and must not expose API keys or provider
 credentials to page scripts.
@@ -588,7 +848,11 @@ Image parts in `messages` and `output.images` are each distinct from chat, funct
 - Image parts on `system` or `tool` messages
 - Streaming partial images (`image_delta`)
 - Size / quality / aspect-ratio enums (later `options` keys, ignore-if-unsupported)
-- Embeddings, speech, or audio
+- Embeddings
+- Live/unbounded audio, realtime or duplex speech sessions, and conversational audio understanding through chat
+- Translation, timestamps, segments, confidence, diarization, and transcript replacement
+- Synthesis formats other than MP3, page-selected model/voice IDs, voice cloning, custom voice enrollment, and speaking-rate/style controls
+- Video understanding, frame inspection, OCR, or subtitle extraction through transcription
 - Image generation as a page-facing `{ type: "image_generation" }` tool (content parts + `output.images` is the canonical surface)
 - Other hosted / provider-executed tools (for example MCP)
 - Options on `{ type: "web_search" }` such as search filters, recency, or location
