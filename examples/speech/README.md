@@ -1,4 +1,59 @@
-# Bounded speech in a browser
+# IPA Speech Demo
+
+A single-page app for bounded transcription and MP3 synthesis using
+`window.inference.request`. Transcription and synthesis are detected independently;
+an unsupported operation stays disabled while the other remains usable.
+
+## Try it
+
+**Demo URL:** [https://samsamskies.github.io/inference-provider-api/speech/](https://samsamskies.github.io/inference-provider-api/speech/)
+
+1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge#installation)
+   with speech support (v0.17.0+), or another injector advertising speech methods.
+2. Open the demo, or serve the examples locally from the repository root:
+
+   ```bash
+   npx serve examples
+   ```
+
+   Open the printed localhost URL followed by `/speech/`. Do not open `index.html`
+   as a `file:` URL.
+3. **Transcribe:** choose an advertised audio/video file, then click **Transcribe**.
+   If the browser reports no MIME type, select the file's actual advertised type.
+   The extension still validates the container and codec; the page does not guess
+   from the filename or override a conflicting detected type.
+4. **Text to speech:** enter text, click **Generate speech**, and approve the operation
+   in your extension. Click **Play** to listen. If your browser offers **Download**
+   in the player's menu, use it to save the MP3.
+
+The UI shows **Waiting for approval…**, then **Transcribing…** or **Generating audio…**
+after `accepted`. Transcripts can stream, but final-only providers work too.
+**Cancel** aborts the active request. Generated audio is exposed only after `done.audio.byteLength`
+matches the received MP3 bytes. Audio never autoplays; clearing, replacing, or leaving
+the page releases its object URLs. Provider, model, and voice selection stay in the
+extension. No app-held API key or build step is needed.
+
+When provided, usage appears beside the model: input audio seconds for transcription,
+and input characters plus output audio seconds for speech generation. Missing usage
+fields are omitted; the demo does not estimate token counts.
+
+## Browser smoke test
+
+- With the extension disabled, both operations should stay disabled and the page
+  should explain how to connect. With only one speech method advertised, only
+  that operation should be enabled. **Check again** rechecks capabilities when
+  speech is unavailable; returning focus to the page also refreshes them.
+- Upload a supported recording, approve transcription, and verify the final text.
+  Try an empty or unsupported file and confirm it cannot be submitted. Try a
+  provider that returns only a final transcript, without deltas.
+- Generate speech and verify it stays paused until **Play**. Where supported,
+  use the player's **Download** menu item and confirm the saved MP3 plays.
+  **Clear audio** should remove the player.
+- Cancel while awaiting approval and during provider work. Expect **Cancelled**
+  with no completed output; partial transcript text is labelled incomplete.
+  Deny approval and verify a useful error appears and the controls recover.
+
+## Developer snippets
 
 These snippets use the normative `window.inference.request` methods from
 [SPEC.md](../../SPEC.md#bounded-speech). Run them in a top-level HTTPS or
@@ -9,9 +64,9 @@ exposes them on stable `request`/`getFeatures`; detect method support before use
 The user chooses provider/model/voice during approval. Existing chat grants do
 not authorize speech. Files can include sensitive bystander/background speech;
 a video container may be uploaded in full even though only audio is transcribed.
-IPA never captures the microphone or starts playback for the page.
+Playback starts only when the user presses Play.
 
-## Upload a completed recording
+### Upload a completed recording
 
 Paste this into DevTools, then select a file in the added input:
 
@@ -44,57 +99,7 @@ type. File picker filters describe MIME types; implementation validation also
 checks applicable container/codec constraints. Final-only providers emit
 `accepted`, then `done`, with no text deltas.
 
-## Record first, then transcribe
-
-This adds a button. Clicking it obtains the page's browser microphone permission,
-records five seconds, stops all microphone tracks, then requests IPA approval
-for the completed file. It never sends a live microphone stream to IPA.
-
-```js
-const recordButton = document.createElement("button");
-recordButton.textContent = "Record five seconds and transcribe";
-document.body.append(recordButton);
-recordButton.onclick = async () => {
-  recordButton.disabled = true;
-  let microphone;
-  let recorder;
-  let recording;
-  try {
-    const ipa = window.inference;
-    const accepted = ipa?.getFeatures?.().methods?.transcribe?.acceptedMedia ?? [];
-    const mimeType = ["audio/webm", "audio/mp4"].find((type) =>
-      accepted.some((entry) => entry.mediaType === type) && MediaRecorder.isTypeSupported(type)
-    );
-    if (!mimeType) throw new Error("No advertised recording format is available.");
-    try {
-      microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recorder = new MediaRecorder(microphone, { mimeType });
-      const parts = [];
-      recorder.ondataavailable = ({ data }) => { if (data.size) parts.push(data); };
-      const stopped = new Promise((resolve, reject) => {
-        recorder.onstop = resolve;
-        recorder.onerror = () => reject(new Error("Recording failed."));
-      });
-      recorder.start();
-      const timer = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, 5_000);
-      try { await stopped; } finally { clearTimeout(timer); }
-      recording = new Blob(parts, { type: recorder.mimeType });
-    } finally {
-      if (recorder && recorder.state !== "inactive") recorder.stop();
-      microphone?.getTracks().forEach((track) => track.stop());
-    }
-    for await (const chunk of ipa.request({ method: "transcribe", media: { data: recording } })) {
-      if (chunk.type === "done") console.log(chunk.transcript.text);
-    }
-  } catch (error) {
-    console.log(error.code ?? error.name, error.message);
-  } finally {
-    recordButton.disabled = false;
-  }
-};
-```
-
-## Text to an MP3 Blob
+### Text to an MP3 Blob
 
 ```js
 const ipa = window.inference;
@@ -129,7 +134,7 @@ Do not use `complete()` for speech. It stays chat-only; `done.audio` contains
 metadata without duplicating audio bytes. No public `synthesize()` or audio
 collector is needed.
 
-## URL input, raw base64, and cancellation
+### URL input, raw base64, and cancellation
 
 URLs are resolved by the page under its normal CORS rules, once iteration starts.
 They may be fetched before approval; provider upload waits for approval. Use an

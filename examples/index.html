@@ -134,6 +134,21 @@
           linear-gradient(180deg, #f3f6f3 0%, #e8efe9 100%);
       }
 
+      .thumb-speech {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        background: #eaf3ee;
+      }
+
+      .thumb-speech span {
+        width: 0.45rem;
+        height: var(--height);
+        border-radius: 999px;
+        background: #0d7a5f;
+      }
+
       .thumb-chat .bubble {
         position: absolute;
         border-radius: 10px;
@@ -584,6 +599,26 @@
             <p>
               Describe a character, generate an SVG avatar with
               <code>ipa-tools</code> <code>complete</code>, then download PNG.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./speech/">
+          <div class="thumb thumb-speech" aria-hidden="true">
+            <span style="--height: 1rem"></span>
+            <span style="--height: 2rem"></span>
+            <span style="--height: 3.1rem"></span>
+            <span style="--height: 1.7rem"></span>
+            <span style="--height: 3.8rem"></span>
+            <span style="--height: 2.6rem"></span>
+            <span style="--height: 1.3rem"></span>
+          </div>
+          <div class="card-body">
+            <h2>Speech</h2>
+            <p>
+              Transcribe an uploaded audio or video file.
+              Generate speech from text, then listen with the audio player.
             </p>
             <span class="cta">Open demo →</span>
           </div>

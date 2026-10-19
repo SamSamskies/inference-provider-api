@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Speech</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --danger: #a61e1e;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: var(--font);
+        line-height: 1.5;
+      }
+      .shell { max-width: 66rem; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+      .header-meta, .actions, .section-heading { display: flex; align-items: center; gap: 0.75rem; }
+      header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+      h1 { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: -0.02em; }
+      h1 span { margin-left: 0.4rem; color: var(--muted); font-size: 0.85rem; font-weight: 400; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      .gallery { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-decoration: none; white-space: nowrap; border-radius: 2px; }
+      .source { display: inline-flex; flex-shrink: 0; color: var(--muted); line-height: 0; border-radius: 2px; }
+      .source svg { display: block; width: 1.05rem; height: 1.05rem; }
+      .gallery:hover, .source:hover { color: var(--accent); }
+      .gallery:focus-visible, .source:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      #connection-status { border: 1px solid var(--line); border-radius: 999px; padding: 0.2rem 0.5rem; background: var(--surface); font: 0.72rem var(--mono); color: var(--muted); }
+      #connection-status[data-ready="true"] { color: var(--accent); background: #d8efe6; border-color: #b7dccf; }
+      .intro { margin: 0 0 1.25rem; color: var(--muted); }
+      .connection { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; margin-bottom: 1.25rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+      .connection-copy { min-width: 0; }
+      .connection-title { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; font-weight: 600; }
+      .connection p { margin: 0; color: var(--muted); font-size: 0.825rem; }
+      .connection-actions { display: flex; flex-shrink: 0; align-items: center; gap: 0.5rem; }
+      .connection-actions > * { white-space: nowrap; }
+      .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+      .panel { min-width: 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+      .section-heading { margin-bottom: 0.65rem; }
+      .section-heading svg { width: 1.4rem; height: 1.4rem; color: var(--accent); flex-shrink: 0; }
+      h2 { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.025em; }
+      .description { min-height: 3rem; margin: 0 0 1.25rem; color: var(--muted); font-size: 0.9rem; }
+      label { display: block; margin-bottom: 0.45rem; font-size: 0.875rem; font-weight: 500; }
+      input, select, textarea, button { font: inherit; }
+      input[type="file"], select, textarea { width: 100%; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper); }
+      input[type="file"] { padding: 0.6rem; font-size: 0.8rem; }
+      input::file-selector-button { margin-right: 0.6rem; padding: 0.35rem 0.6rem; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); cursor: pointer; }
+      select { padding: 0.55rem; }
+      textarea { min-height: 10rem; padding: 0.75rem; resize: vertical; line-height: 1.6; }
+      button, .button { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 0.5rem 0.8rem; background: var(--ink); color: #fff; font-size: 0.85rem; font-weight: 500; text-decoration: none; cursor: pointer; }
+      button:hover:not(:disabled), .button:hover { background: #2a322e; }
+      button.secondary { background: var(--surface); border-color: var(--line); color: var(--ink); }
+      button.secondary:hover:not(:disabled) { background: #e8eee9; }
+      button:disabled, input:disabled, select:disabled, textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      .hint, .metadata { margin: 0.5rem 0; color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
+      .type-field { margin-top: 0.75rem; }
+      .actions { flex-wrap: wrap; margin-top: 1.1rem; }
+      .status { min-height: 1.5rem; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.82rem; }
+      .error { margin: 0.4rem 0 0; color: var(--danger); font-size: 0.85rem; overflow-wrap: anywhere; }
+      .result { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+      h3 { margin: 0 0 0.65rem; font-size: 0.85rem; font-weight: 500; }
+      .transcript { min-height: 8rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.95rem; }
+      .transcript:empty { display: none; }
+      .empty { margin: 0; color: var(--muted); font-size: 0.875rem; }
+      audio { display: block; width: 100%; max-width: 100%; margin: 0.7rem 0; }
+      .privacy { margin: 1.25rem 0 0; color: var(--muted); font-size: 0.8rem; }
+      footer { margin-top: 1.25rem; color: var(--muted); font-size: 0.8rem; }
+      @media (max-width: 760px) {
+        .connection { align-items: flex-start; flex-direction: column; gap: 0.85rem; }
+        .panels { grid-template-columns: 1fr; }
+        .shell { padding: 1.25rem 1rem 2rem; }
+        .panel { padding: 1.15rem; }
+        .description { min-height: 0; }
+      }
+      @media (max-width: 480px) {
+        .connection-actions { width: 100%; flex-direction: column; align-items: stretch; text-align: center; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>IPA Speech<span>window.inference</span></h1>
+        <div class="header-meta">
+          <a class="gallery" href="../">All examples</a>
+          <a class="source" href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/speech" target="_blank" rel="noopener noreferrer" aria-label="Source on GitHub">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8" /></svg>
+          </a>
+          <span id="connection-status" role="status">checking…</span>
+        </div>
+      </header>
+      <p class="intro">Turn a recording into text. Turn text into speech.</p>
+      <div class="connection" id="connection" hidden>
+        <div class="connection-copy">
+          <strong class="connection-title" id="connection-title">Connect an extension</strong>
+          <p id="connection-message"></p>
+        </div>
+        <div class="connection-actions">
+          <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+          <button class="secondary" id="recheck" type="button">Check again</button>
+        </div>
+      </div>
+      <div class="panels">
+        <section class="panel" aria-labelledby="transcribe-heading">
+          <div class="section-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6v20h12V6l-4-4ZM14 2v5h4M9 12h6M9 16h6" /></svg>
+            <h2 id="transcribe-heading">Transcribe</h2>
+          </div>
+          <p class="description" id="transcribe-support">Upload an audio or video file to get its transcript.</p>
+          <label for="file">Audio or video file</label>
+          <input id="file" type="file" disabled aria-describedby="formats source-info" />
+          <p class="hint" id="formats"></p>
+          <div class="type-field" id="type-field" hidden>
+            <label for="media-type">File type</label>
+            <select id="media-type" aria-describedby="type-hint"></select>
+            <p class="hint" id="type-hint">Your browser did not report a file type. Choose its actual format.</p>
+          </div>
+          <p class="metadata" id="source-info">No recording selected.</p>
+          <div class="actions">
+            <button id="transcribe" type="button" disabled>Transcribe</button>
+            <button class="secondary" id="transcribe-cancel" type="button" hidden>Cancel</button>
+            <button class="secondary" id="transcribe-clear" type="button" disabled>Clear</button>
+          </div>
+          <p class="status" id="transcribe-status" role="status" aria-live="polite">Select a recording to begin.</p>
+          <p class="error" id="transcribe-error" role="alert" hidden></p>
+          <div class="result">
+            <h3>Transcript</h3>
+            <p class="empty" id="transcript-empty">Your transcript will appear here.</p>
+            <div class="transcript" id="transcript" tabindex="0" role="region" aria-label="Transcript"></div>
+            <p class="metadata" id="transcript-meta"></p>
+          </div>
+          <p class="privacy">Only send recordings you intend to share. Background voices may be included. A video may be uploaded in full, even though only its audio is transcribed.</p>
+        </section>
+        <section class="panel" aria-labelledby="synthesize-heading">
+          <div class="section-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 4-6 5H2v6h3l6 5V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></svg>
+            <h2 id="synthesize-heading">Text to speech</h2>
+          </div>
+          <p class="description" id="synthesize-support">Write something to hear aloud. You choose the voice in your extension.</p>
+          <label for="speech-text">Text to read</label>
+          <textarea id="speech-text" spellcheck="true">Ain’t it fun living in the real world?</textarea>
+          <div class="actions">
+            <button id="synthesize" type="button" disabled>Generate speech</button>
+            <button class="secondary" id="synthesize-cancel" type="button" hidden>Cancel</button>
+            <button class="secondary" id="synthesize-clear" type="button" disabled>Clear audio</button>
+          </div>
+          <p class="status" id="synthesize-status" role="status" aria-live="polite">Generate audio, then press Play to listen.</p>
+          <p class="error" id="synthesize-error" role="alert" hidden></p>
+          <div class="result">
+            <h3>Generated audio</h3>
+            <p class="empty" id="audio-empty">Your MP3 will appear here. Playback starts when you press Play.</p>
+            <div id="audio-result" hidden>
+              <audio id="generated-audio" controls preload="metadata" aria-label="Generated speech"></audio>
+              <p class="metadata" id="audio-meta"></p>
+            </div>
+          </div>
+        </section>
+      </div>
+      <footer>You choose the provider and model in your extension. Transcription and speech each require their own approval. <a href="https://github.com/SamSamskies/inference-provider-api/blob/main/examples/speech/README.md">Developer examples</a></footer>
+    </main>
+    <script type="module">
+      const el = (id) => document.getElementById(id);
+      const fileInput = el("file");
+      const mediaType = el("media-type");
+      const transcript = el("transcript");
+      const speechText = el("speech-text");
+      const generatedAudio = el("generated-audio");
+      const aliases = { "audio/mp3": "audio/mpeg", "audio/x-m4a": "audio/mp4", "audio/wave": "audio/wav", "audio/x-wav": "audio/wav", "audio/vnd.wave": "audio/wav" };
+      const formatNames = { "audio/mpeg": "MP3", "audio/mp4": "M4A audio", "audio/wav": "WAV", "audio/webm": "WebM audio", "audio/ogg": "Ogg audio", "video/mp4": "MP4 video", "video/webm": "WebM video" };
+      const normalizeType = (value) => {
+        const essence = (value ?? "").split(";")[0].trim().toLowerCase();
+        return aliases[essence] ?? essence;
+      };
+      const formatBytes = (bytes) => bytes < 1024 ? `${bytes} bytes` : `${(bytes / 1024).toFixed(1)} KB`;
+      const failure = (code, message) => Object.assign(new Error(message), { code });
+      let acceptedMedia = [];
+      let canSynthesize = false;
+      let selectedFile = null;
+      let audioURL = null;
+      let transcribeController = null;
+      let synthesizeController = null;
+      let discoveryTimer = null;
+
+      function clearError(method) {
+        el(`${method}-error`).textContent = "";
+        el(`${method}-error`).hidden = true;
+      }
+
+      function showFailure(method, error) {
+        // Browser DOMExceptions have a numeric legacy code; use their descriptive name.
+        const code = typeof error?.code === "string" ? error.code : error?.name ?? "unknown";
+        if (code === "aborted" || code === "AbortError") {
+          el(`${method}-status`).textContent = method === "transcribe" && transcript.textContent ? "Cancelled. The displayed transcript is incomplete." : "Cancelled.";
+          return;
+        }
+        const guidance = {
+          permission_denied: "Allow this operation for this site in your extension, then try again.",
+          invalid_request: "Check the input and try again.",
+          unavailable: "Check the provider and model selected in your extension.",
+          provider_error: "Try again or choose another provider in your extension.",
+        };
+        el(`${method}-status`).textContent = method === "transcribe" && transcript.textContent ? "Could not complete the request. The displayed transcript is incomplete." : "Could not complete the request.";
+        el(`${method}-error`).textContent = `${code}: ${error?.message ?? String(error)}${guidance[code] ? ` ${guidance[code]}` : ""}`;
+        el(`${method}-error`).hidden = false;
+      }
+
+      function sourceType() {
+        return normalizeType(selectedFile?.type || mediaType.value);
+      }
+
+      function updateControls() {
+        const busy = Boolean(transcribeController);
+        fileInput.disabled = busy || !acceptedMedia.length;
+        mediaType.disabled = busy;
+        el("transcribe").disabled = busy || !selectedFile?.size || !acceptedMedia.some((entry) => normalizeType(entry.mediaType) === sourceType());
+        el("transcribe-cancel").hidden = !busy;
+        el("transcribe-cancel").disabled = Boolean(transcribeController?.signal.aborted);
+        el("transcribe-clear").disabled = busy || !(selectedFile || transcript.textContent || el("transcribe-error").textContent);
+        el("synthesize").disabled = Boolean(synthesizeController) || !canSynthesize || !speechText.value.trim();
+        speechText.disabled = Boolean(synthesizeController);
+        el("synthesize-cancel").hidden = !synthesizeController;
+        el("synthesize-cancel").disabled = Boolean(synthesizeController?.signal.aborted);
+        el("synthesize-clear").disabled = Boolean(synthesizeController) || !audioURL;
+      }
+
+      function refreshFeatures() {
+        const usableContext = window.isSecureContext && location.origin !== "null" && window.top === window;
+        const ipa = usableContext && window.inference;
+        let methods;
+        try { methods = typeof ipa?.request === "function" ? ipa.getFeatures?.()?.methods : undefined; } catch { /* Keep unavailable until discovery succeeds. */ }
+        acceptedMedia = Array.isArray(methods?.transcribe?.acceptedMedia) ? methods.transcribe.acceptedMedia.filter((entry) => typeof entry?.mediaType === "string" && normalizeType(entry.mediaType)) : [];
+        canSynthesize = methods?.synthesize === true;
+        const ready = Boolean(acceptedMedia.length || canSynthesize);
+        el("connection-status").dataset.ready = String(ready);
+        el("connection-status").textContent = acceptedMedia.length && canSynthesize ? "ready" : acceptedMedia.length ? "transcription only" : canSynthesize ? "synthesis only" : "unavailable";
+        el("connection").hidden = ready;
+        el("connection-title").textContent = !usableContext ? "Open a supported page" : typeof ipa?.request !== "function" ? "Connect an extension" : "Speech support unavailable";
+        el("connection-message").textContent = !usableContext ? "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported." : typeof ipa?.request !== "function" ? "Install Inference Bridge, then reload this page to get started." : "Enable or update speech support in your extension, then check again.";
+        el("transcribe-support").textContent = acceptedMedia.length ? "Upload an audio or video file to get its transcript." : "Your extension does not offer transcription.";
+        el("synthesize-support").textContent = canSynthesize ? "Write something to hear aloud. You choose the voice in your extension." : "Your extension does not offer speech synthesis.";
+        const types = [...new Set(acceptedMedia.map((entry) => normalizeType(entry.mediaType)))];
+        fileInput.accept = types.join(",");
+        el("formats").textContent = types.length ? `Supported formats: ${types.map((type) => formatNames[type] ?? type).join(", ")}.` : "";
+        const previousType = mediaType.value;
+        mediaType.replaceChildren(new Option("Select the actual file type", ""), ...types.map((type) => new Option(formatNames[type] ?? type, type)));
+        mediaType.value = types.includes(previousType) ? previousType : "";
+        updateControls();
+        return ready;
+      }
+
+      function clearTranscript() {
+        transcript.textContent = "";
+        el("transcript-empty").hidden = false;
+        el("transcript-meta").textContent = "";
+      }
+
+      function clearAudio() {
+        generatedAudio.pause();
+        generatedAudio.removeAttribute("src");
+        generatedAudio.load();
+        if (audioURL) URL.revokeObjectURL(audioURL);
+        audioURL = null;
+        el("audio-meta").textContent = "";
+        el("audio-result").hidden = true;
+        el("audio-empty").hidden = false;
+      }
+
+      function selectFile(file) {
+        selectedFile = file;
+        mediaType.value = "";
+        el("type-field").hidden = !file || Boolean(file.type);
+        clearTranscript();
+        clearError("transcribe");
+        el("source-info").textContent = file ? `${file.name} · ${formatBytes(file.size)} · ${formatNames[normalizeType(file.type)] ?? (file.type || "unknown type")}` : "No recording selected.";
+        el("transcribe-status").textContent = file ? "Ready to transcribe. Your extension will ask for approval if needed." : "Select a recording to begin.";
+        if (file && !file.size) showFailure("transcribe", failure("invalid_request", "The selected recording is empty."));
+        else if (file?.type && !acceptedMedia.some((entry) => normalizeType(entry.mediaType) === normalizeType(file.type))) showFailure("transcribe", failure("invalid_request", "This file type is not advertised. Choose a supported recording."));
+        else if (file && !file.type) el("transcribe-status").textContent = "Select the file's actual media type before transcribing.";
+        updateControls();
+      }
+
+      async function transcribe() {
+        if (transcribeController) return;
+        refreshFeatures();
+        if (el("transcribe").disabled) return;
+        const controller = new AbortController();
+        transcribeController = controller;
+        clearError("transcribe");
+        clearTranscript();
+        el("transcribe-status").textContent = "Waiting for approval…";
+        updateControls();
+        let done;
+        try {
+          // Supply a type only when Blob.type is absent; never override a conflicting detected type.
+          const media = selectedFile.type ? { data: selectedFile } : { data: selectedFile, mediaType: sourceType() };
+          for await (const chunk of window.inference.request({ method: "transcribe", media, signal: controller.signal })) {
+            if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
+            if (chunk.type === "accepted") el("transcribe-status").textContent = "Transcribing…";
+            if (chunk.type === "delta") {
+              transcript.textContent += chunk.content;
+              el("transcript-empty").hidden = Boolean(transcript.textContent);
+            }
+            if (chunk.type === "done") done = chunk;
+          }
+          if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
+          if (typeof done?.transcript?.text !== "string" || !done.transcript.text.trim()) throw failure("provider_error", "No completed transcript was returned.");
+          transcript.textContent = done.transcript.text;
+          el("transcript-empty").hidden = true;
+          el("transcript-meta").textContent = [done.model, done.transcript.language, done.usage?.inputSeconds != null ? `${done.usage.inputSeconds}s audio` : ""].filter(Boolean).join(" · ");
+          el("transcribe-status").textContent = "Transcript ready.";
+        } catch (error) {
+          showFailure("transcribe", error);
+        } finally {
+          transcribeController = null;
+          updateControls();
+        }
+      }
+
+      async function synthesize() {
+        if (synthesizeController) return;
+        refreshFeatures();
+        if (el("synthesize").disabled) return;
+        const controller = new AbortController();
+        synthesizeController = controller;
+        clearError("synthesize");
+        clearAudio();
+        el("synthesize-status").textContent = "Waiting for approval…";
+        updateControls();
+        const parts = [];
+        let byteLength = 0;
+        let done;
+        try {
+          for await (const chunk of window.inference.request({ method: "synthesize", text: speechText.value, signal: controller.signal })) {
+            if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
+            if (chunk.type === "accepted") el("synthesize-status").textContent = "Generating audio…";
+            if (chunk.type === "audio_delta") {
+              if (chunk.mediaType !== "audio/mpeg" || !(chunk.data instanceof Uint8Array)) throw failure("provider_error", "The provider returned an invalid MP3 chunk.");
+              parts.push(chunk.data.slice());
+              byteLength += chunk.data.byteLength;
+              el("synthesize-status").textContent = `Receiving audio… ${formatBytes(byteLength)}`;
+            }
+            if (chunk.type === "done") done = chunk;
+          }
+          if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
+          if (!byteLength || !Number.isSafeInteger(done?.audio?.byteLength) || done.audio.byteLength !== byteLength || done.audio.mediaType !== "audio/mpeg") throw failure("provider_error", "The MP3 stream is incomplete. Generate the audio again.");
+          audioURL = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
+          generatedAudio.src = audioURL;
+          el("audio-meta").textContent = [
+            done.model,
+            "MP3",
+            formatBytes(byteLength),
+            done.usage?.inputCharacters != null ? `${done.usage.inputCharacters} input characters` : "",
+            done.usage?.outputSeconds != null ? `${done.usage.outputSeconds}s` : "",
+          ].filter(Boolean).join(" · ");
+          el("audio-empty").hidden = true;
+          el("audio-result").hidden = false;
+          el("synthesize-status").textContent = "Audio ready. Press Play to listen.";
+        } catch (error) {
+          showFailure("synthesize", error);
+        } finally {
+          synthesizeController = null;
+          updateControls();
+        }
+      }
+
+      fileInput.addEventListener("change", () => selectFile(fileInput.files[0] ?? null));
+      mediaType.addEventListener("change", () => {
+        el("transcribe-status").textContent = mediaType.value ? "Ready to transcribe." : "Select the file's actual media type before transcribing.";
+        updateControls();
+      });
+      el("transcribe").addEventListener("click", transcribe);
+      el("transcribe-cancel").addEventListener("click", () => { transcribeController?.abort(); updateControls(); });
+      el("transcribe-clear").addEventListener("click", () => { selectFile(null); fileInput.value = ""; });
+      el("synthesize").addEventListener("click", synthesize);
+      el("synthesize-cancel").addEventListener("click", () => { synthesizeController?.abort(); updateControls(); });
+      el("synthesize-clear").addEventListener("click", () => {
+        clearAudio();
+        clearError("synthesize");
+        el("synthesize-status").textContent = "Generate audio, then press Play to listen.";
+        updateControls();
+      });
+      speechText.addEventListener("input", updateControls);
+      el("recheck").addEventListener("click", refreshFeatures);
+      window.addEventListener("focus", refreshFeatures);
+      window.addEventListener("pageshow", refreshFeatures);
+      window.addEventListener("pagehide", () => {
+        clearInterval(discoveryTimer);
+        transcribeController?.abort();
+        synthesizeController?.abort();
+        clearAudio();
+      });
+      // Injection can arrive after this module. No extension-specific ready event is required.
+      if (!refreshFeatures()) {
+        const deadline = Date.now() + 3_000;
+        discoveryTimer = setInterval(() => {
+          if (refreshFeatures() || Date.now() >= deadline) clearInterval(discoveryTimer);
+        }, 100);
+      }
+    </script>
+  </body>
+</html>
