@@ -33,6 +33,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Avatar demo](https://samsamskies.github.io/inference-provider-api/avatar/) — describe a character, generate an SVG avatar with [`ipa-tools`](./packages/ipa-tools) `complete`, download PNG ([source](./examples/avatar/))
 - [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — a feed of Nostr notes filtered with natural language via IPA tool calling ([source](./examples/nostr/))
 - [Charts demo](https://samsamskies.github.io/inference-provider-api/charts/) — natural-language charts via IPA tool calling (`render_chart` generative UI) ([source](./examples/charts/))
+- [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 ([source](./examples/speech/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces. Bounded transcription and MP3 synthesis are optional spec methods; Inference Bridge [v0.17.0](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0) exposes them on stable `request`/`getFeatures`. Detect method support before use; see [speech examples](./examples/speech/README.md).
@@ -116,7 +117,7 @@ const features = window.inference.getFeatures?.() ?? {};
 | [MP3 synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 bytes in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, bounded microphone recording, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls recording and playback.
+Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls playback.
 
 ### Permissions
 
