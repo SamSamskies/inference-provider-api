@@ -57,9 +57,9 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
-### Migrating to 1.0.0
+### Method-specific streams
 
-`InferenceRequest` and `InferenceChunk` are now all-method unions. Code that
+Since 1.0.0, `InferenceRequest` and `InferenceChunk` are all-method unions. Code that
 previously used them to mean chat must use the narrow aliases:
 
 ```ts
@@ -89,6 +89,21 @@ for await (const chunk of client.request({ method: "synthesize", text: "Hello" }
 `SynthesisDoneChunk`. `TranscriptionMediaSource` and
 `TranscriptionInputConstraint` describe sources and discovery constraints.
 
+**Unreleased:** the source also supports `DecideRequest`, `DecisionChunk`, and
+`DecisionDoneChunk`. Decision types and routing are not yet in published 1.0.0.
+`DecisionState` / `DecisionJsonValue`, `DecisionQuestion` (`NoulQuestion`,
+`ChoiceQuestion`, `ScoreQuestion`), and `DecisionAnswer` (`NoulAnswer`,
+`ChoiceAnswer`, `ScoreAnswer`, `RefusalAnswer`) describe the bounded contract.
+
+Check `window.inference?.getFeatures?.().methods?.decide` before sending a
+decision. The user selects the provider/model and grants decision permission
+separately from chat or speech. Iterate `request({ method: "decide", state,
+questions })` for `accepted` then `done.answers`; there are no deltas. Check
+each answer's `type` for refusal before consuming probabilities or values.
+See the spec's [decision example and validation rules](../../SPEC.md#typed-decisions-system-one).
+Inference Bridge's stable API has not yet graduated decisions; its experimental
+namespace is not a substitute for advertised stable support.
+
 For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
 `InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk
 by its payload, since `type: "done"` is shared:
@@ -99,14 +114,15 @@ async function display(ipa: Inference, request: InferenceRequest) {
   for await (const chunk of ipa.request(request)) {
     if (chunk.type !== "done") continue;
     if ("message" in chunk) console.log(chunk.message.content);
+    else if ("answers" in chunk) console.log(chunk.answers); // unreleased decision types
     else if ("transcript" in chunk) console.log(chunk.transcript.text);
     else console.log(chunk.audio.byteLength);
   }
 }
 ```
 
-`complete()` and `runTools()` remain chat-only. No speech function or collector
-is added; iterate `request` and assemble MP3 bytes in page code. See the
+`complete()` and `runTools()` remain chat-only. No decision/speech function or collector
+is added; iterate `request` for typed answers or assemble MP3 bytes in page code. See the
 [browser examples](../../examples/speech/README.md). Detect advertised speech
 methods before use; older injectors may omit them.
 
@@ -130,7 +146,7 @@ sendButton.addEventListener("click", async () => {
 
 Optional `fallbacks` (at most one entry) can supply a page-side `InferenceBackend` after IPA is unavailable — compatibility adapters only, not IPA. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay injector-only.
 
-Speech requires a backend-level `getFeatures()` snapshot advertising the
+Decisions and speech require a backend-level `getFeatures()` snapshot advertising the
 requested method before `create()` is called. Transcription also matches a
 known declared/Blob MIME essence to `acceptedMedia`; unknown URL MIME is left
 for page-side resolution and implementation validation. Selection does not
@@ -140,6 +156,10 @@ created client are checked again, including for cached clients. An available
 injector always takes precedence: its unadvertised method is `invalid_request`,
 and an advertised route's `unavailable`, permission denial, or provider error
 is propagated without silently trying another provider.
+
+For decisions, both the backend and created client must advertise
+`methods.decide: true`. A chat-only backend is skipped before `create()`,
+including downloads or session setup; there is no decision-to-chat emulation.
 
 Apps import backend packages themselves (no string aliases in `ipa-tools`):
 

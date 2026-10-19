@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional IPA `decide` request, JSON state, typed question/answer, refusal, chunk, and done types, with `methods.decide` discovery. All-method unions now include decisions; exhaustive consumers must also handle `done.answers`. Chat-specific aliases and helpers remain unchanged.
+- Decision-aware `createInference().request` and fallback selection. Both backend and created-client snapshots must advertise decisions; unsupported fallbacks are skipped before session creation, and injector failures never trigger a silent fallback.
+- Shared browser-compatible decision stream assertions and mock fixtures for typed results, refusals, probability/score consistency, cancellation, and method-specific TypeScript inference. These verify the contract, not live provider availability or decision accuracy.
+
 ## [1.0.0] - 2026-10-17
 
 ### Breaking

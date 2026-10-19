@@ -66,6 +66,44 @@ type ChatRequest = {
   signal?: AbortSignal;
 };
 
+/** Finite JSON values only; no cycles, sparse arrays, binary, or custom objects. */
+type DecisionJsonValue =
+  | null | boolean | number | string
+  | DecisionJsonValue[]
+  | { [key: string]: DecisionJsonValue };
+
+type DecisionState = string | DecisionJsonValue[] | { [key: string]: DecisionJsonValue };
+
+type NoulQuestion = {
+  type: "noul";
+  instructions: string;
+  criteria?: { true?: string; false?: string };
+};
+
+type ChoiceQuestion = {
+  type: "choice";
+  instructions: string;
+  /** 2–26 named choices; null means the key needs no further description. */
+  criteria: Record<string, string | null>;
+};
+
+type ScoreQuestion = {
+  type: "score";
+  instructions: string;
+  /** 2–10 ordered descriptions, indexed from zero. */
+  criteria: string[];
+};
+
+type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
+
+type DecideRequest = {
+  method: "decide";
+  state: DecisionState;
+  /** 1–64 questions over the same state; no dependencies between answers. */
+  questions: Record<string, DecisionQuestion>;
+  signal?: AbortSignal;
+};
+
 /** Exactly one page-owned source. String data is raw base64, never a data URL. */
 type TranscriptionMediaSource =
   | { mediaType: string; data: string; url?: never }
@@ -87,7 +125,7 @@ type SynthesizeRequest = {
   signal?: AbortSignal;
 };
 
-type InferenceRequest = ChatRequest | TranscribeRequest | SynthesizeRequest;
+type InferenceRequest = ChatRequest | DecideRequest | TranscribeRequest | SynthesizeRequest;
 type InferenceMethod = InferenceRequest["method"];
 
 type InferenceOptions = {
@@ -139,6 +177,27 @@ type ChatChunk =
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
+type NoulAnswer = { type: "noul"; noul: number };
+type ChoiceAnswer = {
+  type: "choice";
+  choice: string;
+  probabilities: Record<string, number>;
+  confidence: number;
+};
+type ScoreAnswer = {
+  type: "score";
+  score: number;
+  legend: Record<string, string>;
+  probabilities: Record<string, number>;
+  confidence: number;
+};
+type RefusalAnswer = { type: "refusal" };
+type DecisionAnswer = NoulAnswer | ChoiceAnswer | ScoreAnswer | RefusalAnswer;
+
+type DecisionChunk =
+  | { type: "accepted" }
+  | { type: "done"; model: string; answers: Record<string, DecisionAnswer>; usage?: Usage };
+
 type TranscriptionUsage = { inputSeconds?: number };
 type SynthesisUsage = {
   inputCharacters?: number;
@@ -165,17 +224,19 @@ type SynthesisChunk =
       usage?: SynthesisUsage;
     };
 
-type InferenceChunk = ChatChunk | TranscriptionChunk | SynthesisChunk;
+type InferenceChunk = ChatChunk | DecisionChunk | TranscriptionChunk | SynthesisChunk;
 
 /** Distributes over request unions while preserving concrete method inference. */
 type InferenceChunkFor<R extends InferenceRequest> =
   R extends ChatRequest ? ChatChunk :
+  R extends DecideRequest ? DecisionChunk :
   R extends TranscribeRequest ? TranscriptionChunk :
   R extends SynthesizeRequest ? SynthesisChunk : never;
 
 type InferenceDoneFor<R extends InferenceRequest> =
   Extract<InferenceChunkFor<R>, { type: "done" }>;
 type ChatDoneChunk = InferenceDoneFor<ChatRequest>;
+type DecisionDoneChunk = InferenceDoneFor<DecideRequest>;
 type TranscriptionDoneChunk = InferenceDoneFor<TranscribeRequest>;
 type SynthesisDoneChunk = InferenceDoneFor<SynthesizeRequest>;
 
@@ -187,8 +248,9 @@ type TranscriptionInputConstraint = {
 };
 
 type InferenceFeatures = {
-  /** Chat is required. Absent speech methods mean unsupported. */
+  /** Chat is required. Absent or false optional methods mean unsupported. */
   methods?: {
+    decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
     synthesize?: boolean;
   };
@@ -273,11 +335,10 @@ type DoneChunk = ChatDoneChunk;
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Bounded transcription (`method: "transcribe"`) and MP3 synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Typed decisions (`method: "decide"`), bounded transcription (`method: "transcribe"`) and MP3 synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
 
-`request` is the only operation entry point. Do not add `transcribe()` or
-`synthesize()` functions to `window.inference`. The method determines the chunk
-union: chat yields `ChatChunk`, transcription yields `TranscriptionChunk`, and
+The method determines the chunk union: chat yields `ChatChunk`, decisions yield
+`DecisionChunk`, transcription yields `TranscriptionChunk`, and
 synthesis yields `SynthesisChunk`. The conditional mapping distributes over an
 `InferenceRequest` union. Equivalent overloads must also accept a union-typed
 request. `ChatRequest`, `ChatChunk`, and `ChatDoneChunk` retain the narrow chat
@@ -309,7 +370,7 @@ for await (const chunk of window.inference.request({
 3. API keys never leave the extension. Applications never see them.
 4. If a request fails, iteration throws an `InferenceError`. A failed request does not yield a `done` chunk.
 5. `request` yields exactly one `accepted` chunk after the origin is permitted and the request is cleared to call a provider — including when a persistent grant already exists and no prompt is shown. `accepted` does not mean the user clicked Allow in a UI; applications must not assume a prompt occurred. Failures during permission or preflight do not yield `accepted`.
-6. After `accepted`, a successful request yields method-specific chunks, then exactly one `done` chunk. No chunks follow `done`. Chat yields zero or more `reasoning_delta` and/or `delta` chunks (in any order); the chat-specific rules below apply to `method: "chat"`. Speech follows [Bounded speech](#bounded-speech).
+6. After `accepted`, a successful request yields method-specific chunks, then exactly one `done` chunk. No chunks follow `done`. Chat yields zero or more `reasoning_delta` and/or `delta` chunks (in any order); the chat-specific rules below apply to `method: "chat"`. Decisions follow [Typed decisions](#typed-decisions-system-one); speech follows [Bounded speech](#bounded-speech).
 7. Concatenating every `delta.content` produces `done.message.content` when the assistant reply is text. Reasoning is not included in `content`. On a tool turn with no `delta` chunks, `done.message.content` may be `null` or `""`; applications must treat both as no text reply. When the reply includes images, `done.message.content` is a `ContentPart[]`; concatenating every `delta.content` produces the concatenation of the `type: "text"` parts, in order. Image parts appear only on `done` (no `image_delta` in this draft). An image-only reply uses `content: [{ type: "image", ... }, ...]` with zero `delta`s — do not use `null` to mean “here is a PNG.”
 8. Concatenating every `reasoning_delta.content` produces `done.message.reasoning` when the provider exposed reasoning. If there were no `reasoning_delta` chunks, `done.message.reasoning` is omitted.
 9. Providers or models that do not expose reasoning yield no `reasoning_delta` chunks and omit `message.reasoning`. Applications must treat reasoning as optional.
@@ -326,6 +387,9 @@ Applications must feature-detect. Older injectors may omit the method:
 
 ```ts
 const features = window.inference.getFeatures?.() ?? {};
+if (features.methods?.decide) {
+  // decide returns typed answers over a shared JSON state
+}
 if (features.methods?.transcribe) {
   // transcribe accepts the advertised acceptedMedia constraints
 }
@@ -372,13 +436,13 @@ Rules:
 16. Implementations that do not support image output must reject `output.images: true` with `invalid_request` — including implementations that omit `getFeatures`. Extra keys under `output` are ignored (forward compatible). If the page does not set `output.images: true`, implementations must not put `ImagePart`s on `done.message` (text only, as today).
 17. Advertising `imageInput` / `imageOutput` does not guarantee that the user's provider or model can see or draw. Applications must still handle a text-only `done` when they set `output.images: true`. If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that, do not complete a normal chat reply — see Images.
 
-18. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` advertises MP3 synthesis. Missing entries mean unsupported; chat remains required without a `methods.chat` entry. Speech methods are independent of chat capability flags.
-19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`; do not substitute chat, drop media, or silently change the approved route.
+18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` advertises MP3 synthesis. Missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
+19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`; do not substitute chat, omit questions, drop media, or silently change the approved route.
 20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Discovery may describe the identity-free union of possible routes; approval must filter to matching routes. No provider/model/voice identities or account state belong in discovery.
 
 ### Request options
 
-`options` is a bag of generation preferences for this call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` and `temperature`; later drafts may add further keys under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise.
+`options` is a bag of generation preferences for a chat call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` and `temperature`; later drafts may add further keys under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise. Other methods have closed request shapes and do not accept `options` in this draft.
 
 #### `reasoningEffort`
 
@@ -664,6 +728,170 @@ Use `unavailable` (not `invalid_request`) for this case:
 
 Prefer disabling Allow so the user never hits the error; if the request still proceeds, throw `unavailable`. Advertising `imageOutput` does not mean the model will draw. Applications must still handle a text-only `done`.
 
+### Typed decisions (System One)
+
+`method: "decide"` evaluates a shared `state` against named, typed `questions`.
+It returns probabilities and bounded decisions for application code, rather
+than a chat message. The vocabulary follows the [TypeSafe primitives](https://docs.typesafe.ai/primitives)
+and can be mapped to native decision APIs such as [Ollama System One](https://docs.ollama.com/api/systemone).
+Provider protocols, endpoint names, and model catalogs remain implementation details.
+
+#### Decision request and validation
+
+Feature-detect `getFeatures().methods?.decide === true` before use. This flag
+describes API support, independently of credentials, installed models, or site
+approval. It covers `noul`, `choice`, and `score`; there are no per-provider or
+per-primitive discovery flags in this draft.
+
+The request has only `method`, `state`, `questions`, and optional `signal`.
+Reject unknown top-level or question fields with `invalid_request`, including
+page-selected `provider`, `model`, `keep_alive`, `messages`, `tools`, `output`,
+`options`, or `stream`. The user chooses the decision provider and model;
+implementations may offer different defaults from chat.
+
+- `state` must be a non-whitespace string, a plain JSON object, or an array.
+  Nested JSON values may include strings, booleans, null, and finite numbers.
+  Empty objects and arrays are valid state; top-level null, numbers, and booleans
+  are not. Reject cycles, undefined values, sparse arrays, non-finite numbers,
+  functions, symbols, BigInts, binary objects, and custom objects such as
+  `Date`, `Map`, or instances with custom serialization. Do not silently coerce
+  or drop non-JSON values. Shared references without cycles are allowed.
+- `questions` must be a plain object with 1–64 own entries. Every id must be a
+  non-whitespace string; preserve ids exactly in `done.answers`. Each question
+  has `type` and non-whitespace string `instructions`, plus `criteria` as below.
+  Ids correlate answers; put the actual question in `instructions`.
+- All questions are evaluated against the same state independently. An answer
+  cannot refer to another answer in the same request. Applications make a later
+  request when a decision depends on an earlier result.
+- The UTF-8 encoding of `JSON.stringify({ state, questions })` must not exceed
+  **63 KiB (64,512 bytes)**. This excludes `method`, `signal`, and provider-added
+  fields. Reject deeper than **64 levels**, counting this wrapper as depth 0
+  and each object-property or array-element descent as one level, including
+  primitive leaves. These are API envelope limits, not a guarantee that every
+  selected model has enough context for the maximum input.
+- On first iteration, validate and snapshot `state` and `questions` before
+  approval or provider I/O. Later page mutations must not alter the approved
+  request. `signal` remains a cancellation handle and is never serialized.
+  Do not truncate input to fit a route's limits. URLs or image-like strings
+  inside state are ordinary data; the implementation must not fetch them or
+  interpret them as media attachments.
+
+| Question type | `criteria` | Answer |
+| --- | --- | --- |
+| `noul` | Optional object with only `"true"` and/or `"false"` string descriptions; either may be omitted | `{ type: "noul", noul }`, where `noul` is the probability of yes in `[0, 1]` |
+| `choice` | Object with 2–26 non-whitespace option keys and string or null descriptions; null means the key needs no extra description | `{ type: "choice", choice, probabilities, confidence }` |
+| `score` | Array of 2–10 string level descriptions, ordered from index 0 | `{ type: "score", score, legend, probabilities, confidence }` |
+
+This draft deliberately bounds the portable envelope to string instructions
+and descriptions. Structured instructions/criteria, media attachments, and
+additional primitives supported by some native APIs are outside this envelope.
+
+#### Decision answers and stream
+
+A successful stream is exactly **`accepted` → `done`**. There are no text,
+reasoning, audio, or partial-answer deltas. `done` contains a non-whitespace
+`model`, `answers`, and optional `usage`; it has no chat `message`, `transcript`,
+or synthesis `audio` payload. `usage` uses `inputTokens` / `outputTokens` when
+reported, each a nonnegative safe integer; omit unreported usage, never invent it.
+
+`answers` must contain exactly one own entry for every requested id and no
+extra ids. Each answer's type must match its question, except that any question
+may instead return **`{ type: "refusal" }`**. A refusal is an explicit provider
+refusal for that question, not a missing answer, numeric zero, low confidence,
+or permission denial. It carries no probability/choice/score fields. Other
+questions can still succeed, and even an all-refusal result is a completed
+request. Applications must check `answer.type` before reading answer fields.
+
+For non-refused answers:
+
+- Every probability and `confidence` must be finite and in `[0, 1]`.
+  Noul has no separate confidence or distribution: near 0.5 means uncertainty
+  about yes/no, rather than medium intensity.
+- Choice `probabilities` must have exactly the requested option keys. `choice`
+  must be one of the highest-probability keys; any tied maximum is valid.
+- Score `legend` and `probabilities` must have exactly the zero-based decimal
+  string indices `"0"` through `String(criteria.length - 1)`. Each legend value
+  must equal the corresponding requested description. `score` is a finite
+  probability-weighted level index in `[0, criteria.length - 1]`, possibly
+  fractional. Its difference from `sum(index * probability) / sum(probability)`
+  must be at most **0.02** to allow rounding.
+- Choice and score distributions must sum to 1 within an absolute tolerance
+  of **0.02**. Preserve provider probabilities; do not silently renormalize a
+  malformed distribution. `confidence` summarizes concentration in that
+  distribution; its formula is provider-defined in this draft. It is not a
+  guarantee of correctness or a permission to act, and thresholds need
+  evaluation for the application's data and selected model.
+
+Implementations must validate the complete upstream result before yielding
+`done`. Missing, extra, wrong-type, out-of-range, or inconsistent answers are
+`provider_error`; do not expose a partial successful result or turn malformed
+answers into refusals. Native wire shapes may be mapped (for example a boolean
+predicate to `noul`, or ordered levels to zero-based score indices), but do not
+emulate typed decisions by prompting a chat model and parsing generated text or
+inventing probabilities. If the selected route cannot honor a well-formed
+request, fail with `unavailable` and yield no `done`.
+
+The normal cancellation rules apply during permission and provider work.
+Aborting throws `aborted`, cancels in-flight provider work, and yields no
+`done`. Stopping iteration must release resources and cancel unfinished work.
+
+#### Decision permission
+
+Decisions require a separate origin-and-method grant. A chat or speech grant
+does not authorize `decide`; a decision grant does not authorize those methods.
+A persistent grant binds the approved decision provider and model. Changing
+that route requires fresh approval; changing global defaults must not rewrite
+saved grants. Blocking an origin continues to block every method.
+
+Approval must identify the decision operation, provider/model, and question
+ids/types. A state or question-content preview is optional and may be
+truncated, but the selected provider receives the complete bounded request.
+No request content may reach a provider before permission resolves. Result
+values never authorize the implementation to execute application actions;
+application code owns how to use the answers.
+
+```js
+if (!window.inference?.getFeatures?.().methods?.decide) {
+  throw new Error("This IPA implementation does not support typed decisions.");
+}
+const controller = new AbortController();
+try {
+  for await (const chunk of window.inference.request({
+    method: "decide",
+    state: { ticket: "My checkout page is blank after Pay." },
+    questions: {
+      is_bug: { type: "noul", instructions: "Is this a software defect?" },
+      team: {
+        type: "choice",
+        instructions: "Which team should handle this ticket?",
+        criteria: { billing: "Payments and refunds", technical: "Bugs and integrations", other: null },
+      },
+      urgency: {
+        type: "score",
+        instructions: "How urgent is the customer's problem?",
+        criteria: ["Routine", "Should be fixed soon", "Blocking revenue right now"],
+      },
+    },
+    signal: controller.signal,
+  })) {
+    if (chunk.type === "accepted") console.log("accepted");
+    if (chunk.type === "done") {
+      for (const [id, answer] of Object.entries(chunk.answers)) {
+        if (answer.type === "refusal") console.log(id, "refused");
+        else console.log(id, answer);
+      }
+    }
+  }
+} catch (error) {
+  console.log(error.code); // permission_denied, invalid_request, unavailable, provider_error, aborted
+}
+// From a cancel control while awaiting permission/provider: controller.abort().
+```
+
+The shared [decision conformance assertions](./packages/ipa-tools/test/conformance/decisions.mjs)
+check successful stream order and answer invariants. Mock fixtures verify the
+contract; they do not certify live provider availability or model accuracy.
+
 ### Bounded speech
 
 Transcription and synthesis are optional variants of the same `request` function.
@@ -810,8 +1038,8 @@ provide a stable site identity for grants or blocks.
 
 A persistent allow grant records the provider and model chosen at approval time,
 scoped by origin and method (and voice for synthesis); later requests reuse that
-approved route. Existing grants migrate as chat-only and authorize neither speech
-method. Changing the approved route requires fresh approval. Blocking an origin
+approved route. Existing grants migrate as chat-only and authorize neither decisions
+nor speech. Changing the approved route requires fresh approval. Blocking an origin
 blocks every method. Changing a global
 default provider or model does not rewrite existing origin grants.
 Implementations must validate requests and must not expose API keys or provider
@@ -841,8 +1069,9 @@ Image parts in `messages` and `output.images` are each distinct from chat, funct
 - Streaming partial images (`image_delta`)
 - Size / quality / aspect-ratio enums (later `options` keys, ignore-if-unsupported)
 - Embeddings
+- Decision media attachments, structured instructions/criteria, additional question types, partial answers, and page-selected decision routes or generation controls
 - Live/unbounded audio, realtime or duplex speech sessions, and conversational audio understanding through chat
-- Translation, timestamps, segments, confidence, diarization, and transcript replacement
+- Transcription translation, timestamps, segments, confidence, diarization, and transcript replacement
 - Synthesis formats other than MP3, page-selected model/voice IDs, voice cloning, custom voice enrollment, and speaking-rate/style controls
 - Video understanding, frame inspection, OCR, or subtitle extraction through transcription
 - Image generation as a page-facing `{ type: "image_generation" }` tool (content parts + `output.images` is the canonical surface)
