@@ -38,6 +38,12 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 
 The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces. Bounded transcription and MP3 synthesis are optional spec methods; Inference Bridge [v0.17.0](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0) exposes them on stable `request`/`getFeatures`. Detect method support before use; see [speech examples](./examples/speech/README.md).
 
+[Typed decisions (System One)](./SPEC.md#typed-decisions-system-one) are now an
+optional spec method: `request({ method: "decide", state, questions })`, gated by
+`getFeatures().methods?.decide`. Inference Bridge currently exposes decisions
+through its experimental namespace; graduation to stable `request` is separate.
+Do not assume spec support means an installed injector has shipped the method.
+
 ## Motivation
 
 Today, every AI-powered web application has to reinvent the same infrastructure:
@@ -113,17 +119,18 @@ const features = window.inference.getFeatures?.() ?? {};
 | [Hosted web search](./SPEC.md#hosted-web-search) | `features.webSearch` | `tools: [{ type: "web_search" }]`; the injector or provider executes search |
 | [Image input](./SPEC.md#images) | `features.imageInput` | Image parts in user or assistant messages |
 | [Image output](./SPEC.md#images) | `features.imageOutput` | `output: { images: true }`; image parts appear on `done.message.content` |
+| [Typed decisions](./SPEC.md#typed-decisions-system-one) | `features.methods?.decide` | `method: "decide"` with JSON `state` and named `noul` / `choice` / `score` questions; `accepted` then `done.answers`, including per-question refusals |
 | [Transcription](./SPEC.md#bounded-speech) | `features.methods?.transcribe?.acceptedMedia` | `method: "transcribe"` with completed `media`; text on `done.transcript` |
 | [MP3 synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 bytes in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls playback.
+Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised decision or speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls playback.
 
 ### Permissions
 
 The injector obtains permission for the calling origin before sending content to a provider. The user chooses the provider and model. Remembered grants bind that route to the origin and method (plus voice for synthesis); changing a global default does not rewrite existing grants. A remembered denial blocks the origin.
 
-Function tools, hosted search, image input/output, and speech require their own approval; a plain chat grant does not cover them. The approval UI must identify offered tools and capabilities, but a request preview is optional. Applications should disclose what page tools may send before the first request because later tool results can be sent without another preview.
+Function tools, hosted search, image input/output, typed decisions, and speech require their own approval; a plain chat grant does not cover them. The approval UI must identify offered tools and capabilities, but a request preview is optional. Decision approval identifies question ids/types. Applications should disclose what page tools may send before the first request because later tool results can be sent without another preview.
 
 An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
 
@@ -213,7 +220,7 @@ Some topics that still need community discussion:
 - Should `getFeatures` add a nested object later (for example for MCP), or stay one key per capability as with `toolCalling` and `webSearch`?
 - Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?
 - Should tool calls stream as their own chunk type, or stay on `done.message.toolCalls` only?
-- Should structured outputs (e.g. JSON Schema / `responseFormat`) be part of IPA, or left to prompt engineering until providers converge?
+- Should arbitrary structured chat outputs (e.g. JSON Schema / `responseFormat`, beyond typed decisions) be part of IPA, or left to prompt engineering until providers converge?
 - How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
 - Should applications be encouraged or required to round-trip `message.reasoning` on later turns for providers that benefit from it?
 

@@ -47,6 +47,7 @@ export function assertRequestMethod(
   features: InferenceFeatures
 ): void {
   if (request.method === "chat") return;
+  if (request.method === "decide" && features.methods?.decide === true) return;
   if (request.method === "transcribe") {
     if (supportsTranscription(features, transcriptionMediaType(request))) return;
     throw makeInferenceError("invalid_request", "Transcription or its media type is not advertised.");

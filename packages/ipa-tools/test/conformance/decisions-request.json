@@ -1,0 +1,17 @@
+{
+  "method": "decide",
+  "state": { "ticket": "My checkout page is blank after Pay." },
+  "questions": {
+    "is_bug": { "type": "noul", "instructions": "Is this a software defect?" },
+    "team": {
+      "type": "choice",
+      "instructions": "Which team should handle this ticket?",
+      "criteria": { "billing": "Payments and refunds", "technical": "Bugs and integrations", "other": null }
+    },
+    "urgency": {
+      "type": "score",
+      "instructions": "How urgent is the customer's problem?",
+      "criteria": ["Routine", "Should be fixed soon", "Blocking revenue right now"]
+    }
+  }
+}

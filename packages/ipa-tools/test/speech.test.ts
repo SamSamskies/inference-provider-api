@@ -2,16 +2,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInference } from "../src/create-inference.js";
 import { complete } from "../src/complete.js";
 import { makeInferenceError } from "../src/errors.js";
-import type { Inference, InferenceBackend, InferenceChunk, InferenceFeatures,
+import type { DecideRequest, Inference, InferenceBackend, InferenceChunk, InferenceFeatures,
   InferenceRequest, SynthesizeRequest, TranscribeRequest } from "../src/types.js";
 
 const transcription: TranscribeRequest = {
   method: "transcribe", media: { data: new Blob(["recording"], { type: "audio/wav" }) },
 };
 const synthesis: SynthesizeRequest = { method: "synthesize", text: "Hello" };
+const decision: DecideRequest = {
+  method: "decide", state: { ticket: "Checkout is broken" },
+  questions: { is_bug: { type: "noul", instructions: "Is this a software defect?" } },
+};
 const chat = { method: "chat" as const, messages: [{ role: "user" as const, content: "Hello" }] };
 const features: InferenceFeatures = { methods: {
-  transcribe: { acceptedMedia: [{ mediaType: "audio/wav" }] }, synthesize: true,
+  decide: true, transcribe: { acceptedMedia: [{ mediaType: "audio/wav" }] }, synthesize: true,
 } };
 
 async function collect(stream: AsyncIterable<unknown>) {
@@ -27,7 +31,9 @@ function fakeInference(snapshot: InferenceFeatures = features, request = vi.fn()
       request(input);
       return (async function* (): AsyncIterable<InferenceChunk> {
         yield { type: "accepted" };
-        if (input.method === "transcribe") {
+        if (input.method === "decide") {
+          yield { type: "done", model: "test", answers: { is_bug: { type: "noul", noul: 0.95 } } };
+        } else if (input.method === "transcribe") {
           yield { type: "done", model: "test", transcript: { text: "Hello" } };
         } else if (input.method === "synthesize") {
           yield { type: "audio_delta", mediaType: "audio/mpeg", data: new Uint8Array([1, 2, 3]) };
@@ -54,7 +60,7 @@ function backend(snapshot?: InferenceFeatures, instance = fakeInference(snapshot
 afterEach(() => vi.unstubAllGlobals());
 
 describe("method-aware request routing", () => {
-  it.each([transcription, synthesis])("lazily routes $method to the advertised backend", async (request) => {
+  it.each([transcription, synthesis, decision])("lazily routes $method to the advertised backend", async (request) => {
     const { route, create, probe } = backend(features);
     const stream = createInference({ fallbacks: [route] }).request(request);
     expect(create).not.toHaveBeenCalled();
@@ -66,11 +72,12 @@ describe("method-aware request routing", () => {
   });
 
   it.each([undefined, {}, { methods: {} }, { methods: { synthesize: false } }])(
-    "skips backends without advertised speech before create: %j", async (snapshot) => {
+    "skips backends without advertised optional methods before create: %j", async (snapshot) => {
       const { route, create } = backend(snapshot);
       const client = createInference({ fallbacks: [route] });
       await expect(collect(client.request(synthesis))).rejects.toMatchObject({ code: "invalid_request" });
       await expect(collect(client.request(transcription))).rejects.toMatchObject({ code: "invalid_request" });
+      await expect(collect(client.request(decision))).rejects.toMatchObject({ code: "invalid_request" });
       expect(create).not.toHaveBeenCalled();
     },
   );
@@ -105,40 +112,40 @@ describe("method-aware request routing", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("keeps IPA first and rejects an unadvertised method without trying a fallback", async () => {
+  it.each([synthesis, decision])("keeps IPA first and rejects unadvertised $method without trying a fallback", async (input) => {
     const request = vi.fn();
     vi.stubGlobal("window", { inference: fakeInference({}, request) });
     const { route, create } = backend(features);
-    await expect(collect(createInference({ fallbacks: [route] }).request(synthesis)))
+    await expect(collect(createInference({ fallbacks: [route] }).request(input)))
       .rejects.toMatchObject({ code: "invalid_request" });
     expect(create).not.toHaveBeenCalled();
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("does not recreate a cached chat-only backend for speech", async () => {
+  it.each([synthesis, decision])("does not recreate a cached chat-only backend for $method", async (input) => {
     const { route, create } = backend({}, fakeInference({}));
     const client = createInference({ fallbacks: [route] });
     await client.complete(chat);
-    await expect(collect(client.request(synthesis))).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(collect(client.request(input))).rejects.toMatchObject({ code: "invalid_request" });
     await client.complete(chat);
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it("rechecks features on the created backend and avoids calling an incompatible request", async () => {
+  it.each([synthesis, decision])("rechecks $method on the created backend and avoids calling an incompatible request", async (input) => {
     const request = vi.fn();
     const { route } = backend(features, fakeInference({}, request));
-    await expect(collect(createInference({ fallbacks: [route] }).request(synthesis)))
+    await expect(collect(createInference({ fallbacks: [route] }).request(input)))
       .rejects.toMatchObject({ code: "invalid_request" });
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("does not let concurrent incompatible speech suppress a valid chat request", async () => {
+  it.each([synthesis, decision])("does not let concurrent incompatible $method suppress a valid chat request", async (input) => {
     const { route, create } = backend({});
     const client = createInference({ fallbacks: [route] });
-    const [speech, text] = await Promise.allSettled([
-      collect(client.request(synthesis)), client.complete(chat),
+    const [optional, text] = await Promise.allSettled([
+      collect(client.request(input)), client.complete(chat),
     ]);
-    expect(speech.status).toBe("rejected");
+    expect(optional.status).toBe("rejected");
     expect(text.status).toBe("fulfilled");
     expect(create).toHaveBeenCalledTimes(1);
   });
@@ -154,28 +161,29 @@ describe("method-aware request routing", () => {
     expect(wav.status).toBe("fulfilled");
   });
 
-  it.each(["permission_denied", "unavailable", "provider_error", "aborted"] as const)(
-    "propagates %s from the selected route without fallback", async (code) => {
+  it.each((["permission_denied", "unavailable", "provider_error", "aborted"] as const)
+    .flatMap((code) => [synthesis, decision].map((input) => ({ code, input }))))(
+    "propagates $code for $input.method from the selected route without fallback", async ({ code, input }) => {
       const error = makeInferenceError(code, "route failed");
       vi.stubGlobal("window", { inference: {
         getFeatures: () => features,
         request: async function* () { throw error; },
       } });
       const { route, create } = backend(features);
-      await expect(collect(createInference({ fallbacks: [route] }).request(synthesis))).rejects.toBe(error);
+      await expect(collect(createInference({ fallbacks: [route] }).request(input))).rejects.toBe(error);
       expect(create).not.toHaveBeenCalled();
     },
   );
 
-  it("aborts before resolution without creating a backend", async () => {
+  it.each([synthesis, decision])("aborts $method before resolution without creating a backend", async (input) => {
     const { route, create } = backend(features);
     const client = createInference({ fallbacks: [route] });
-    await expect(collect(client.request({ ...synthesis, signal: AbortSignal.abort() })))
+    await expect(collect(client.request({ ...input, signal: AbortSignal.abort() })))
       .rejects.toMatchObject({ code: "aborted" });
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("propagates abort after accepted with no done and closes the delegate", async () => {
+  it.each([synthesis, decision])("propagates $method abort after accepted with no done and closes the delegate", async (input) => {
     const controller = new AbortController();
     const closed = vi.fn();
     vi.stubGlobal("window", { inference: {
@@ -187,18 +195,38 @@ describe("method-aware request routing", () => {
         } finally { closed(); }
       },
     } });
-    const iterator = createInference().request({ ...synthesis, signal: controller.signal })[Symbol.asyncIterator]();
+    const iterator = createInference().request({ ...input, signal: controller.signal })[Symbol.asyncIterator]();
     expect((await iterator.next()).value).toEqual({ type: "accepted" });
     controller.abort();
     await expect(iterator.next()).rejects.toMatchObject({ code: "aborted" });
     expect(closed).toHaveBeenCalledOnce();
   });
 
-  it("rejects unknown methods and speech passed to complete before provider work", async () => {
+  it("rejects unknown methods and non-chat passed to complete before provider work", async () => {
     const { route, create } = backend(features);
     const client = createInference({ fallbacks: [route] });
     await expect(collect(client.request({ method: "speak" } as never))).rejects.toMatchObject({ code: "invalid_request" });
     await expect(complete(synthesis as never)).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(complete(decision as never)).rejects.toMatchObject({ code: "invalid_request" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("passes decision state/questions/signal unchanged to IPA with chat-only capability flags absent", async () => {
+    const request = vi.fn();
+    vi.stubGlobal("window", { inference: fakeInference({ methods: { decide: true } }, request) });
+    const input = { ...decision, signal: new AbortController().signal };
+    const chunks = await collect(createInference().request(input));
+    expect(request).toHaveBeenCalledExactlyOnceWith(input);
+    expect(chunks).toEqual([
+      { type: "accepted" },
+      { type: "done", model: "test", answers: { is_bug: { type: "noul", noul: 0.95 } } },
+    ]);
+  });
+
+  it("treats false decide as unsupported even when other methods are advertised", async () => {
+    const { route, create } = backend({ ...features, methods: { ...features.methods, decide: false } });
+    await expect(collect(createInference({ fallbacks: [route] }).request(decision)))
+      .rejects.toMatchObject({ code: "invalid_request", message: "No configured backend supports typed decisions." });
     expect(create).not.toHaveBeenCalled();
   });
 });

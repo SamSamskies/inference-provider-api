@@ -125,7 +125,7 @@ function requestWithResolver<R extends InferenceRequest>(
 
   return {
     async *[Symbol.asyncIterator]() {
-      if (!["chat", "transcribe", "synthesize"].includes(request.method)) {
+      if (!["chat", "decide", "transcribe", "synthesize"].includes(request.method)) {
         throw makeInferenceError("invalid_request", `Unknown method "${request.method}".`);
       }
       const inference = await resolver.resolve({

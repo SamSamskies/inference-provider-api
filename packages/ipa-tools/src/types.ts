@@ -53,6 +53,44 @@ export type ChatRequest = {
   signal?: AbortSignal;
 };
 
+/** Finite JSON values only; no cycles, sparse arrays, binary, or custom objects. */
+export type DecisionJsonValue =
+  | null | boolean | number | string
+  | DecisionJsonValue[]
+  | { [key: string]: DecisionJsonValue };
+
+export type DecisionState = string | DecisionJsonValue[] | { [key: string]: DecisionJsonValue };
+
+export type NoulQuestion = {
+  type: "noul";
+  instructions: string;
+  criteria?: { true?: string; false?: string };
+};
+
+export type ChoiceQuestion = {
+  type: "choice";
+  instructions: string;
+  /** 2–26 named choices; null means the key needs no further description. */
+  criteria: Record<string, string | null>;
+};
+
+export type ScoreQuestion = {
+  type: "score";
+  instructions: string;
+  /** 2–10 ordered descriptions, indexed from zero. */
+  criteria: string[];
+};
+
+export type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
+
+export type DecideRequest = {
+  method: "decide";
+  state: DecisionState;
+  /** 1–64 questions over the same state; no dependencies between answers. */
+  questions: Record<string, DecisionQuestion>;
+  signal?: AbortSignal;
+};
+
 /** Exactly one page-owned source. String data is raw base64, never a data URL. */
 export type TranscriptionMediaSource =
   | { mediaType: string; data: string; url?: never }
@@ -74,7 +112,7 @@ export type SynthesizeRequest = {
   signal?: AbortSignal;
 };
 
-export type InferenceRequest = ChatRequest | TranscribeRequest | SynthesizeRequest;
+export type InferenceRequest = ChatRequest | DecideRequest | TranscribeRequest | SynthesizeRequest;
 export type InferenceMethod = InferenceRequest["method"];
 
 export type InferenceOptions = {
@@ -126,6 +164,27 @@ export type ChatChunk =
   | { type: "delta"; content: string }
   | { type: "done"; model: string; message: Message; usage?: Usage };
 
+export type NoulAnswer = { type: "noul"; noul: number };
+export type ChoiceAnswer = {
+  type: "choice";
+  choice: string;
+  probabilities: Record<string, number>;
+  confidence: number;
+};
+export type ScoreAnswer = {
+  type: "score";
+  score: number;
+  legend: Record<string, string>;
+  probabilities: Record<string, number>;
+  confidence: number;
+};
+export type RefusalAnswer = { type: "refusal" };
+export type DecisionAnswer = NoulAnswer | ChoiceAnswer | ScoreAnswer | RefusalAnswer;
+
+export type DecisionChunk =
+  | { type: "accepted" }
+  | { type: "done"; model: string; answers: Record<string, DecisionAnswer>; usage?: Usage };
+
 export type TranscriptionUsage = { inputSeconds?: number };
 export type SynthesisUsage = {
   inputCharacters?: number;
@@ -152,17 +211,19 @@ export type SynthesisChunk =
       usage?: SynthesisUsage;
     };
 
-export type InferenceChunk = ChatChunk | TranscriptionChunk | SynthesisChunk;
+export type InferenceChunk = ChatChunk | DecisionChunk | TranscriptionChunk | SynthesisChunk;
 
 /** Distributes over request unions while preserving concrete method inference. */
 export type InferenceChunkFor<R extends InferenceRequest> =
   R extends ChatRequest ? ChatChunk :
+  R extends DecideRequest ? DecisionChunk :
   R extends TranscribeRequest ? TranscriptionChunk :
   R extends SynthesizeRequest ? SynthesisChunk : never;
 
 export type InferenceDoneFor<R extends InferenceRequest> =
   Extract<InferenceChunkFor<R>, { type: "done" }>;
 export type ChatDoneChunk = InferenceDoneFor<ChatRequest>;
+export type DecisionDoneChunk = InferenceDoneFor<DecideRequest>;
 export type TranscriptionDoneChunk = InferenceDoneFor<TranscribeRequest>;
 export type SynthesisDoneChunk = InferenceDoneFor<SynthesizeRequest>;
 
@@ -174,8 +235,9 @@ export type TranscriptionInputConstraint = {
 };
 
 export type InferenceFeatures = {
-  /** Chat is required. Absent speech methods mean unsupported. */
+  /** Chat is required. Absent or false optional methods mean unsupported. */
   methods?: {
+    decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
     synthesize?: boolean;
   };

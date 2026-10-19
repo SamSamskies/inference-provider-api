@@ -32,9 +32,9 @@ export type InferenceBackend = {
   }): Promise<Inference>;
   /**
    * Optional feature snapshot used to skip `create()` when the call needs
-   * tools, search, images, or a speech method/MIME type that this backend
-   * does not advertise (avoids download / session side effects). Speech
-   * requires an explicit snapshot before create().
+   * tools, search, images, or an optional method/MIME type that this backend
+   * does not advertise (avoids download / session side effects). Optional
+   * methods require an explicit snapshot before create().
    */
   getFeatures?(): InferenceFeatures;
 };
@@ -184,6 +184,9 @@ function featuresSupportNeeded(
   features: InferenceFeatures,
   needs: CapabilityNeeds
 ): boolean {
+  if (needs.method === "decide" && features.methods?.decide !== true) {
+    return false;
+  }
   if (needs.method === "transcribe" && !supportsTranscription(features, needs.mediaType)) {
     return false;
   }
@@ -214,6 +217,7 @@ function backendSupportsNeeded(
 
 function capabilitySkipMessage(needs: CapabilityNeeds): string {
   const labels: string[] = [];
+  if (needs.method === "decide") labels.push("typed decisions");
   if (needs.method === "transcribe") {
     labels.push(`transcription${needs.mediaType ? ` of ${needs.mediaType}` : ""}`);
   }
