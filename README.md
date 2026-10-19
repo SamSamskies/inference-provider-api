@@ -221,7 +221,7 @@ Some topics that still need community discussion:
 
 This proposal is intentionally in an early draft stage.
 
-For package development, use Node.js 22 (22.12 or later), 24, or 26+ and npm. From the repository root, run `npm ci`, then `npm test` to build both packages and run their tests and TypeScript checks. CI exercises Node.js 22.12, 24, and 26.
+For package development, use Node.js 22 (22.12 or later), 24, or 26+ and npm. From the repository root, run `npm ci`, then `npm test` to build both packages and run their tests and TypeScript checks.
 
 The goal is to collaboratively design an open browser standard for provider-agnostic inference—not a specific implementation.
 
