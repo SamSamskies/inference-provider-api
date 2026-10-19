@@ -16,11 +16,11 @@ Zero runtime dependencies. Browser ESM only (no Node APIs).
 
 ### CDN / no bundler
 
-Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@1.0.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
+Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@2.0.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
 
 ```html
 <script type="module">
-  import { complete, runTools } from "https://esm.sh/ipa-tools@1.0.0";
+  import { complete, runTools } from "https://esm.sh/ipa-tools@2.0.0";
 
   const { message } = await complete({
     method: "chat",
@@ -36,7 +36,7 @@ Import map equivalent:
 <script type="importmap">
   {
     "imports": {
-      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@1.0.0/+esm"
+      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@2.0.0/+esm"
     }
   }
 </script>
@@ -56,6 +56,15 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 ```
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
+
+### Migrating to 2.0.0
+
+`InferenceRequest` / `InferenceMethod` now include `decide`, and `InferenceChunk`
+includes `done.answers`. Add a decision branch to exhaustive method/result
+handlers; the union example below shows how. Custom `Inference` implementations
+must reject unadvertised methods with `invalid_request` before yielding.
+Concrete chat/speech requests still infer their existing results. Chat-specific
+aliases, `DoneChunk`, `complete()`, and `runTools()` keep their contracts.
 
 ### Method-specific streams
 
@@ -89,8 +98,7 @@ for await (const chunk of client.request({ method: "synthesize", text: "Hello" }
 `SynthesisDoneChunk`. `TranscriptionMediaSource` and
 `TranscriptionInputConstraint` describe sources and discovery constraints.
 
-**Unreleased:** the source also supports `DecideRequest`, `DecisionChunk`, and
-`DecisionDoneChunk`. Decision types and routing are not yet in published 1.0.0.
+`DecideRequest` yields `DecisionChunk`, ending in `DecisionDoneChunk`.
 `DecisionState` / `DecisionJsonValue`, `DecisionQuestion` (`NoulQuestion`,
 `ChoiceQuestion`, `ScoreQuestion`), and `DecisionAnswer` (`NoulAnswer`,
 `ChoiceAnswer`, `ScoreAnswer`, `RefusalAnswer`) describe the bounded contract.
@@ -101,8 +109,7 @@ separately from chat or speech. Iterate `request({ method: "decide", state,
 questions })` for `accepted` then `done.answers`; there are no deltas. Check
 each answer's `type` for refusal before consuming probabilities or values.
 See the spec's [decision example and validation rules](../../SPEC.md#typed-decisions-system-one).
-Inference Bridge's stable API has not yet graduated decisions; its experimental
-namespace is not a substitute for advertised stable support.
+An injector's experimental decision namespace does not advertise stable support.
 
 For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
 `InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk
@@ -114,7 +121,7 @@ async function display(ipa: Inference, request: InferenceRequest) {
   for await (const chunk of ipa.request(request)) {
     if (chunk.type !== "done") continue;
     if ("message" in chunk) console.log(chunk.message.content);
-    else if ("answers" in chunk) console.log(chunk.answers); // unreleased decision types
+    else if ("answers" in chunk) console.log(chunk.answers);
     else if ("transcript" in chunk) console.log(chunk.transcript.text);
     else console.log(chunk.audio.byteLength);
   }
