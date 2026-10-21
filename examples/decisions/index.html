@@ -15,7 +15,6 @@
         --surface: #f3f6f3;
         --paper: #fafcf9;
         --accent: #0d7a5f;
-        --review: #87500d;
         --danger: #a61e1e;
         --font: "IBM Plex Sans", system-ui, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -24,7 +23,7 @@
       [hidden] { display: none !important; }
       body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); line-height: 1.5; }
       .shell { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
-      header, .header-meta, .actions, .result-heading, .threshold-label { display: flex; align-items: center; gap: 0.75rem; }
+      header, .header-meta, .actions { display: flex; align-items: center; gap: 0.75rem; }
       header { align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; }
       .brand { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: -0.02em; }
       .brand span { margin-left: 0.4rem; color: var(--muted); font-size: 0.85rem; font-weight: 400; }
@@ -62,10 +61,6 @@
       .status { min-height: 1.5rem; margin: 0.9rem 0 0; font-size: 0.85rem; color: var(--muted); }
       .error { margin: 0.4rem 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
       .privacy { margin: 1.25rem 0 0; color: var(--muted); font-size: 0.8rem; }
-      .result-heading { justify-content: space-between; flex-wrap: wrap; margin-bottom: 1.25rem; }
-      .result-heading h2 { margin: 0; }
-      .review-flag { padding: 0.2rem 0.55rem; border-radius: 4px; background: #d8efe6; color: var(--accent); font-size: 0.75rem; font-weight: 500; }
-      .review-flag[data-review="true"] { background: #fff0d9; color: var(--review); }
       .empty { padding: 2rem 0 2.5rem; color: var(--muted); max-width: 25rem; }
       .empty svg { display: block; width: 3rem; height: 3rem; margin-bottom: 1rem; color: var(--line); }
       .judgment + .judgment { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
@@ -86,12 +81,6 @@
       #urgency-meter::-moz-meter-bar { background: var(--accent); }
       .scale-labels { display: flex; justify-content: space-between; margin-top: 0.35rem; gap: 0.5rem; color: var(--muted); font-size: 0.75rem; }
       .metadata { margin: 0.6rem 0 0; overflow-wrap: anywhere; }
-      .rule { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
-      .threshold-label { justify-content: space-between; }
-      .threshold-label label { margin: 0; }
-      output { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-      input[type="range"] { width: 100%; margin: 0.75rem 0 0; accent-color: var(--accent); }
-      #review-reason { margin: 0.75rem 0 0; font-size: 0.85rem; }
       .developer { margin-top: 1.5rem; }
       details { border-top: 1px solid var(--line); padding: 0.85rem 0; }
       summary { cursor: pointer; font-size: 0.85rem; font-weight: 500; }
@@ -161,10 +150,7 @@
           <p class="privacy">The message and questions are sent to the provider you approve in your extension.</p>
         </section>
         <section class="panel" id="results-panel" aria-labelledby="results-heading" aria-busy="false">
-          <div class="result-heading">
-            <h2 id="results-heading">Triage results</h2>
-            <span class="review-flag" id="review-flag" hidden></span>
-          </div>
+          <h2 id="results-heading">Triage results</h2>
           <div class="empty" id="empty-result">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="9" width="34" height="30" rx="4" /><path d="M7 27h10l4 5h6l4-5h10M15 17h18M15 22h11" /></svg>
             Analyze a message to see its category, urgency, and reply probability here.
@@ -193,15 +179,6 @@
             </section>
             <p class="metadata" id="result-meta"></p>
           </div>
-          <div class="rule">
-            <div class="threshold-label">
-              <label for="threshold">Review threshold</label>
-              <output id="threshold-value" for="threshold">60%</output>
-            </div>
-            <input id="threshold" type="range" min="0" max="100" step="5" value="60" aria-describedby="threshold-hint" />
-            <p class="hint" id="threshold-hint">Flag category or urgency confidence below 60% for review. Refused answers always need review.</p>
-            <p id="review-reason" role="status" aria-live="polite">Adjusting this rule uses the existing answers, without another model request.</p>
-          </div>
         </section>
       </div>
       <div class="developer">
@@ -220,7 +197,6 @@
       const el = (id) => document.getElementById(id);
       const message = el("message");
       const sample = el("sample");
-      const threshold = el("threshold");
       const samples = {
         outage: message.value,
         billing: "I was charged twice for order A-104 yesterday. Both charges are for $49 and have cleared my bank. Could you refund the duplicate and send me a confirmation?",
@@ -258,7 +234,6 @@
       const percent = (value) => `${Math.round(value * 100)}%`;
       let supported = false;
       let controller = null;
-      let result = null;
       let discoveryTimer;
 
       function buildRequest() {
@@ -296,34 +271,11 @@
       }
 
       function clearResult() {
-        result = null;
         el("results").hidden = true;
         el("empty-result").hidden = false;
-        el("review-flag").hidden = true;
         el("result-json").textContent = "No completed result yet.";
         el("request-error").textContent = "";
         el("request-error").hidden = true;
-        updateReview();
-      }
-
-      function updateReview() {
-        const cutoff = Number(threshold.value) / 100;
-        el("threshold-value").value = percent(cutoff);
-        el("threshold-hint").textContent = `Flag category or urgency confidence below ${percent(cutoff)} for review. Refused answers always need review.`;
-        if (!result) {
-          el("review-reason").textContent = "Adjusting this rule uses the existing answers, without another model request.";
-          return;
-        }
-        const names = { category: "Category", urgency: "Urgency", reply_needed: "Reply needed" };
-        const reasons = Object.entries(result.answers).flatMap(([id, answer]) => {
-          if (answer.type === "refusal") return [`${names[id]} was refused`];
-          if (answer.type !== "noul" && answer.confidence < cutoff) return [`${names[id]} confidence is ${percent(answer.confidence)}`];
-          return [];
-        });
-        el("review-flag").hidden = false;
-        el("review-flag").dataset.review = String(Boolean(reasons.length));
-        el("review-flag").textContent = reasons.length ? "Needs review" : "No review flag";
-        el("review-reason").textContent = reasons.length ? `${reasons.join("; ")}.` : "Category and urgency meet the threshold, and no answers were refused.";
       }
 
       function validateResult(done) {
@@ -352,7 +304,7 @@
         }
       }
 
-      function renderResult() {
+      function renderResult(result) {
         const { category, urgency, reply_needed: reply } = result.answers;
         el("category-answer").textContent = category.type === "refusal" ? "Refused" : labels[category.choice];
         el("category-distribution").replaceChildren();
@@ -391,7 +343,6 @@
         el("result-json").textContent = JSON.stringify(result, null, 2);
         el("results").hidden = false;
         el("empty-result").hidden = true;
-        updateReview();
       }
 
       async function analyze(event) {
@@ -421,9 +372,8 @@
           }
           if (active.signal.aborted) throw failure("aborted", "Cancelled.");
           validateResult(done);
-          result = done;
-          renderResult();
-          el("request-status").textContent = Object.values(done.answers).some((answer) => answer.type === "refusal") ? "Analysis complete. Some answers need review." : "Analysis complete.";
+          renderResult(done);
+          el("request-status").textContent = Object.values(done.answers).some((answer) => answer.type === "refusal") ? "Analysis complete. One or more questions were refused." : "Analysis complete.";
         } catch (error) {
           clearResult();
           const code = typeof error?.code === "string" ? error.code : error?.name ?? "unknown";
@@ -454,7 +404,6 @@
 
       sample.addEventListener("change", () => { message.value = samples[sample.value]; editMessage(); });
       message.addEventListener("input", () => { sample.value = "custom"; editMessage(); });
-      threshold.addEventListener("input", updateReview);
       el("triage-form").addEventListener("submit", analyze);
       el("cancel").addEventListener("click", () => {
         controller?.abort();

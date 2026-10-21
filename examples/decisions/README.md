@@ -32,9 +32,6 @@ or loopback HTTP page, rather than a `file:` URL.
    Approve Decisions for this site when prompted. A chat grant does not cover it.
 3. Inspect the category probabilities, urgency score, and probability that a reply
    is needed. Expand **Request JSON** and **Result JSON** to inspect the contract.
-4. Move **Review threshold**. The app flags category or urgency confidence below
-   the threshold, plus any refused question. This recomputes the review flag from
-   the existing answers without another model call.
 
 The demo only labels the message; it does not send replies or route real tickets.
 Messages and questions go to the provider approved in the extension. There is no
@@ -60,13 +57,11 @@ judgments about the new text. Oversized requests are disabled using the spec's
 The urgency score is a probability-weighted position from 0 (routine) to 2
 (critical), and can be fractional. Choice and Score confidence summarize their
 distributions; they do not guarantee correctness. Noul near 0.5 means uncertainty
-about yes/no, not medium urgency. The demo's initial 60% review threshold is an
-illustration to adjust and evaluate, not a validated policy. The reply probability
-is displayed separately and is not part of the confidence-threshold rule.
+about yes/no, not medium urgency.
 Only provider-reported input/output token usage is displayed, when supplied.
 
 The three questions are independent: no answer is used as another question's
-input. Code owns the review rule. See TypeSafe's
+input. See TypeSafe's
 [primitives](https://docs.typesafe.ai/primitives) and
 [confidence guidance](https://docs.typesafe.ai/confidence) for the programming model.
 
@@ -80,12 +75,11 @@ input. Code owns the review rule. See TypeSafe's
   `done`, all three answers, the returned model, and only reported usage. Inspect
   the request: no page-selected provider/model or generation options are sent.
   Sample labels suggest scenarios rather than asserting expected model outputs.
-- Move the review threshold above and below a returned confidence. The review
-  flag should change without another request. A zero reply probability should
+- A zero reply probability should
   display as 0%, not a refusal. Near 50% should remain a probability of yes.
 - Try a per-question refusal and an all-refusal response with a test injector.
-  Both complete successfully, display refused answers without fabricated numeric
-  values, and require review at every threshold.
+  Both complete successfully and display refused answers without fabricated
+  numeric values.
 - Cancel while waiting for approval and during analysis. Expect **Cancelled. No
   completed result.** and enabled controls. Deny permission or select an
   unavailable route: expect useful guidance and no stale result.
