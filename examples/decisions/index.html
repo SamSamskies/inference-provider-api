@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Decisions — Inbox triage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #1a1f1c;
+        --muted: #5c6760;
+        --line: #d4ddd6;
+        --surface: #f3f6f3;
+        --paper: #fafcf9;
+        --accent: #0d7a5f;
+        --review: #87500d;
+        --danger: #a61e1e;
+        --font: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); line-height: 1.5; }
+      .shell { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+      header, .header-meta, .actions, .result-heading, .threshold-label { display: flex; align-items: center; gap: 0.75rem; }
+      header { justify-content: space-between; flex-wrap: wrap; margin-bottom: 2rem; }
+      .brand { margin: 0; font-size: 1.05rem; font-weight: 600; }
+      .brand span { margin-left: 0.4rem; color: var(--muted); font-size: 0.8rem; font-weight: 400; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      .header-meta { font-size: 0.8rem; flex-wrap: wrap; }
+      .header-meta a { color: var(--muted); }
+      #connection-status { padding: 0.15rem 0.55rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 0.75rem; }
+      #connection-status[data-ready="true"] { color: var(--accent); background: #d8efe6; border-color: #b7dccf; }
+      h1 { margin: 0 0 0.35rem; font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 500; letter-spacing: -0.035em; }
+      .intro { margin: 0 0 1.75rem; color: var(--muted); max-width: 45rem; }
+      .connection { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+      .connection p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.85rem; }
+      .connection .actions { flex-shrink: 0; flex-wrap: wrap; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 1.5rem; align-items: start; }
+      .panel { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 1.5rem; }
+      h2 { margin: 0 0 1.25rem; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.015em; }
+      label { display: block; margin-bottom: 0.4rem; font-size: 0.875rem; font-weight: 500; }
+      input, select, textarea, button { font: inherit; }
+      select, textarea { width: 100%; max-width: 100%; padding: 0.7rem; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--paper); }
+      select { margin-bottom: 1.25rem; font-size: 0.875rem; }
+      textarea { display: block; min-height: 15rem; resize: vertical; line-height: 1.65; font-size: 0.95rem; }
+      button, .button { display: inline-block; padding: 0.6rem 0.85rem; border: 1px solid transparent; border-radius: 6px; background: var(--ink); color: #fff; font-size: 0.85rem; font-weight: 500; text-decoration: none; cursor: pointer; }
+      button:hover:not(:disabled), .button:hover { background: #2a322e; }
+      button.secondary { background: var(--surface); border-color: var(--line); color: var(--ink); }
+      button:disabled, select:disabled, textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      .actions { flex-wrap: wrap; }
+      form > .actions { margin-top: 1.25rem; }
+      .hint, .metadata, footer { color: var(--muted); font-size: 0.8rem; }
+      .hint { margin: 0.6rem 0 0; }
+      .hint[data-invalid="true"], .error { color: var(--danger); }
+      .status { min-height: 1.5rem; margin: 0.9rem 0 0; font-size: 0.85rem; color: var(--muted); }
+      .error { margin: 0.4rem 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+      .privacy { margin: 1.25rem 0 0; color: var(--muted); font-size: 0.8rem; }
+      .result-heading { justify-content: space-between; flex-wrap: wrap; margin-bottom: 1.25rem; }
+      .result-heading h2 { margin: 0; }
+      .review-flag { padding: 0.2rem 0.55rem; border-radius: 4px; background: #d8efe6; color: var(--accent); font-size: 0.75rem; font-weight: 500; }
+      .review-flag[data-review="true"] { background: #fff0d9; color: var(--review); }
+      .empty { padding: 2rem 0 2.5rem; color: var(--muted); max-width: 25rem; }
+      .empty svg { display: block; width: 3rem; height: 3rem; margin-bottom: 1rem; color: var(--line); }
+      .judgment + .judgment { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+      h3 { margin: 0 0 0.25rem; font-size: 0.85rem; font-weight: 500; color: var(--muted); }
+      h3 code { margin-left: 0.4rem; font-size: 0.7rem; font-weight: 400; }
+      .answer { margin: 0 0 0.8rem; font-size: 1.5rem; font-weight: 500; letter-spacing: -0.025em; }
+      .probability-row { display: grid; grid-template-columns: 8rem minmax(0, 1fr) 3rem; align-items: center; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.8rem; }
+      .probability-row[data-selected="true"] { font-weight: 600; }
+      .probability-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+      meter { display: block; width: 100%; height: 0.65rem; background: var(--surface); border: 0; border-radius: 3px; }
+      meter::-webkit-meter-bar { background: var(--surface); border: 0; border-radius: 3px; }
+      meter::-webkit-meter-optimum-value { background: #a9c7b9; border-radius: 3px; }
+      meter::-moz-meter-bar { background: #a9c7b9; border-radius: 3px; }
+      [data-selected="true"] meter::-webkit-meter-optimum-value, #reply-meter::-webkit-meter-optimum-value { background: var(--accent); }
+      [data-selected="true"] meter::-moz-meter-bar, #reply-meter::-moz-meter-bar { background: var(--accent); }
+      #urgency-meter { height: 0.85rem; }
+      #urgency-meter::-webkit-meter-optimum-value { background: var(--accent); }
+      #urgency-meter::-moz-meter-bar { background: var(--accent); }
+      .scale-labels { display: flex; justify-content: space-between; margin-top: 0.35rem; gap: 0.5rem; color: var(--muted); font-size: 0.75rem; }
+      .metadata { margin: 0.6rem 0 0; overflow-wrap: anywhere; }
+      .rule { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+      .threshold-label { justify-content: space-between; }
+      .threshold-label label { margin: 0; }
+      output { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; margin: 0.75rem 0 0; accent-color: var(--accent); }
+      #review-reason { margin: 0.75rem 0 0; font-size: 0.85rem; }
+      .developer { margin-top: 1.5rem; }
+      details { border-top: 1px solid var(--line); padding: 0.85rem 0; }
+      summary { cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+      code, pre { font-family: var(--mono); }
+      pre { max-height: 24rem; overflow: auto; padding: 1rem; background: var(--surface); border-radius: 6px; font-size: 0.75rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+      footer { margin-top: 1.5rem; max-width: 50rem; }
+      @media (max-width: 760px) {
+        .workspace { grid-template-columns: 1fr; }
+        .shell { padding: 1.25rem 1rem 2rem; }
+        .panel { padding: 1.25rem; }
+        .connection { flex-direction: column; align-items: flex-start; }
+        header { margin-bottom: 1.5rem; }
+      }
+      @media (max-width: 380px) {
+        .probability-row { grid-template-columns: 6.5rem minmax(0, 1fr) 2.75rem; gap: 0.4rem; }
+        .brand span { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="brand">IPA Decisions<span>window.inference</span></p>
+        <div class="header-meta">
+          <a href="../">All examples</a>
+          <a href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/decisions" target="_blank" rel="noopener noreferrer">Source</a>
+          <span id="connection-status" role="status">Checking…</span>
+        </div>
+      </header>
+      <h1>Inbox triage</h1>
+      <p class="intro">Route a message, rate its urgency, and check whether it needs a reply. Three System One judgments in one request.</p>
+      <div class="connection" id="connection" hidden>
+        <div>
+          <strong id="connection-title">Connect an extension</strong>
+          <p id="connection-message"></p>
+        </div>
+        <div class="actions">
+          <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+          <button class="secondary" id="recheck" type="button">Check again</button>
+        </div>
+      </div>
+      <div class="workspace">
+        <section class="panel" aria-labelledby="message-heading">
+          <h2 id="message-heading">Incoming message</h2>
+          <form id="triage-form">
+            <label for="sample">Try a fictional message</label>
+            <select id="sample">
+              <option value="outage">Checkout outage</option>
+              <option value="billing">Duplicate charge</option>
+              <option value="sales">Pricing question</option>
+              <option value="fyi">Just an FYI</option>
+              <option value="unclear">Ambiguous follow-up</option>
+              <option value="custom" disabled>Custom message</option>
+            </select>
+            <label for="message">Message</label>
+            <textarea id="message" required aria-describedby="input-hint">Our checkout stopped working after this morning’s update. Every customer sees a blank page after clicking Pay, and we have no workaround. Can you investigate now and let us know when it’s fixed?</textarea>
+            <p class="hint" id="input-hint">Edit the example or paste your own message.</p>
+            <div class="actions">
+              <button id="analyze" type="submit" disabled>Analyze message</button>
+              <button class="secondary" id="cancel" type="button" hidden>Cancel</button>
+            </div>
+            <p class="status" id="request-status" role="status" aria-live="polite">Choose a message, then analyze it.</p>
+            <p class="error" id="request-error" role="alert" hidden></p>
+          </form>
+          <p class="privacy">The message and questions are sent to the provider you approve in your extension.</p>
+        </section>
+        <section class="panel" id="results-panel" aria-labelledby="results-heading" aria-busy="false">
+          <div class="result-heading">
+            <h2 id="results-heading">Triage results</h2>
+            <span class="review-flag" id="review-flag" hidden></span>
+          </div>
+          <div class="empty" id="empty-result">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="9" width="34" height="30" rx="4" /><path d="M7 27h10l4 5h6l4-5h10M15 17h18M15 22h11" /></svg>
+            Analyze a message to see its category, urgency, and reply probability here.
+          </div>
+          <div id="results" hidden>
+            <section class="judgment" aria-labelledby="category-heading">
+              <h3 id="category-heading">Category <code>choice</code></h3>
+              <p class="answer" id="category-answer"></p>
+              <div id="category-distribution"></div>
+              <p class="metadata" id="category-confidence"></p>
+            </section>
+            <section class="judgment" aria-labelledby="urgency-heading">
+              <h3 id="urgency-heading">Urgency <code>score</code></h3>
+              <p class="answer" id="urgency-answer"></p>
+              <div id="urgency-scale" hidden>
+                <meter id="urgency-meter" min="0" max="2" value="0" aria-label="Urgency score"></meter>
+                <div class="scale-labels"><span>Routine · 0</span><span>Time-sensitive · 1</span><span>Critical · 2</span></div>
+              </div>
+              <p class="metadata" id="urgency-confidence"></p>
+            </section>
+            <section class="judgment" aria-labelledby="reply-heading">
+              <h3 id="reply-heading">Reply needed? <code>noul</code></h3>
+              <p class="answer" id="reply-answer"></p>
+              <meter id="reply-meter" min="0" max="1" value="0" aria-label="Probability that a reply is needed" hidden></meter>
+              <p class="metadata" id="reply-description"></p>
+            </section>
+            <p class="metadata" id="result-meta"></p>
+          </div>
+          <div class="rule">
+            <div class="threshold-label">
+              <label for="threshold">Review threshold</label>
+              <output id="threshold-value" for="threshold">60%</output>
+            </div>
+            <input id="threshold" type="range" min="0" max="100" step="5" value="60" aria-describedby="threshold-hint" />
+            <p class="hint" id="threshold-hint">Flag category or urgency confidence below 60% for review. Refused answers always need review.</p>
+            <p id="review-reason" role="status" aria-live="polite">Adjusting this rule uses the existing answers, without another model request.</p>
+          </div>
+        </section>
+      </div>
+      <div class="developer">
+        <details>
+          <summary>Request JSON</summary>
+          <pre id="request-json"></pre>
+        </details>
+        <details>
+          <summary>Result JSON</summary>
+          <pre id="result-json">No completed result yet.</pre>
+        </details>
+      </div>
+      <footer>This demo only labels the message. You choose the provider and model in your extension; each site needs separate Decisions approval. Confidence describes the answer’s probability distribution, not guaranteed correctness. <a href="https://github.com/SamSamskies/inference-provider-api/blob/main/examples/decisions/README.md">Developer notes</a></footer>
+    </main>
+    <script type="module">
+      const el = (id) => document.getElementById(id);
+      const message = el("message");
+      const sample = el("sample");
+      const threshold = el("threshold");
+      const samples = {
+        outage: message.value,
+        billing: "I was charged twice for order A-104 yesterday. Both charges are for $49 and have cleared my bank. Could you refund the duplicate and send me a confirmation?",
+        sales: "We’re comparing plans for a team of 20. Do you offer annual pricing, and can you send details about your team plan? We’re planning for next quarter.",
+        fyi: "A quick heads-up: we finished updating our team’s contact details. Everything is working well. This is just for your records; no reply or action needed.",
+        unclear: "Hi, following up on the thing we talked about last week. It’s still happening. Can someone get back to me?",
+      };
+      const labels = { billing: "Billing", technical: "Technical support", sales: "Sales", other: "Other" };
+      const questions = {
+        category: {
+          type: "choice",
+          instructions: "Which team should handle `message`? Choose other if it does not fit or there is not enough information to choose a team.",
+          criteria: {
+            billing: "Charges, invoices, payments already made, or refunds.",
+            technical: "Software defects, outages, broken functionality, or integrations.",
+            sales: "Plans, pricing before a purchase, or product purchase inquiries.",
+            other: "General updates, unrelated messages, or too little information to choose a team.",
+          },
+        },
+        urgency: {
+          type: "score",
+          instructions: "How urgent is the situation described in `message`? Judge the stated impact and timing, without inventing missing details.",
+          criteria: [
+            "Routine: no current service disruption or near-term deadline is stated.",
+            "Time-sensitive: work is affected or a deadline is approaching, but the message does not describe a critical situation.",
+            "Critical: a service is unusable, transactions are blocked with no workaround, or an immediate deadline requires intervention.",
+          ],
+        },
+        reply_needed: {
+          type: "noul",
+          instructions: "Does `message` ask the recipient to reply with information, an answer, a confirmation, or an update? An FYI with no request for a response counts as no.",
+        },
+      };
+      const failure = (code, text) => Object.assign(new Error(text), { code });
+      const percent = (value) => `${Math.round(value * 100)}%`;
+      let supported = false;
+      let controller = null;
+      let result = null;
+      let discoveryTimer;
+
+      function buildRequest() {
+        return { method: "decide", state: { message: message.value.trim() }, questions };
+      }
+
+      function updateControls() {
+        const busy = Boolean(controller);
+        const request = buildRequest();
+        const tooLarge = new TextEncoder().encode(JSON.stringify({ state: request.state, questions })).byteLength > 64_512;
+        message.disabled = busy;
+        sample.disabled = busy;
+        message.setAttribute("aria-invalid", String(tooLarge));
+        el("input-hint").dataset.invalid = String(tooLarge);
+        el("input-hint").textContent = tooLarge ? "This message is too large. Shorten it to fit a 63 KiB request." : "Edit the example or paste your own message.";
+        el("analyze").disabled = busy || !supported || !request.state.message || tooLarge;
+        el("cancel").hidden = !busy;
+        el("cancel").disabled = Boolean(controller?.signal.aborted);
+        el("results-panel").setAttribute("aria-busy", String(busy));
+        el("request-json").textContent = JSON.stringify(request, null, 2);
+      }
+
+      function refreshFeatures() {
+        const usableContext = window.isSecureContext && location.origin !== "null" && window.top === window;
+        const ipa = usableContext && window.inference;
+        supported = false;
+        try { supported = typeof ipa?.request === "function" && ipa.getFeatures?.()?.methods?.decide === true; } catch { /* Discovery may not be ready yet. */ }
+        el("connection-status").textContent = supported ? "Decisions supported" : "Unavailable";
+        el("connection-status").dataset.ready = String(supported);
+        el("connection").hidden = supported;
+        el("connection-title").textContent = !usableContext ? "Open a supported page" : typeof ipa?.request !== "function" ? "Connect an extension" : "Decisions support unavailable";
+        el("connection-message").textContent = !usableContext ? "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported." : typeof ipa?.request !== "function" ? "Install Inference Bridge, then reload this page to get started." : "Use an extension that advertises typed decisions, then check again.";
+        updateControls();
+        return supported;
+      }
+
+      function clearResult() {
+        result = null;
+        el("results").hidden = true;
+        el("empty-result").hidden = false;
+        el("review-flag").hidden = true;
+        el("result-json").textContent = "No completed result yet.";
+        el("request-error").textContent = "";
+        el("request-error").hidden = true;
+        updateReview();
+      }
+
+      function updateReview() {
+        const cutoff = Number(threshold.value) / 100;
+        el("threshold-value").value = percent(cutoff);
+        el("threshold-hint").textContent = `Flag category or urgency confidence below ${percent(cutoff)} for review. Refused answers always need review.`;
+        if (!result) {
+          el("review-reason").textContent = "Adjusting this rule uses the existing answers, without another model request.";
+          return;
+        }
+        const names = { category: "Category", urgency: "Urgency", reply_needed: "Reply needed" };
+        const reasons = Object.entries(result.answers).flatMap(([id, answer]) => {
+          if (answer.type === "refusal") return [`${names[id]} was refused`];
+          if (answer.type !== "noul" && answer.confidence < cutoff) return [`${names[id]} confidence is ${percent(answer.confidence)}`];
+          return [];
+        });
+        el("review-flag").hidden = false;
+        el("review-flag").dataset.review = String(Boolean(reasons.length));
+        el("review-flag").textContent = reasons.length ? "Needs review" : "No review flag";
+        el("review-reason").textContent = reasons.length ? `${reasons.join("; ")}.` : "Category and urgency meet the threshold, and no answers were refused.";
+      }
+
+      function validateResult(done) {
+        const invalid = () => { throw failure("provider_error", "The extension returned an incomplete or invalid decision result."); };
+        const probability = (value) => Number.isFinite(value) && value >= 0 && value <= 1;
+        const sameKeys = (object, keys) => object && typeof object === "object" && !Array.isArray(object) && Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+        if (typeof done?.model !== "string" || !done.model.trim() || !sameKeys(done.answers, Object.keys(questions))) invalid();
+        for (const [id, question] of Object.entries(questions)) {
+          const answer = done.answers[id];
+          if (answer?.type === "refusal") continue;
+          if (answer?.type !== question.type) invalid();
+          if (answer.type === "noul") {
+            if (!probability(answer.noul)) invalid();
+            continue;
+          }
+          const keys = answer.type === "choice" ? Object.keys(question.criteria) : question.criteria.map((_, index) => String(index));
+          if (!probability(answer.confidence) || !sameKeys(answer.probabilities, keys) || !Object.values(answer.probabilities).every(probability)) invalid();
+          const sum = Object.values(answer.probabilities).reduce((total, value) => total + value, 0);
+          if (Math.abs(sum - 1) > 0.02) invalid();
+          if (answer.type === "choice") {
+            if (!keys.includes(answer.choice) || answer.probabilities[answer.choice] !== Math.max(...Object.values(answer.probabilities))) invalid();
+          } else {
+            const weighted = keys.reduce((total, key) => total + Number(key) * answer.probabilities[key], 0) / sum;
+            if (!sameKeys(answer.legend, keys) || !keys.every((key) => answer.legend[key] === question.criteria[Number(key)]) || !Number.isFinite(answer.score) || answer.score < 0 || answer.score > keys.length - 1 || Math.abs(answer.score - weighted) > 0.02) invalid();
+          }
+        }
+      }
+
+      function renderResult() {
+        const { category, urgency, reply_needed: reply } = result.answers;
+        el("category-answer").textContent = category.type === "refusal" ? "Refused" : labels[category.choice];
+        el("category-distribution").replaceChildren();
+        if (category.type !== "refusal") {
+          for (const [key, label] of Object.entries(labels)) {
+            const row = document.createElement("div");
+            row.className = "probability-row";
+            row.dataset.selected = String(category.choice === key);
+            const name = document.createElement("span");
+            name.textContent = label;
+            const meter = document.createElement("meter");
+            meter.min = 0;
+            meter.max = 1;
+            meter.value = category.probabilities[key];
+            meter.setAttribute("aria-label", `${label} probability`);
+            const value = document.createElement("span");
+            value.textContent = percent(category.probabilities[key]);
+            row.append(name, meter, value);
+            el("category-distribution").append(row);
+          }
+        }
+        el("category-confidence").textContent = category.type === "refusal" ? "The provider declined this question; no category was assigned." : `Category confidence: ${percent(category.confidence)}`;
+        el("urgency-answer").textContent = urgency.type === "refusal" ? "Refused" : `${urgency.score.toFixed(2)} / 2`;
+        el("urgency-scale").hidden = urgency.type === "refusal";
+        if (urgency.type !== "refusal") el("urgency-meter").value = urgency.score;
+        el("urgency-confidence").textContent = urgency.type === "refusal" ? "The provider declined this question; no urgency was assigned." : `Urgency confidence: ${percent(urgency.confidence)}. The score can fall between the defined levels.`;
+        el("reply-answer").textContent = reply.type === "refusal" ? "Refused" : `${percent(reply.noul)} probability of yes`;
+        el("reply-meter").hidden = reply.type === "refusal";
+        if (reply.type !== "refusal") el("reply-meter").value = reply.noul;
+        el("reply-description").textContent = reply.type === "refusal" ? "The provider declined this question; no reply probability was returned." : "Near 50% means uncertain whether a reply is needed. Noul has no separate confidence value.";
+        el("result-meta").textContent = [
+          result.model,
+          Number.isSafeInteger(result.usage?.inputTokens) && result.usage.inputTokens >= 0 ? `${result.usage.inputTokens} input tokens` : "",
+          Number.isSafeInteger(result.usage?.outputTokens) && result.usage.outputTokens >= 0 ? `${result.usage.outputTokens} output tokens` : "",
+        ].filter(Boolean).join(" · ");
+        el("result-json").textContent = JSON.stringify(result, null, 2);
+        el("results").hidden = false;
+        el("empty-result").hidden = true;
+        updateReview();
+      }
+
+      async function analyze(event) {
+        event.preventDefault();
+        if (controller) return;
+        refreshFeatures();
+        if (el("analyze").disabled) return;
+        const active = new AbortController();
+        const request = buildRequest();
+        controller = active;
+        clearResult();
+        el("request-status").textContent = "Waiting for approval…";
+        updateControls();
+        let accepted = false;
+        let done;
+        try {
+          for await (const chunk of window.inference.request({ ...request, signal: active.signal })) {
+            if (active.signal.aborted) throw failure("aborted", "Cancelled.");
+            if (chunk.type === "accepted" && !accepted && !done) {
+              accepted = true;
+              el("request-status").textContent = "Analyzing message…";
+            } else if (chunk.type === "done" && accepted && !done) {
+              done = chunk;
+            } else {
+              throw failure("provider_error", "Expected a decision stream with accepted, then done.");
+            }
+          }
+          if (active.signal.aborted) throw failure("aborted", "Cancelled.");
+          validateResult(done);
+          result = done;
+          renderResult();
+          el("request-status").textContent = Object.values(done.answers).some((answer) => answer.type === "refusal") ? "Analysis complete. Some answers need review." : "Analysis complete.";
+        } catch (error) {
+          clearResult();
+          const code = typeof error?.code === "string" ? error.code : error?.name ?? "unknown";
+          if (active.signal.aborted || code === "aborted" || code === "AbortError") {
+            el("request-status").textContent = "Cancelled. No completed result.";
+          } else {
+            const guidance = {
+              permission_denied: "Allow Decisions for this site in your extension, then try again.",
+              invalid_request: "Check the message and try again.",
+              unavailable: "Check the Decisions provider and model selected in your extension.",
+              provider_error: "Try again or choose another Decisions provider in your extension.",
+            };
+            el("request-status").textContent = "Could not analyze the message.";
+            el("request-error").textContent = `${code}: ${error?.message ?? String(error)}${guidance[code] ? ` ${guidance[code]}` : ""}`;
+            el("request-error").hidden = false;
+          }
+        } finally {
+          controller = null;
+          updateControls();
+        }
+      }
+
+      function editMessage() {
+        clearResult();
+        el("request-status").textContent = "Choose a message, then analyze it.";
+        updateControls();
+      }
+
+      sample.addEventListener("change", () => { message.value = samples[sample.value]; editMessage(); });
+      message.addEventListener("input", () => { sample.value = "custom"; editMessage(); });
+      threshold.addEventListener("input", updateReview);
+      el("triage-form").addEventListener("submit", analyze);
+      el("cancel").addEventListener("click", () => {
+        controller?.abort();
+        el("request-status").textContent = "Cancelling…";
+        updateControls();
+      });
+      el("recheck").addEventListener("click", refreshFeatures);
+      window.addEventListener("focus", refreshFeatures);
+      window.addEventListener("pageshow", refreshFeatures);
+      window.addEventListener("pagehide", () => { clearInterval(discoveryTimer); controller?.abort(); });
+      // Injectors can arrive after this module; no extension-specific ready event is needed.
+      if (!refreshFeatures()) {
+        const deadline = Date.now() + 3_000;
+        discoveryTimer = setInterval(() => {
+          if (refreshFeatures() || Date.now() >= deadline) clearInterval(discoveryTimer);
+        }, 100);
+      }
+    </script>
+  </body>
+</html>

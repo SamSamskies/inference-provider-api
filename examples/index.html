@@ -149,6 +149,30 @@
         background: #0d7a5f;
       }
 
+      .thumb-decisions {
+        display: grid;
+        align-content: center;
+        gap: 0.65rem;
+        padding: 1.25rem 1.5rem;
+        background: #eaf3ee;
+      }
+
+      .thumb-decisions .decision-row {
+        display: grid;
+        grid-template-columns: 3.5rem 1fr;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.65rem;
+        color: var(--muted);
+      }
+
+      .thumb-decisions .decision-bar {
+        height: 0.45rem;
+        width: var(--width);
+        border-radius: 3px;
+        background: var(--accent);
+      }
+
       .thumb-chat .bubble {
         position: absolute;
         border-radius: 10px;
@@ -619,6 +643,22 @@
             <p>
               Transcribe an uploaded audio or video file.
               Generate speech from text, then listen with the audio player.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./decisions/">
+          <div class="thumb thumb-decisions" aria-hidden="true">
+            <div class="decision-row"><span>Category</span><div class="decision-bar" style="--width: 88%"></div></div>
+            <div class="decision-row"><span>Urgency</span><div class="decision-bar" style="--width: 65%"></div></div>
+            <div class="decision-row"><span>Reply?</span><div class="decision-bar" style="--width: 95%"></div></div>
+          </div>
+          <div class="card-body">
+            <h2>Decisions</h2>
+            <p>
+              Triage a message with System One: choose a category, score urgency,
+              and check whether a reply is needed. Adjust the review rule locally.
             </p>
             <span class="cta">Open demo →</span>
           </div>

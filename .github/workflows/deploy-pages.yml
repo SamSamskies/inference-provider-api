@@ -29,7 +29,7 @@ jobs:
 
       - name: Prepare site
         run: |
-          mkdir -p _site/chat _site/social/avatars _site/translate _site/avatar _site/nostr _site/prompt-api-fallback _site/charts _site/speech
+          mkdir -p _site/chat _site/social/avatars _site/translate _site/avatar _site/nostr _site/prompt-api-fallback _site/charts _site/speech _site/decisions
           cp examples/index.html _site/index.html
           cp examples/chat/index.html _site/chat/index.html
           cp examples/social/index.html _site/social/index.html
@@ -43,6 +43,7 @@ jobs:
           cp examples/charts/index.html _site/charts/index.html
           cp examples/charts/data.json _site/charts/data.json
           cp examples/speech/index.html _site/speech/index.html
+          cp examples/decisions/index.html _site/decisions/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

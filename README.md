@@ -34,6 +34,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — a feed of Nostr notes filtered with natural language via IPA tool calling ([source](./examples/nostr/))
 - [Charts demo](https://samsamskies.github.io/inference-provider-api/charts/) — natural-language charts via IPA tool calling (`render_chart` generative UI) ([source](./examples/charts/))
 - [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 ([source](./examples/speech/))
+- [Decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/) — triage a message with typed category, urgency, and reply-needed judgments ([source](./examples/decisions/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
 ## Motivation
