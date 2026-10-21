@@ -16,13 +16,13 @@ Install the [build-with-ipa skill](./skills/build-with-ipa/SKILL.md) in your app
 npx skills add SamSamskies/inference-provider-api --skill build-with-ipa
 ```
 
-Then ask your agent to add an IPA-powered feature to your app. The skill guides integration with the browser API and points to the current spec, helpers, and examples. You can also give an agent [SPEC.md](./SPEC.md) directly for a one-off integration.
+Then ask your agent to add an IPA-powered feature to your app. The skill guides integration with the browser API and points to the spec, helpers, and examples.
 
 ### Reference Implementation
 
-- [Inference Bridge](https://github.com/SamSamskies/inference-bridge) — official Chrome and Firefox extension that injects `window.inference` and routes to OpenAI, Anthropic, OpenRouter, Ollama, or OpenAI-compatible servers
+[Inference Bridge](https://github.com/SamSamskies/inference-bridge) is the reference Chrome and Firefox extension that injects `window.inference` and connects to local or cloud providers.
 
-Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge). For development in Chrome, clone the repository and load it unpacked from `chrome://extensions` (Developer mode → Load unpacked → select the repo root).
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge). See its [installation guide](https://github.com/SamSamskies/inference-bridge#installation) for development builds.
 
 ### Example Applications
 
@@ -36,39 +36,30 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 ([source](./examples/speech/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
-The specification defines the standard. Inference Bridge implements that standard and may also include experimental features that are not part of the API contract yet. Applications should target the Inference Provider API (`request` and `getFeatures`), not extension-specific namespaces. Bounded transcription and MP3 synthesis are optional spec methods; Inference Bridge [v0.17.0](https://github.com/SamSamskies/inference-bridge/releases/tag/v0.17.0) exposes them on stable `request`/`getFeatures`. Detect method support before use; see [speech examples](./examples/speech/README.md).
-
-[Typed decisions (System One)](./SPEC.md#typed-decisions-system-one) are now an
-optional spec method: `request({ method: "decide", state, questions })`, gated by
-`getFeatures().methods?.decide`. Inference Bridge currently exposes decisions
-through its experimental namespace; graduation to stable `request` is separate.
-Do not assume spec support means an installed injector has shipped the method.
-
 ## Motivation
 
-Today, every AI-powered web application has to reinvent the same infrastructure:
+AI-powered web applications often have to:
 
 - Ask users for API keys
 - Integrate every inference provider separately
 - Proxy requests through their own backend
 - Build custom permission systems
 
-The **Inference Provider API (IPA)** proposes a standard browser interface that allows web applications to request inference from a user-approved browser extension without ever accessing API keys.
+IPA lets applications request inference through a user-controlled browser or extension without handling the user's API keys.
 
 Inspired by [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md), IPA separates **applications** from **providers**, giving users complete control over where inference is performed.
 
 ## Design Principles
 
-1. Users own their API keys.
-2. Applications request inference, not providers.
-3. Users choose providers.
-4. Users choose models.
-5. Applications should be provider agnostic.
-6. Local and remote inference are first-class citizens.
-7. Permission is explicit.
-8. API keys never leave the browser extension.
+1. Users own their API keys; applications never access them.
+2. Applications use a provider-agnostic inference API.
+3. Users choose providers and models.
+4. Local and remote inference are first-class citizens.
+5. Permission is explicit.
 
 ## Example
+
+`request` is required. Check `window.inference?.request` before enabling inference UI; a compatible browser or extension may be missing.
 
 ```ts
 for await (const chunk of window.inference.request({
@@ -83,7 +74,7 @@ for await (const chunk of window.inference.request({
   if (chunk.type === "accepted") {
     // permission resolved; provider call may begin
   } else if (chunk.type === "reasoning_delta") {
-    // optional: model reasoning / chain-of-thought
+    // optional reasoning output
   } else if (chunk.type === "delta") {
     // append chunk.content to the reply UI
   } else if (chunk.type === "done") {
@@ -92,7 +83,7 @@ for await (const chunk of window.inference.request({
 }
 ```
 
-`request` is required. Check `window.inference?.request` before enabling inference UI; a compatible injector may be missing. Use [`ipa-tools`](./packages/ipa-tools) (`npm install ipa-tools`) when you only need the final chat result or a page-executed tool loop:
+Use [`ipa-tools`](./packages/ipa-tools) (`npm install ipa-tools`) when you only need the final chat result or a page-executed tool loop:
 
 ```ts
 import { complete } from "ipa-tools";
@@ -124,7 +115,7 @@ const features = window.inference.getFeatures?.() ?? {};
 | [MP3 synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 bytes in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Detect optional capabilities before sending them. Function tools, hosted search, image input, and image output are independent; sending an unadvertised one is `invalid_request`. Unadvertised decision or speech methods are also `invalid_request`. Hosted search does not produce page-side tool calls. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback controls, URL input, and cancellation. The user chooses provider, model, and synthesis voice; the page controls playback.
+Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback, URL input, and cancellation.
 
 ### Permissions
 
@@ -134,16 +125,6 @@ Function tools, hosted search, image input/output, typed decisions, and speech r
 
 An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
 
-## Goals
-
-- Standard browser API
-- Provider agnostic
-- Bring Your Own Key (BYOK)
-- Local-first compatible
-- Per-origin permissions
-- Streaming support
-- Zero backend required
-
 ## Non-goals
 
 - Replacing provider SDKs
@@ -152,97 +133,23 @@ An `accepted` chunk means permission has resolved, including through an existing
 - Defining inference protocols
 - Choosing the "best" model
 
-## Potential Providers
-
-An IPA-compatible browser extension could route requests to any provider, including:
-
-- OpenAI
-- Anthropic
-- Google Gemini
-- xAI
-- OpenRouter
-- ppq.ai
-- Routstr
-- Ollama
-- LM Studio
-- Local inference servers
-
-Applications should not need to know which provider the user has selected.
-
-### Local providers (Ollama, LM Studio, etc.)
-
-Local servers often reject requests that carry a `chrome-extension://` `Origin`
-header (commonly HTTP 403). IPA extensions that support local inference should
-strip or rewrite that header on their own requests to loopback endpoints so
-users are not asked to set `OLLAMA_ORIGINS=chrome-extension://*` or similar
-allowlists. Widening the local server's origin allowlist remains a fallback, not
-the preferred path.
-
-**Chrome MV3 reference:** [Inference Bridge](https://github.com/SamSamskies/inference-bridge)
-does this with `declarativeNetRequestWithHostAccess` and dynamic rules in
-[`src/ollama-origin-bypass.js`](https://github.com/SamSamskies/inference-bridge/blob/main/src/ollama-origin-bypass.js)
-and
-[`src/loopback-origin-bypass.js`](https://github.com/SamSamskies/inference-bridge/blob/main/src/loopback-origin-bypass.js)
-that remove `Origin` / `Referer` for local Ollama and other loopback
-OpenAI-compatible servers. See [SPEC.md](./SPEC.md) Security for the normative
-guidance.
-
-That permission lets the extension modify request headers only for hosts already
-listed in `host_permissions`—it is not a browser-wide rewrite capability. Still
-treat it as privileged: a compromised or overly broad extension could alter
-headers on those hosts. Prefer port-scoped loopback permissions (for example
-`http://localhost:11434/*`) over `http://localhost/*`, keep DNR rules limited to
-local inference endpoints, and do not use DNR to touch remote provider traffic.
-This is still preferable to asking every user to set
-`OLLAMA_ORIGINS=chrome-extension://*`, which trusts every installed extension
-talking to Ollama.
-
-## Example Use Cases
-
-- A "Grok" button on every social post.
-- AI-powered documentation.
-- Browser-based coding tools and other page-executed function tools.
-- Translation.
-- Writing assistance.
-- Local-first AI applications.
-
 ## Open Questions
 
 Some topics that still need community discussion:
 
-- Is `window.inference` the right namespace?
 - Which further capability constraints, if any, do applications need beyond tools and `options`?
 - Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
-- Which further keys belong under `options` (for example `maxTokens`), and should clamp/override UX stay optional?
-- Should model selection always remain under user control?
-- Should embeddings use this API or a separate API? (Bounded speech: this API — `transcribe` / `synthesize` request variants. Realtime speech sessions remain separate future work. Images: content parts on chat plus `output.images`.)
-- How should extensions surface token usage? Should estimated cost remain optional UX until pricing metadata is defined?
-- Should `getFeatures` add a nested object later (for example for MCP), or stay one key per capability as with `toolCalling` and `webSearch`?
+- Which further keys belong under `options` (for example `maxTokens`)?
+- Should embeddings use this API or a separate API?
 - Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?
 - Should tool calls stream as their own chunk type, or stay on `done.message.toolCalls` only?
 - Should arbitrary structured chat outputs (e.g. JSON Schema / `responseFormat`, beyond typed decisions) be part of IPA, or left to prompt engineering until providers converge?
-- How should permission UIs present multi-message requests — e.g. emphasize the last user message and collapse system/context by default?
-- Should applications be encouraged or required to round-trip `message.reasoning` on later turns for providers that benefit from it?
 
 ## Contributing
 
-This proposal is intentionally in an early draft stage.
-
 For package development, use Node.js 22 (22.12 or later), 24, or 26+ and npm. From the repository root, run `npm ci`, then `npm test` to build both packages and run their tests and TypeScript checks.
 
-The goal is to collaboratively design an open browser standard for provider-agnostic inference—not a specific implementation.
-
-Contributions of all kinds are welcome, including:
-
-- Design feedback
-- API suggestions
-- Security considerations
-- Alternative approaches
-- Reference implementations
-- Browser extension prototypes
-- Related standards or prior art
-
-If you have an idea or concern, please open an issue.
+Open an issue or pull request for spec feedback, API proposals, examples, reference implementations, or related standards and prior art.
 
 ## License
 
