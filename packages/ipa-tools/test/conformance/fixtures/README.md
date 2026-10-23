@@ -3,12 +3,13 @@
 These files are test data, not recordings of provider responses. `speech.wav`
 contains locally synthesized “The sky is blue.” using macOS Samantha; there is
 no human recording or personal speech data. The other `speech` files encode
-that same utterance. `speech.mp3` is also the deterministic byte fixture for
-synthesis transport tests; mock providers replay its checked-in bytes.
+that same utterance. `speech.mp3` and `speech.wav` are also deterministic byte fixtures for
+synthesis transport tests; mock providers replay their checked-in bytes. Neither
+is a native Gemini result.
 
 | File | MIME / tracks | Purpose |
 | --- | --- | --- |
-| `speech.wav` | `audio/wav`, mono 16 kHz PCM | Common transcription input |
+| `speech.wav` | `audio/wav`, mono 16 kHz PCM | Transcription and byte-exact WAV synthesis transport |
 | `speech.mp3` | `audio/mpeg`, MP3 | Transcription and byte-exact synthesis transport |
 | `speech.m4a` | `audio/mp4`, AAC | Audio-only MP4 container |
 | `speech.webm` | `audio/webm`, Opus | Audio-only WebM container |

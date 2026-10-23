@@ -36,8 +36,9 @@ function fakeInference(snapshot: InferenceFeatures = features, request = vi.fn()
         } else if (input.method === "transcribe") {
           yield { type: "done", model: "test", transcript: { text: "Hello" } };
         } else if (input.method === "synthesize") {
-          yield { type: "audio_delta", mediaType: "audio/mpeg", data: new Uint8Array([1, 2, 3]) };
-          yield { type: "done", model: "test", audio: { mediaType: "audio/mpeg", byteLength: 3 } };
+          const mediaType = input.output?.mediaType ?? "audio/mpeg";
+          yield { type: "audio_delta", mediaType, data: new Uint8Array([1, 2, 3]) };
+          yield { type: "done", model: "test", audio: { mediaType, byteLength: 3 } };
         } else {
           yield { type: "done", model: "test", message: { role: "assistant", content: "Hello" } };
         }
@@ -228,5 +229,165 @@ describe("method-aware request routing", () => {
     await expect(collect(createInference({ fallbacks: [route] }).request(decision)))
       .rejects.toMatchObject({ code: "invalid_request", message: "No configured backend supports typed decisions." });
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+const wav: SynthesizeRequest = { ...synthesis, output: { mediaType: "audio/wav" } };
+const wavOnly: InferenceFeatures = { methods: { synthesize: { outputMediaTypes: ["audio/wav"] } } };
+const both: InferenceFeatures = { methods: { synthesize: { outputMediaTypes: ["audio/mpeg", "audio/wav"] } } };
+
+describe("format-aware synthesis routing", () => {
+  it.each([features, both])("preserves omitted, empty, and explicit MP3 output with %j", async (snapshot) => {
+    const request = vi.fn();
+    const { route } = backend(snapshot, fakeInference(snapshot, request));
+    const client = createInference({ fallbacks: [route] });
+    for (const input of [synthesis, { ...synthesis, output: {} }, { ...synthesis, output: { mediaType: undefined } }, { ...synthesis, output: { mediaType: "audio/mpeg" as const } }]) {
+      const chunks = await collect(client.request(input));
+      expect(chunks.at(-1)).toHaveProperty("audio.mediaType", "audio/mpeg");
+      expect(request).toHaveBeenLastCalledWith(input);
+    }
+  });
+
+  it.each([wavOnly, both])("lazily forwards explicit WAV unchanged to %j", async (snapshot) => {
+    const request = vi.fn();
+    const { route, create, probe } = backend(snapshot, fakeInference(snapshot, request));
+    const input = { ...wav, signal: new AbortController().signal };
+    const stream = createInference({ fallbacks: [route] }).request(input);
+    expect(create).not.toHaveBeenCalled();
+    expect(probe).not.toHaveBeenCalled();
+    const chunks = await collect(stream);
+    expect(request).toHaveBeenCalledExactlyOnceWith(input);
+    expect(chunks.at(-1)).toHaveProperty("audio.mediaType", "audio/wav");
+  });
+
+  it.each([features, { methods: { synthesize: { outputMediaTypes: [] } } },
+    { methods: { synthesize: { outputMediaTypes: ["audio/*"] } } },
+    { methods: { synthesize: { outputMediaTypes: ["audio/wav", "audio/l16"] } } }])(
+    "skips unadvertised WAV and malformed format lists before create: %j", async (snapshot) => {
+      const { route, create } = backend(snapshot as InferenceFeatures);
+      await expect(collect(createInference({ fallbacks: [route] }).request(wav)))
+        .rejects.toMatchObject({ code: "invalid_request" });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+  it.each([synthesis, { ...synthesis, output: {} }, { ...synthesis, output: { mediaType: "audio/mpeg" as const } }])(
+    "does not change default MP3 to WAV on a WAV-only backend: %j", async (input) => {
+      const { route, create } = backend(wavOnly);
+      await expect(collect(createInference({ fallbacks: [route] }).request(input)))
+        .rejects.toMatchObject({ code: "invalid_request" });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+  it.each(["audio/l16", "audio/wave", "AUDIO/WAV", "audio/wav; codecs=pcm", "", null, 42])(
+    "rejects unknown output %j before backend initialization", async (mediaType) => {
+      const { route, create, probe } = backend(both);
+      await expect(collect(createInference({ fallbacks: [route] }).request({ ...synthesis, output: { mediaType } } as never)))
+        .rejects.toMatchObject({ code: "invalid_request" });
+      expect(probe).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    });
+
+  it.each([null, "audio/wav", [], { format: "wav" }])(
+    "rejects malformed output objects before backend creation: %j", async (output) => {
+      const { route, create, probe } = backend(both);
+      await expect(collect(createInference({ fallbacks: [route] }).request({ ...synthesis, output } as never)))
+        .rejects.toMatchObject({ code: "invalid_request" });
+      expect(create).not.toHaveBeenCalled();
+      expect(probe).not.toHaveBeenCalled();
+    });
+
+  it("checks the injector advertisement without trying a WAV-capable fallback", async () => {
+    const request = vi.fn();
+    vi.stubGlobal("window", { inference: fakeInference(features, request) });
+    const { route, create } = backend(both);
+    await expect(collect(createInference({ fallbacks: [route] }).request(wav)))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(request).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the created client and cached client formats before calling request", async () => {
+    const request = vi.fn();
+    const { route, create } = backend(both, fakeInference(features, request));
+    const client = createInference({ fallbacks: [route] });
+    await expect(collect(client.request(wav))).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(collect(client.request(wav))).rejects.toMatchObject({ code: "invalid_request" });
+    expect(request).not.toHaveBeenCalled();
+    await collect(client.request(synthesis));
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it.each([true, false])("separates concurrent WAV and MP3 needs (WAV first: %j)", async (wavFirst) => {
+    const { route, create } = backend(wavOnly);
+    const client = createInference({ fallbacks: [route] });
+    const inputs = wavFirst ? [wav, synthesis] : [synthesis, wav];
+    const results = await Promise.allSettled(inputs.map((input) => collect(client.request(input))));
+    expect(results[wavFirst ? 0 : 1].status).toBe("fulfilled");
+    expect(results[wavFirst ? 1 : 0].status).toBe("rejected");
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it.each([wav, synthesis])("propagates unavailable on the chosen route without switching providers: %j", async (input) => {
+    const error = makeInferenceError("unavailable", "The saved voice route cannot produce this format.");
+    vi.stubGlobal("window", { inference: {
+      getFeatures: () => both, request: async function* () { throw error; },
+    } });
+    const { route, create } = backend(both);
+    await expect(collect(createInference({ fallbacks: [route] }).request(input))).rejects.toBe(error);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("preserves WAV backpressure and closes the delegate when iteration stops", async () => {
+    let pulls = 0;
+    const closed = vi.fn();
+    vi.stubGlobal("window", { inference: {
+      getFeatures: () => wavOnly,
+      request: async function* () {
+        try {
+          yield { type: "accepted" };
+          for (let index = 0; index < 4; index++) {
+            pulls++;
+            yield { type: "audio_delta", mediaType: "audio/wav", data: new Uint8Array([index]) };
+          }
+        } finally { closed(); }
+      },
+    } });
+    const iterator = createInference().request(wav)[Symbol.asyncIterator]();
+    expect(pulls).toBe(0);
+    await iterator.next();
+    expect(pulls).toBe(0);
+    await iterator.next();
+    expect(pulls).toBe(1);
+    await iterator.return?.();
+    expect(pulls).toBe(1);
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("propagates WAV abort after accepted and closes without done", async () => {
+    const controller = new AbortController();
+    const closed = vi.fn();
+    vi.stubGlobal("window", { inference: {
+      getFeatures: () => wavOnly,
+      request: async function* (input: SynthesizeRequest) {
+        try {
+          yield { type: "accepted" };
+          if (input.signal?.aborted) throw makeInferenceError("aborted", "Cancelled");
+          yield { type: "audio_delta", mediaType: "audio/wav", data: new Uint8Array([1]) };
+        } finally { closed(); }
+      },
+    } });
+    const iterator = createInference().request({ ...wav, signal: controller.signal })[Symbol.asyncIterator]();
+    expect((await iterator.next()).value).toEqual({ type: "accepted" });
+    controller.abort();
+    await expect(iterator.next()).rejects.toMatchObject({ code: "aborted" });
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("rejects pre-aborted WAV before backend creation", async () => {
+    const { route, create, probe } = backend(wavOnly);
+    await expect(collect(createInference({ fallbacks: [route] }).request({ ...wav, signal: AbortSignal.abort() })))
+      .rejects.toMatchObject({ code: "aborted" });
+    expect(create).not.toHaveBeenCalled();
+    expect(probe).not.toHaveBeenCalled();
   });
 });

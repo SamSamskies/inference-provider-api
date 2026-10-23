@@ -1,6 +1,6 @@
 # IPA Speech Demo
 
-A single-page app for bounded transcription and MP3 synthesis using
+A single-page app for bounded transcription and MP3/WAV synthesis using
 `window.inference.request`. Transcription and synthesis are detected independently;
 an unsupported operation stays disabled while the other remains usable.
 
@@ -22,14 +22,14 @@ an unsupported operation stays disabled while the other remains usable.
    If the browser reports no MIME type, select the file's actual advertised type.
    The extension still validates the container and codec; the page does not guess
    from the filename or override a conflicting detected type.
-4. **Text to speech:** enter text, click **Generate speech**, and approve the operation
+4. **Text to speech:** enter text, choose an advertised audio format, click **Generate speech**, and approve the operation
    in your extension. Click **Play** to listen. If your browser offers **Download**
-   in the player's menu, use it to save the MP3.
+   in the player's menu, use it to save the audio file.
 
 The UI shows **Waiting for approval…**, then **Transcribing…** or **Generating audio…**
 after `accepted`. Transcripts can stream, but final-only providers work too.
 **Cancel** aborts the active request. Generated audio is exposed only after `done.audio.byteLength`
-matches the received MP3 bytes. Audio never autoplays; clearing, replacing, or leaving
+matches the received bytes and every MIME type matches the requested format. Audio never autoplays; clearing, replacing, or leaving
 the page releases its object URLs. Provider, model, and voice selection stay in the
 extension. No app-held API key or build step is needed.
 
@@ -47,8 +47,12 @@ fields are omitted; the demo does not estimate token counts.
   Try an empty or unsupported file and confirm it cannot be submitted. Try a
   provider that returns only a final transcript, without deltas.
 - Generate speech and verify it stays paused until **Play**. Where supported,
-  use the player's **Download** menu item and confirm the saved MP3 plays.
+  use the player's **Download** menu item and confirm the saved file plays.
   **Clear audio** should remove the player.
+- Verify legacy MP3-only discovery, object discovery offering both formats, and
+  WAV-only discovery. Show the format radio group only when both formats are
+  advertised; a sole supported format is selected automatically. The selected format
+  must match the player metadata and Blob MIME.
 - Cancel while awaiting approval and during provider work. Expect **Cancelled**
   with no completed output; partial transcript text is labelled incomplete.
   Deny approval and verify a useful error appears and the controls recover.
@@ -99,20 +103,34 @@ type. File picker filters describe MIME types; implementation validation also
 checks applicable container/codec constraints. Final-only providers emit
 `accepted`, then `done`, with no text deltas.
 
-### Text to an MP3 Blob
+### Text to an MP3 or WAV Blob
 
 ```js
 const ipa = window.inference;
-if (!ipa?.getFeatures?.().methods?.synthesize) throw new Error("Stable synthesis is not advertised.");
+const synthesis = ipa?.getFeatures?.().methods?.synthesize;
+const formats = synthesis === true ? ["audio/mpeg"] : synthesis?.outputMediaTypes ?? [];
+// Choose WAV explicitly when supported; omitted output always means MP3.
+const mediaType = formats.includes("audio/wav") ? "audio/wav" : "audio/mpeg";
+if (!formats.includes(mediaType)) throw new Error("No supported synthesis format advertised.");
 const parts = [];
-let expectedBytes;
-for await (const chunk of ipa.request({ method: "synthesize", text: "The sky is blue." })) {
+let done;
+for await (const chunk of ipa.request({
+  method: "synthesize", text: "The sky is blue.", output: { mediaType },
+})) {
   console.log(chunk);
-  if (chunk.type === "audio_delta") parts.push(chunk.data);
-  if (chunk.type === "done") expectedBytes = chunk.audio.byteLength;
+  if (chunk.type === "audio_delta") {
+    if (chunk.mediaType !== mediaType || !(chunk.data instanceof Uint8Array) || !chunk.data.byteLength) {
+      throw new Error("Invalid audio bytes or unexpected encoding.");
+    }
+    parts.push(chunk.data.slice());
+  }
+  if (chunk.type === "done") done = chunk;
 }
-const blob = new Blob(parts, { type: "audio/mpeg" });
-if (!blob.size || blob.size !== expectedBytes) throw new Error("Incomplete MP3 stream.");
+if (done?.audio?.mediaType !== mediaType) throw new Error("Unexpected final encoding.");
+const blob = new Blob(parts, { type: done.audio.mediaType });
+if (!blob.size || !Number.isSafeInteger(done.audio.byteLength) || blob.size !== done.audio.byteLength) {
+  throw new Error("Incomplete audio stream.");
+}
 console.log(blob.type, blob.size);
 const url = URL.createObjectURL(blob);
 const audio = document.createElement("audio");
@@ -129,6 +147,15 @@ removeButton.onclick = () => {
 };
 document.body.append(removeButton);
 ```
+
+Legacy `synthesize: true` advertises MP3 only. An object declares exactly its
+nonempty `outputMediaTypes`, so WAV-only injectors need an explicit WAV request.
+Omitted `output`, `output: {}`, and omitted `output.mediaType` all mean MP3;
+unadvertised formats are `invalid_request`. An advertised format unavailable
+on the user-selected or saved route is `unavailable`, without changing providers.
+WAV fragments belong to one RIFF/WAVE file; assemble them without adding headers.
+WAV needs an injector implementing [issue #68](https://github.com/SamSamskies/inference-provider-api/issues/68);
+older speech releases may advertise only MP3.
 
 Do not use `complete()` for speech. It stays chat-only; `done.audio` contains
 metadata without duplicating audio bytes. No public `synthesize()` or audio
