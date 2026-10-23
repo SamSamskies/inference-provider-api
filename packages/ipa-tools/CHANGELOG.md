@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-These changes require the next major release, **3.0.0**; 2.x remains MP3-only.
+## [3.0.0] - 2026-10-23
 
 ### Breaking
 
