@@ -61,6 +61,12 @@
       input[type="file"] { padding: 0.6rem; font-size: 0.8rem; }
       input::file-selector-button { margin-right: 0.6rem; padding: 0.35rem 0.6rem; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); cursor: pointer; }
       select { padding: 0.55rem; }
+      .output-format { margin: 0.9rem 0 0; padding: 0; border: 0; }
+      .output-format legend { margin-bottom: 0.45rem; padding: 0; font-size: 0.875rem; font-weight: 500; }
+      .format-options { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+      .format-options label { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; cursor: pointer; }
+      .format-options input { margin: 0; accent-color: var(--accent); }
+      .output-format:disabled label { opacity: 0.5; cursor: not-allowed; }
       textarea { min-height: 10rem; padding: 0.75rem; resize: vertical; line-height: 1.6; }
       button, .button { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 0.5rem 0.8rem; background: var(--ink); color: #fff; font-size: 0.85rem; font-weight: 500; text-decoration: none; cursor: pointer; }
       button:hover:not(:disabled), .button:hover { background: #2a322e; }
@@ -155,6 +161,10 @@
           <p class="description" id="synthesize-support">Write something to hear aloud. You choose the voice in your extension.</p>
           <label for="speech-text">Text to read</label>
           <textarea id="speech-text" spellcheck="true">Ain’t it fun living in the real world?</textarea>
+          <fieldset class="output-format" id="output-format" disabled>
+            <legend>Audio format</legend>
+            <div class="format-options" id="output-options"></div>
+          </fieldset>
           <div class="actions">
             <button id="synthesize" type="button" disabled>Generate speech</button>
             <button class="secondary" id="synthesize-cancel" type="button" hidden>Cancel</button>
@@ -164,7 +174,7 @@
           <p class="error" id="synthesize-error" role="alert" hidden></p>
           <div class="result">
             <h3>Generated audio</h3>
-            <p class="empty" id="audio-empty">Your MP3 will appear here. Playback starts when you press Play.</p>
+            <p class="empty" id="audio-empty">Your audio will appear here. Playback starts when you press Play.</p>
             <div id="audio-result" hidden>
               <audio id="generated-audio" controls preload="metadata" aria-label="Generated speech"></audio>
               <p class="metadata" id="audio-meta"></p>
@@ -181,6 +191,8 @@
       const transcript = el("transcript");
       const speechText = el("speech-text");
       const generatedAudio = el("generated-audio");
+      const outputFormat = el("output-format");
+      const outputOptions = el("output-options");
       const aliases = { "audio/mp3": "audio/mpeg", "audio/x-m4a": "audio/mp4", "audio/wave": "audio/wav", "audio/x-wav": "audio/wav", "audio/vnd.wave": "audio/wav" };
       const formatNames = { "audio/mpeg": "MP3", "audio/mp4": "M4A audio", "audio/wav": "WAV", "audio/webm": "WebM audio", "audio/ogg": "Ogg audio", "video/mp4": "MP4 video", "video/webm": "WebM video" };
       const normalizeType = (value) => {
@@ -191,6 +203,7 @@
       const failure = (code, message) => Object.assign(new Error(message), { code });
       let acceptedMedia = [];
       let canSynthesize = false;
+      let outputMediaTypes = [];
       let selectedFile = null;
       let audioURL = null;
       let transcribeController = null;
@@ -234,6 +247,7 @@
         el("transcribe-clear").disabled = busy || !(selectedFile || transcript.textContent || el("transcribe-error").textContent);
         el("synthesize").disabled = Boolean(synthesizeController) || !canSynthesize || !speechText.value.trim();
         speechText.disabled = Boolean(synthesizeController);
+        outputFormat.disabled = Boolean(synthesizeController) || !canSynthesize;
         el("synthesize-cancel").hidden = !synthesizeController;
         el("synthesize-cancel").disabled = Boolean(synthesizeController?.signal.aborted);
         el("synthesize-clear").disabled = Boolean(synthesizeController) || !audioURL;
@@ -245,7 +259,22 @@
         let methods;
         try { methods = typeof ipa?.request === "function" ? ipa.getFeatures?.()?.methods : undefined; } catch { /* Keep unavailable until discovery succeeds. */ }
         acceptedMedia = Array.isArray(methods?.transcribe?.acceptedMedia) ? methods.transcribe.acceptedMedia.filter((entry) => typeof entry?.mediaType === "string" && normalizeType(entry.mediaType)) : [];
-        canSynthesize = methods?.synthesize === true;
+        const synthesis = methods?.synthesize;
+        const advertised = synthesis === true ? ["audio/mpeg"] : synthesis?.outputMediaTypes;
+        outputMediaTypes = Array.isArray(advertised) && advertised.length && advertised.every((type) => type === "audio/mpeg" || type === "audio/wav") ? [...new Set(advertised)] : [];
+        canSynthesize = outputMediaTypes.length > 0;
+        const previousOutput = outputOptions.querySelector("input:checked")?.value;
+        const selectedOutput = outputMediaTypes.includes(previousOutput) ? previousOutput : outputMediaTypes.includes("audio/mpeg") ? "audio/mpeg" : outputMediaTypes[0];
+        outputOptions.replaceChildren(...outputMediaTypes.map((type) => {
+          const label = document.createElement("label");
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "output-media-type";
+          radio.value = type;
+          radio.checked = type === selectedOutput;
+          label.append(radio, formatNames[type]);
+          return label;
+        }));
         const ready = Boolean(acceptedMedia.length || canSynthesize);
         el("connection-status").dataset.ready = String(ready);
         el("connection-status").textContent = acceptedMedia.length && canSynthesize ? "ready" : acceptedMedia.length ? "transcription only" : canSynthesize ? "synthesis only" : "unavailable";
@@ -342,15 +371,16 @@
         clearAudio();
         el("synthesize-status").textContent = "Waiting for approval…";
         updateControls();
+        const requestedType = outputOptions.querySelector("input:checked").value;
         const parts = [];
         let byteLength = 0;
         let done;
         try {
-          for await (const chunk of window.inference.request({ method: "synthesize", text: speechText.value, signal: controller.signal })) {
+          for await (const chunk of window.inference.request({ method: "synthesize", text: speechText.value, output: { mediaType: requestedType }, signal: controller.signal })) {
             if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
             if (chunk.type === "accepted") el("synthesize-status").textContent = "Generating audio…";
             if (chunk.type === "audio_delta") {
-              if (chunk.mediaType !== "audio/mpeg" || !(chunk.data instanceof Uint8Array)) throw failure("provider_error", "The provider returned an invalid MP3 chunk.");
+              if (chunk.mediaType !== requestedType || !(chunk.data instanceof Uint8Array) || !chunk.data.byteLength) throw failure("provider_error", "The provider returned an invalid audio chunk or a different format.");
               parts.push(chunk.data.slice());
               byteLength += chunk.data.byteLength;
               el("synthesize-status").textContent = `Receiving audio… ${formatBytes(byteLength)}`;
@@ -358,12 +388,12 @@
             if (chunk.type === "done") done = chunk;
           }
           if (controller.signal.aborted) throw failure("aborted", "Cancelled.");
-          if (!byteLength || !Number.isSafeInteger(done?.audio?.byteLength) || done.audio.byteLength !== byteLength || done.audio.mediaType !== "audio/mpeg") throw failure("provider_error", "The MP3 stream is incomplete. Generate the audio again.");
-          audioURL = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
+          if (!byteLength || !Number.isSafeInteger(done?.audio?.byteLength) || done.audio.byteLength !== byteLength || done.audio.mediaType !== requestedType) throw failure("provider_error", "The audio stream is incomplete. Generate the audio again.");
+          audioURL = URL.createObjectURL(new Blob(parts, { type: done.audio.mediaType }));
           generatedAudio.src = audioURL;
           el("audio-meta").textContent = [
             done.model,
-            "MP3",
+            formatNames[done.audio.mediaType],
             formatBytes(byteLength),
             done.usage?.inputCharacters != null ? `${done.usage.inputCharacters} input characters` : "",
             done.usage?.outputSeconds != null ? `${done.usage.outputSeconds}s` : "",

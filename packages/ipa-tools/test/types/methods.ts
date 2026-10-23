@@ -116,8 +116,15 @@ async function chatCompatibility() {
 const missingType: TranscriptionMediaSource = { data: "YQ==" };
 // @ts-expect-error URL and data are mutually exclusive
 const bothSources: TranscriptionMediaSource = { data: new Blob(), url: "https://example.com/a.wav" };
-// @ts-expect-error synthesis only returns MP3
-ipa.request({ method: "synthesize", text: "Hello", output: { mediaType: "audio/wav" } });
+const wavRequest = { method: "synthesize", text: "Hello", output: { mediaType: "audio/wav" } } satisfies SynthesizeRequest;
+const wavStream = ipa.request(wavRequest);
+type WavInference = Assert<Equal<typeof wavStream, AsyncIterable<SynthesisChunk>>>;
+const wavFeature: import("../../src/index.js").InferenceFeatures = {
+  methods: { synthesize: { outputMediaTypes: ["audio/wav"] } },
+};
+const outputType: import("../../src/index.js").SynthesisMediaType = "audio/wav";
+// @ts-expect-error raw PCM is not a synthesis output format
+ipa.request({ method: "synthesize", text: "Hello", output: { mediaType: "audio/l16" } });
 // @ts-expect-error pages do not choose voices
 const pageVoice: SynthesizeRequest = { method: "synthesize", text: "Hello", voice: "a-provider-voice" };
 // @ts-expect-error no method-named runtime function is added

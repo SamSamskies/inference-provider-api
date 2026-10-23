@@ -57,6 +57,17 @@ import type { InferenceRequest, InferenceChunk } from "ipa-tools";
 
 Importing the package (or its types) augments `Window` so `window.inference.request(...)` is typed. There is **no** package-level `request` / `stream` export.
 
+### Preparing for 3.0.0
+
+The next major release adds `SynthesisMediaType` (`audio/mpeg` or `audio/wav`)
+and widens `methods.synthesize` from a boolean to a boolean or
+`{ outputMediaTypes: SynthesisMediaType[] }`. Existing injectors may keep `true`
+for MP3 only. Pages that previously compared only with `=== true` must also
+read the object form to discover WAV or object-advertised MP3 support. Custom
+implementations must validate the requested format and return matching MIME
+metadata. Existing MP3 requests and omitted-format behavior stay unchanged.
+These changes are unreleased; the CDN snippets above pin the published 2.0.0.
+
 ### Migrating to 2.0.0
 
 `InferenceRequest` / `InferenceMethod` now include `decide`, and `InferenceChunk`
@@ -92,7 +103,7 @@ for await (const chunk of client.request({ method: "synthesize", text: "Hello" }
 
 `TranscribeRequest` uses `media: { data: Blob }`, `{ data: string, mediaType }`
 (raw base64), or `{ url, mediaType? }`. It yields `TranscriptionChunk` with
-`done.transcript`. `SynthesizeRequest` yields `SynthesisChunk` with MP3
+`done.transcript`. `SynthesizeRequest` yields `SynthesisChunk` with MP3 or WAV
 `audio_delta`s and metadata-only `done.audio`. Exported usage and done types are
 `TranscriptionUsage`, `SynthesisUsage`, `TranscriptionDoneChunk`, and
 `SynthesisDoneChunk`. `TranscriptionMediaSource` and
@@ -129,7 +140,7 @@ async function display(ipa: Inference, request: InferenceRequest) {
 ```
 
 `complete()` and `runTools()` remain chat-only. No decision/speech function or collector
-is added; iterate `request` for typed answers or assemble MP3 bytes in page code. See the
+is added; iterate `request` for typed answers or assemble encoded audio bytes in page code. See the
 [browser examples](../../examples/speech/README.md). Detect advertised speech
 methods before use; older injectors may omit them.
 
@@ -163,6 +174,16 @@ created client are checked again, including for cached clients. An available
 injector always takes precedence: its unadvertised method is `invalid_request`,
 and an advertised route's `unavailable`, permission denial, or provider error
 is propagated without silently trying another provider.
+
+For synthesis, both snapshots must advertise the requested output type.
+`synthesize: true` supports MP3 only; an object supports exactly its nonempty
+`outputMediaTypes`. Omitted `output` or `output.mediaType` requests MP3 even
+when only WAV is advertised. Unknown or unadvertised types are `invalid_request`
+before backend creation/request; a chosen route's advertised-but-unavailable
+format error remains `unavailable` without fallback. No encoder or provider is
+silently substituted. The helper routes and delegates streams; provider output
+validation and approval-route filtering remain implementation responsibilities.
+See the [format-aware Blob example](../../examples/speech/README.md#text-to-an-mp3-or-wav-blob).
 
 For decisions, both the backend and created client must advertise
 `methods.decide: true`. A chat-only backend is skipped before `create()`,

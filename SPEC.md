@@ -118,10 +118,13 @@ type TranscribeRequest = {
   signal?: AbortSignal;
 };
 
+type SynthesisMediaType = "audio/mpeg" | "audio/wav";
+
 type SynthesizeRequest = {
   method: "synthesize";
   text: string;
-  output?: { mediaType?: "audio/mpeg" };
+  /** Omitted output or mediaType means MP3; WAV requires explicit discovery. */
+  output?: { mediaType?: SynthesisMediaType };
   signal?: AbortSignal;
 };
 
@@ -216,11 +219,11 @@ type TranscriptionChunk =
 
 type SynthesisChunk =
   | { type: "accepted" }
-  | { type: "audio_delta"; mediaType: "audio/mpeg"; data: Uint8Array }
+  | { type: "audio_delta"; mediaType: SynthesisMediaType; data: Uint8Array }
   | {
       type: "done";
       model: string;
-      audio: { mediaType: "audio/mpeg"; byteLength: number };
+      audio: { mediaType: SynthesisMediaType; byteLength: number };
       usage?: SynthesisUsage;
     };
 
@@ -252,7 +255,8 @@ type InferenceFeatures = {
   methods?: {
     decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
-    synthesize?: boolean;
+    /** true means MP3 only; an object declares exactly its nonempty format list. */
+    synthesize?: boolean | { outputMediaTypes: SynthesisMediaType[] };
   };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
@@ -335,7 +339,7 @@ type DoneChunk = ChatDoneChunk;
 
 `InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Typed decisions (`method: "decide"`), bounded transcription (`method: "transcribe"`) and MP3 synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Typed decisions (`method: "decide"`), bounded transcription (`method: "transcribe"`) and bounded speech synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
 
 The method determines the chunk union: chat yields `ChatChunk`, decisions yield
 `DecisionChunk`, transcription yields `TranscriptionChunk`, and
@@ -394,7 +398,7 @@ if (features.methods?.transcribe) {
   // transcribe accepts the advertised acceptedMedia constraints
 }
 if (features.methods?.synthesize) {
-  // synthesize returns MP3 bytes; the page controls playback
+  // synthesize returns encoded audio bytes; the page controls format and playback
 }
 if (features.toolCalling) {
   // request accepts function tools / toolChoice / tool messages
@@ -436,9 +440,9 @@ Rules:
 16. Implementations that do not support image output must reject `output.images: true` with `invalid_request` — including implementations that omit `getFeatures`. Extra keys under `output` are ignored (forward compatible). If the page does not set `output.images: true`, implementations must not put `ImagePart`s on `done.message` (text only, as today).
 17. Advertising `imageInput` / `imageOutput` does not guarantee that the user's provider or model can see or draw. Applications must still handle a text-only `done` when they set `output.images: true`. If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that, do not complete a normal chat reply — see Images.
 
-18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` advertises MP3 synthesis. Missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
+18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` is the legacy MP3-only advertisement; an object declares exactly its nonempty `outputMediaTypes` list, with every entry a `SynthesisMediaType`. A WAV-only implementation may advertise `{ outputMediaTypes: ["audio/wav"] }`. `false` or missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
 19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`; do not substitute chat, omit questions, drop media, or silently change the approved route.
-20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Discovery may describe the identity-free union of possible routes; approval must filter to matching routes. No provider/model/voice identities or account state belong in discovery.
+20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Speech discovery may describe the identity-free union of possible routes; approval must filter to matching input constraints or requested synthesis formats. Advertising a synthesis format does not guarantee the currently approved provider/model/voice route can produce it. No provider/model/voice identities or account state belong in discovery.
 
 ### Request options
 
@@ -966,9 +970,21 @@ and implementation. Speech requests accept only their method-specific fields;
 chat fields, page-selected route/voice fields, and unknown speech request or
 `media`/`output` fields are `invalid_request` in this draft.
 
-Omitting `output` or `output.mediaType` means `audio/mpeg`; any other synthesis
-format is `invalid_request`. MP3 is the only portable output in this version.
-This avoids prematurely specifying raw PCM layout or streamed container headers.
+Omitting `output` or `output.mediaType` means `audio/mpeg`, including `output: {}`.
+MP3 remains the default; WAV requires explicit `output: { mediaType: "audio/wav" }`
+and an object advertisement containing `audio/wav`. Legacy
+`methods.synthesize: true` means MP3 only. An object advertisement declares
+exactly its nonempty supported format list; it does not implicitly include MP3.
+Only the exact canonical values in `SynthesisMediaType` are valid output types;
+unknown, aliased, or unadvertised types are `invalid_request`.
+
+A well-formed advertised format unavailable on the user-selected or remembered
+provider/model/voice route is `unavailable`. In particular, omitted output still
+requests MP3 and fails with `unavailable` on a WAV-only route when MP3 is
+advertised elsewhere; if MP3 is not advertised at all, it is `invalid_request`.
+Filter approval choices by the requested format. Fail before `accepted` when
+support is knowable, and never silently change encoding or providers. A saved
+grant does not authorize switching routes to satisfy a different format.
 Implementations must document conservative input/output limits and reject before
 approval when source metadata makes that possible. The standard fixes no
 provider-derived byte cap. Never truncate text or audio to fit a limit silently.
@@ -995,15 +1011,25 @@ Do not expose replacement/interim corrections, timestamps, or segment objects.
 
 Synthesis yields one or more `audio_delta` chunks, even for a non-streaming
 upstream response. Every chunk contains `Uint8Array` encoded bytes and
-`mediaType: "audio/mpeg"`. Concatenating bytes in order must reproduce the MP3
-exactly. `done.audio.byteLength` must equal that byte count; `done.audio` is
+the requested media type (including the MP3 default). Every `audio_delta.mediaType`
+and `done.audio.mediaType` must match that type. Concatenating bytes in order
+must reproduce exactly one complete playable file, with the original encoded
+bytes preserved. `done.audio.byteLength` must equal that byte count; `done.audio` is
 metadata and must not duplicate bytes. `usage.inputCharacters`, when reported,
 counts input Unicode code points; `usage.outputSeconds` optionally reports output
 duration. Usage is optional and must not be fabricated. Counts and durations
 must be finite and nonnegative; byte lengths must be positive safe integers.
 
-IPA returns bytes and never starts playback. Pages may construct an
-`audio/mpeg` `Blob`, attach controls, and play only following an explicit user
+For WAV, chunks are transport fragments of one RIFF/WAVE file, not independent
+WAV files. The complete file has a single RIFF container with valid sizes,
+format information, and audio data; do not prepend a header to every chunk or
+label headerless PCM as WAV. A complete unary provider result may be split into
+bounded byte chunks with the same backpressure and cancellation rules. Invalid
+containers, mismatched MIME types, truncated output, or inconsistent byte counts
+are `provider_error` and must not yield a successful `done`.
+
+IPA returns bytes and never starts playback. Pages may construct a `Blob` using
+the returned media type, attach controls, and play only following an explicit user
 action, subject to browser autoplay policy. See the browser-only
 [speech examples](./examples/speech/README.md).
 
@@ -1019,7 +1045,7 @@ Transcription approval must identify the operation, provider/model, media type,
 byte size, and container/audio codec/duration when known. For a video container,
 disclose that the complete file may be uploaded even though only audio is
 transcribed. Synthesis approval must identify generated speech and show the
-provider/model/voice. A page cannot override that choice.
+provider/model/voice and requested output format. A page cannot override the route choice.
 
 Implementations must update privacy disclosures before shipping speech. Recordings
 can contain biometric voice data, bystander speech, location/health information,
@@ -1072,7 +1098,7 @@ Image parts in `messages` and `output.images` are each distinct from chat, funct
 - Decision media attachments, structured instructions/criteria, additional question types, partial answers, and page-selected decision routes or generation controls
 - Live/unbounded audio, realtime or duplex speech sessions, and conversational audio understanding through chat
 - Transcription translation, timestamps, segments, confidence, diarization, and transcript replacement
-- Synthesis formats other than MP3, page-selected model/voice IDs, voice cloning, custom voice enrollment, and speaking-rate/style controls
+- Synthesis formats other than MP3 and WAV (including raw PCM), page-selected model/voice IDs, voice cloning, custom voice enrollment, multi-speaker audio, and speaking-rate/style controls
 - Video understanding, frame inspection, OCR, or subtitle extraction through transcription
 - Image generation as a page-facing `{ type: "image_generation" }` tool (content parts + `output.images` is the canonical surface)
 - Other hosted / provider-executed tools (for example MCP)

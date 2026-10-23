@@ -33,7 +33,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Avatar demo](https://samsamskies.github.io/inference-provider-api/avatar/) — describe a character, generate an SVG avatar with [`ipa-tools`](./packages/ipa-tools) `complete`, download PNG ([source](./examples/avatar/))
 - [Nostr feed demo](https://samsamskies.github.io/inference-provider-api/nostr/) — a feed of Nostr notes filtered with natural language via IPA tool calling ([source](./examples/nostr/))
 - [Charts demo](https://samsamskies.github.io/inference-provider-api/charts/) — natural-language charts via IPA tool calling (`render_chart` generative UI) ([source](./examples/charts/))
-- [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 ([source](./examples/speech/))
+- [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 or WAV ([source](./examples/speech/))
 - [Decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/) — triage a message with typed category, urgency, and reply-needed judgments ([source](./examples/decisions/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
@@ -113,10 +113,10 @@ const features = window.inference.getFeatures?.() ?? {};
 | [Image output](./SPEC.md#images) | `features.imageOutput` | `output: { images: true }`; image parts appear on `done.message.content` |
 | [Typed decisions](./SPEC.md#typed-decisions-system-one) | `features.methods?.decide` | `method: "decide"` with JSON `state` and named `noul` / `choice` / `score` questions; `accepted` then `done.answers`, including per-question refusals |
 | [Transcription](./SPEC.md#bounded-speech) | `features.methods?.transcribe?.acceptedMedia` | `method: "transcribe"` with completed `media`; text on `done.transcript` |
-| [MP3 synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 bytes in `audio_delta` chunks |
+| [Speech synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 by default, optional advertised WAV in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. See the [speech examples](./examples/speech/README.md) for uploads, MP3 playback, URL input, and cancellation.
+Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. See the [speech examples](./examples/speech/README.md) for uploads, format discovery and playback, URL input, and cancellation.
 
 ### Permissions
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+These changes require the next major release, **3.0.0**; 2.x remains MP3-only.
+
+### Breaking
+
+- `SynthesisChunk` MIME fields now use the exported `SynthesisMediaType` union (`audio/mpeg` or `audio/wav`), and `InferenceFeatures.methods.synthesize` also accepts `{ outputMediaTypes: SynthesisMediaType[] }`. Exhaustive MIME handlers and boolean-only discovery code must account for the new variants. Existing requests, the MP3 default, and legacy `synthesize: true` keep their behavior.
+
+### Added
+
+- Optional explicit WAV synthesis, identity-free format discovery, and format-aware fallback filtering before session creation, including created/cached/concurrent client checks. Unknown and unadvertised formats fail with `invalid_request`; selected-route errors propagate without changing providers.
+- Browser demo format selection and returned-MIME Blob assembly; shared conformance assertions for byte-exact WAV fragments, one RIFF/WAVE container, MIME/length consistency, malformed output, and cancellation. Synthetic fixtures validate transport, not live provider availability.
+
 ## [2.0.0] - 2026-10-19
 
 ### Breaking

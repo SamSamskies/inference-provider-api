@@ -1,6 +1,6 @@
 import { isInferenceError, makeInferenceError } from "./errors.js";
 import { getInference, isInferenceAvailable } from "./inference.js";
-import { supportsTranscription } from "./methods.js";
+import { supportsSynthesis, supportsTranscription } from "./methods.js";
 import type {
   Inference,
   InferenceFeatures,
@@ -190,7 +190,7 @@ function featuresSupportNeeded(
   if (needs.method === "transcribe" && !supportsTranscription(features, needs.mediaType)) {
     return false;
   }
-  if (needs.method === "synthesize" && features.methods?.synthesize !== true) {
+  if (needs.method === "synthesize" && !supportsSynthesis(features, needs.mediaType)) {
     return false;
   }
   if (needs.tools && features.toolCalling !== true) return false;
@@ -221,7 +221,7 @@ function capabilitySkipMessage(needs: CapabilityNeeds): string {
   if (needs.method === "transcribe") {
     labels.push(`transcription${needs.mediaType ? ` of ${needs.mediaType}` : ""}`);
   }
-  if (needs.method === "synthesize") labels.push("speech synthesis");
+  if (needs.method === "synthesize") labels.push(`speech synthesis${needs.mediaType ? ` as ${needs.mediaType}` : ""}`);
   if (needs.tools) labels.push("tool calling");
   if (needs.webSearch) labels.push("web search");
   if (needs.imageInput) labels.push("image input");

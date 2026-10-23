@@ -49,6 +49,7 @@ export type {
   TranscriptionDoneChunk,
   TranscriptionUsage,
   SynthesizeRequest,
+  SynthesisMediaType,
   SynthesisChunk,
   SynthesisDoneChunk,
   SynthesisUsage,

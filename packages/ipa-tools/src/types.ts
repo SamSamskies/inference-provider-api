@@ -105,10 +105,13 @@ export type TranscribeRequest = {
   signal?: AbortSignal;
 };
 
+export type SynthesisMediaType = "audio/mpeg" | "audio/wav";
+
 export type SynthesizeRequest = {
   method: "synthesize";
   text: string;
-  output?: { mediaType?: "audio/mpeg" };
+  /** Omitted output or mediaType means MP3; WAV requires explicit discovery. */
+  output?: { mediaType?: SynthesisMediaType };
   signal?: AbortSignal;
 };
 
@@ -203,11 +206,11 @@ export type TranscriptionChunk =
 
 export type SynthesisChunk =
   | { type: "accepted" }
-  | { type: "audio_delta"; mediaType: "audio/mpeg"; data: Uint8Array }
+  | { type: "audio_delta"; mediaType: SynthesisMediaType; data: Uint8Array }
   | {
       type: "done";
       model: string;
-      audio: { mediaType: "audio/mpeg"; byteLength: number };
+      audio: { mediaType: SynthesisMediaType; byteLength: number };
       usage?: SynthesisUsage;
     };
 
@@ -239,7 +242,8 @@ export type InferenceFeatures = {
   methods?: {
     decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
-    synthesize?: boolean;
+    /** true means MP3 only; an object declares exactly its nonempty format list. */
+    synthesize?: boolean | { outputMediaTypes: SynthesisMediaType[] };
   };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
