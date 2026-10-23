@@ -50,7 +50,8 @@ fields are omitted; the demo does not estimate token counts.
   use the player's **Download** menu item and confirm the saved file plays.
   **Clear audio** should remove the player.
 - Verify legacy MP3-only discovery, object discovery offering both formats, and
-  WAV-only discovery. Only advertised format radio buttons should appear; the selected format
+  WAV-only discovery. Show the format radio group only when both formats are
+  advertised; a sole supported format is selected automatically. The selected format
   must match the player metadata and Blob MIME.
 - Cancel while awaiting approval and during provider work. Expect **Cancelled**
   with no completed output; partial transcript text is labelled incomplete.

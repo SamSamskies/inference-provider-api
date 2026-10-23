@@ -161,7 +161,7 @@
           <p class="description" id="synthesize-support">Write something to hear aloud. You choose the voice in your extension.</p>
           <label for="speech-text">Text to read</label>
           <textarea id="speech-text" spellcheck="true">Ain’t it fun living in the real world?</textarea>
-          <fieldset class="output-format" id="output-format" disabled>
+          <fieldset class="output-format" id="output-format" disabled hidden>
             <legend>Audio format</legend>
             <div class="format-options" id="output-options"></div>
           </fieldset>
@@ -263,6 +263,7 @@
         const advertised = synthesis === true ? ["audio/mpeg"] : synthesis?.outputMediaTypes;
         outputMediaTypes = Array.isArray(advertised) && advertised.length && advertised.every((type) => type === "audio/mpeg" || type === "audio/wav") ? [...new Set(advertised)] : [];
         canSynthesize = outputMediaTypes.length > 0;
+        outputFormat.hidden = outputMediaTypes.length < 2;
         const previousOutput = outputOptions.querySelector("input:checked")?.value;
         const selectedOutput = outputMediaTypes.includes(previousOutput) ? previousOutput : outputMediaTypes.includes("audio/mpeg") ? "audio/mpeg" : outputMediaTypes[0];
         outputOptions.replaceChildren(...outputMediaTypes.map((type) => {
