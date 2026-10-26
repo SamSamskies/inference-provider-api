@@ -2017,27 +2017,19 @@
         eventDialogEl.close();
       });
 
-      document.getElementById("recheck").addEventListener("click", () => {
+      function syncAvailability() {
         refreshAvailability();
-        setBusy(false);
-      });
-      window.addEventListener("focus", () => {
-        refreshAvailability();
-        setBusy(false);
-      });
-      window.addEventListener("pageshow", () => {
-        refreshAvailability();
-        setBusy(false);
-      });
+        if (!activeController) setBusy(false);
+      }
 
-      refreshAvailability();
-      setBusy(false);
+      document.getElementById("recheck").addEventListener("click", syncAvailability);
+      window.addEventListener("focus", syncAvailability);
+      window.addEventListener("pageshow", syncAvailability);
+
+      syncAvailability();
       if (!hasToolCalling()) {
         void waitForInference()
-          .then(() => {
-            refreshAvailability();
-            setBusy(false);
-          })
+          .then(syncAvailability)
           .catch(() => {
             /* stay unavailable */
           });

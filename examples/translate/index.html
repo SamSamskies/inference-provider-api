@@ -752,6 +752,7 @@ one book finds my hand</p></div>
           statusEl.textContent = "ready";
           statusEl.className = "ready";
           connectionEl.hidden = true;
+          if (activeController) return true;
           setBusy(false);
           return true;
         }
@@ -764,6 +765,7 @@ one book finds my hand</p></div>
         connectionMessage.textContent = usableContext
           ? "Install Inference Bridge, then reload this page to get started."
           : "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported.";
+        if (activeController) return false;
         translateBtn.disabled = true;
         languageEl.disabled = true;
         resetBtn.disabled = !showingTranslation;
