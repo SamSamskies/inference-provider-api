@@ -29,8 +29,9 @@ jobs:
 
       - name: Prepare site
         run: |
-          mkdir -p _site/chat _site/social/avatars _site/translate _site/avatar _site/nostr _site/prompt-api-fallback _site/charts _site/speech _site/decisions
+          mkdir -p _site/og _site/chat _site/social/avatars _site/translate _site/avatar _site/nostr _site/prompt-api-fallback _site/charts _site/speech _site/decisions
           cp examples/index.html _site/index.html
+          cp examples/og/*.png _site/og/
           cp examples/chat/index.html _site/chat/index.html
           cp examples/social/index.html _site/social/index.html
           cp examples/social/data.json _site/social/data.json
