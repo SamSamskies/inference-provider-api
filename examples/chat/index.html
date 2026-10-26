@@ -645,7 +645,8 @@
         height: 1.1rem;
       }
 
-      .icon-btn svg[hidden] {
+      .icon-btn[data-mode="send"] .icon-stop,
+      .icon-btn[data-mode="stop"] .icon-send {
         display: none;
       }
 
@@ -832,7 +833,7 @@
                     d="M8 13.75a.75.75 0 0 1-.75-.75V5.31L4.53 8.03a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 1 1-1.06 1.06L8.75 5.31V13a.75.75 0 0 1-.75.75"
                   />
                 </svg>
-                <svg class="icon-stop" viewBox="0 0 16 16" aria-hidden="true" hidden>
+                <svg class="icon-stop" viewBox="0 0 16 16" aria-hidden="true">
                   <rect x="4" y="4" width="8" height="8" rx="1.25" fill="currentColor" />
                 </svg>
               </button>
@@ -854,8 +855,6 @@
       const attachPreview = document.getElementById("attach-preview");
       const webSearchBtn = document.getElementById("web-search");
       const composerHint = document.getElementById("composer-hint");
-      const sendIcon = primaryBtn.querySelector(".icon-send");
-      const stopIcon = primaryBtn.querySelector(".icon-stop");
       const connectionEl = document.getElementById("connection");
       const connectionTitle = document.getElementById("connection-title");
       const connectionMessage = document.getElementById("connection-message");
@@ -1091,8 +1090,6 @@
           stopping ? "Stop generating" : "Send message",
         );
         primaryBtn.title = stopping ? "Stop" : "Send";
-        sendIcon.hidden = stopping;
-        stopIcon.hidden = !stopping;
       }
 
       function setBusy(busy) {
