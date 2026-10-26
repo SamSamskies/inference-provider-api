@@ -16,6 +16,8 @@
         --paper: #fafcf9;
         --accent: #0d7a5f;
         --danger: #a61e1e;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
         --font: "IBM Plex Sans", system-ui, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, monospace;
       }
@@ -40,7 +42,7 @@
       .source svg { display: block; width: 1.05rem; height: 1.05rem; }
       .gallery:hover, .source:hover { color: var(--accent); }
       .gallery:focus-visible, .source:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-      #connection-status { border: 1px solid var(--line); border-radius: 999px; padding: 0.2rem 0.5rem; background: var(--surface); font: 0.72rem var(--mono); color: var(--muted); }
+      #connection-status { border: 1px solid transparent; border-radius: 999px; padding: 0.2rem 0.5rem; background: var(--warn-soft); font: 0.72rem var(--mono); color: var(--warn); }
       #connection-status[data-ready="true"] { color: var(--accent); background: #d8efe6; border-color: #b7dccf; }
       .intro { margin: 0 0 1.25rem; color: var(--muted); }
       .connection { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; margin-bottom: 1.25rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
