@@ -1227,9 +1227,12 @@
           statusEl.textContent = "ready";
           statusEl.className = "ready";
           connectionEl.hidden = true;
+          if (discoveryTimer) {
+            clearInterval(discoveryTimer);
+            discoveryTimer = null;
+          }
           if (activeController) return true;
           setBusy(false);
-          input.focus();
           return true;
         }
         statusEl.textContent = "unavailable";
@@ -1489,10 +1492,16 @@
       window.addEventListener("pagehide", () => {
         if (discoveryTimer) clearInterval(discoveryTimer);
       });
-      if (!refreshAvailability()) {
+      if (refreshAvailability()) {
+        input.focus();
+      } else {
         const deadline = Date.now() + 3_000;
         discoveryTimer = setInterval(() => {
-          if (refreshAvailability() || Date.now() >= deadline) {
+          if (refreshAvailability()) {
+            input.focus();
+            return;
+          }
+          if (Date.now() >= deadline) {
             clearInterval(discoveryTimer);
             discoveryTimer = null;
           }

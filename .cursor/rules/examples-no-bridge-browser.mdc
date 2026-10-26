@@ -1,0 +1,16 @@
+---
+description: Do not verify IPA example apps in the Cursor browser — no Inference Bridge
+alwaysApply: true
+---
+
+# Examples are not verifiable in the agent browser
+
+Cursor’s IDE browser does **not** have [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd). `window.inference` is never injected there, so IPA demos under `examples/` cannot be exercised end to end.
+
+Do not:
+
+- Retry chat, translate, avatar, social, nostr, charts, speech, or similar demo flows in that browser
+- Stub or inject a fake `window.inference` to work around the missing bridge
+- Treat the connect-extension / unavailable banner as a failed check of the ready path
+
+Verify by reading the code or asking the user to try it with Inference Bridge installed. The only UI the agent browser can show is the unavailable empty state.
