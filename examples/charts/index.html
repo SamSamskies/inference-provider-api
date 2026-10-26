@@ -137,6 +137,83 @@
         border-color: transparent;
       }
 
+      .connection {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        margin-bottom: 1.1rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+
+      .connection[hidden] {
+        display: none !important;
+      }
+
+      .connection-copy {
+        min-width: 0;
+      }
+
+      .connection-title {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .connection p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.825rem;
+      }
+
+      .connection-actions {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .connection-actions > * {
+        white-space: nowrap;
+      }
+
+      .connection-actions .button,
+      .connection-actions button {
+        display: inline-block;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.5rem 0.8rem;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        min-height: 0;
+      }
+
+      .connection-actions .button {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .connection-actions .button:hover {
+        background: #2a322e;
+      }
+
+      .connection-actions button.secondary {
+        background: var(--surface);
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      .connection-actions button.secondary:hover {
+        background: #e8eee9;
+      }
+
       .lede {
         margin: 0 0 1rem;
         color: var(--muted);
@@ -534,6 +611,14 @@
         flex: none;
       }
 
+      @media (max-width: 760px) {
+        .connection {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+      }
+
       @media (max-width: 560px) {
         .search-row {
           flex-direction: column;
@@ -541,6 +626,15 @@
 
         .primary {
           width: 100%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .connection-actions {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          text-align: center;
         }
       }
     </style>
@@ -572,6 +666,17 @@
       <p class="lede">
         Ask for a chart in plain language.
       </p>
+
+      <div class="connection" id="connection" hidden>
+        <div class="connection-copy">
+          <strong class="connection-title" id="connection-title">Connect an extension</strong>
+          <p id="connection-message"></p>
+        </div>
+        <div class="connection-actions">
+          <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+          <button class="secondary" id="recheck" type="button">Check again</button>
+        </div>
+      </div>
 
       <section class="dataset" aria-labelledby="dataset-title">
         <div class="dataset-head">
@@ -702,6 +807,9 @@
       };
 
       const statusEl = document.getElementById("status");
+      const connectionEl = document.getElementById("connection");
+      const connectionTitle = document.getElementById("connection-title");
+      const connectionMessage = document.getElementById("connection-message");
       const queryEl = document.getElementById("query");
       const chartBtn = document.getElementById("chart-btn");
       const clearBtn = document.getElementById("clear");
@@ -773,12 +881,29 @@
       }
 
       function refreshAvailability() {
+        const usableContext =
+          window.isSecureContext &&
+          location.origin !== "null" &&
+          window.top === window;
+        const available = isInferenceAvailable();
         if (hasToolCalling()) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
+          connectionEl.hidden = true;
           return true;
         }
-        if (isInferenceAvailable()) {
+        connectionEl.hidden = false;
+        connectionTitle.textContent = !usableContext
+          ? "Open a supported page"
+          : !available
+            ? "Connect an extension"
+            : "Tool calling unavailable";
+        connectionMessage.textContent = !usableContext
+          ? "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported."
+          : !available
+            ? "Install Inference Bridge, then reload this page to get started."
+            : "Use an extension that advertises tool calling, then check again.";
+        if (available) {
           statusEl.textContent = "no tools";
           statusEl.className = "missing";
           return false;
@@ -1529,6 +1654,19 @@
           resizeTimer = 0;
           drawChart(lastChartSpec, { silent: true });
         }, 120);
+      });
+
+      document.getElementById("recheck").addEventListener("click", () => {
+        refreshAvailability();
+        setBusy(false);
+      });
+      window.addEventListener("focus", () => {
+        refreshAvailability();
+        setBusy(false);
+      });
+      window.addEventListener("pageshow", () => {
+        refreshAvailability();
+        setBusy(false);
       });
 
       refreshAvailability();

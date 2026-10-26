@@ -156,6 +156,85 @@
         color: var(--warn);
       }
 
+      .connection {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        max-width: var(--thread-max);
+        width: 100%;
+        margin: 0 auto 0.5rem;
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--bg-elevated);
+        box-sizing: border-box;
+      }
+
+      .connection[hidden] {
+        display: none !important;
+      }
+
+      .connection-copy {
+        min-width: 0;
+      }
+
+      .connection-title {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .connection p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.825rem;
+      }
+
+      .connection-actions {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .connection-actions > * {
+        white-space: nowrap;
+      }
+
+      .connection-actions .button,
+      .connection-actions button {
+        display: inline-block;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.5rem 0.8rem;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .connection-actions .button {
+        background: var(--ink);
+        color: var(--bg);
+      }
+
+      .connection-actions .button:hover {
+        filter: brightness(0.94);
+      }
+
+      .connection-actions button.secondary {
+        background: var(--bg-panel);
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      .connection-actions button.secondary:hover {
+        background: var(--bg);
+      }
+
       main {
         flex: 1;
         max-width: var(--thread-max);
@@ -607,6 +686,23 @@
           display: none;
         }
       }
+
+      @media (max-width: 760px) {
+        .connection {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .connection-actions {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          text-align: center;
+        }
+      }
     </style>
   </head>
   <body>
@@ -633,6 +729,17 @@
             <div id="status" class="missing" role="status">checking…</div>
           </div>
         </header>
+
+        <div class="connection" id="connection" hidden>
+          <div class="connection-copy">
+            <strong class="connection-title" id="connection-title">Connect an extension</strong>
+            <p id="connection-message"></p>
+          </div>
+          <div class="connection-actions">
+            <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+            <button class="secondary" id="recheck" type="button">Check again</button>
+          </div>
+        </div>
 
         <main>
           <article id="note" class="note" aria-busy="true"></article>
@@ -692,6 +799,11 @@
       const sendBtn = document.getElementById("send");
       const clearBtn = document.getElementById("clear");
       const abortBtn = document.getElementById("abort");
+      const connectionEl = document.getElementById("connection");
+      const connectionTitle = document.getElementById("connection-title");
+      const connectionMessage = document.getElementById("connection-message");
+      /** @type {ReturnType<typeof setInterval> | null} */
+      let discoveryTimer = null;
 
       /** @type {AbortController | null} */
       let activeController = null;
@@ -946,17 +1058,27 @@
       }
 
       function refreshAvailability() {
-        if (
-          window.inference &&
-          typeof window.inference.request === "function"
-        ) {
+        const usableContext =
+          window.isSecureContext &&
+          location.origin !== "null" &&
+          window.top === window;
+        const ipa = usableContext && window.inference;
+        if (typeof ipa?.request === "function") {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
+          connectionEl.hidden = true;
           setBusy(false);
           return true;
         }
         statusEl.textContent = "unavailable";
         statusEl.className = "missing";
+        connectionEl.hidden = false;
+        connectionTitle.textContent = usableContext
+          ? "Connect an extension"
+          : "Open a supported page";
+        connectionMessage.textContent = usableContext
+          ? "Install Inference Bridge, then reload this page to get started."
+          : "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported.";
         sendBtn.disabled = true;
         input.disabled = true;
         clearBtn.disabled = history.length === 0 && !logEl.firstChild;
@@ -1117,12 +1239,23 @@
         input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
       });
 
+      document.getElementById("recheck").addEventListener("click", refreshAvailability);
+      window.addEventListener("focus", refreshAvailability);
+      window.addEventListener("pageshow", refreshAvailability);
+      window.addEventListener("pagehide", () => {
+        if (discoveryTimer) clearInterval(discoveryTimer);
+      });
+
       async function init() {
         if (!refreshAvailability()) {
-          appendMeta(
-            "window.inference is missing — install Inference Bridge and open this page over https or localhost.",
-          );
           clearBtn.disabled = false;
+          const deadline = Date.now() + 3_000;
+          discoveryTimer = setInterval(() => {
+            if (refreshAvailability() || Date.now() >= deadline) {
+              clearInterval(discoveryTimer);
+              discoveryTimer = null;
+            }
+          }, 100);
         }
 
         try {
