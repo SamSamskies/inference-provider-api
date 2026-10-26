@@ -21,6 +21,8 @@
         --accent-soft: #d8efe6;
         --danger: #a61e1e;
         --danger-soft: #f8e4e4;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
         --radius: 10px;
         --font: "IBM Plex Sans", system-ui, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -130,9 +132,85 @@
       }
 
       #status.missing {
-        color: var(--danger);
-        background: var(--danger-soft);
-        border-color: #ebc5c5;
+        color: var(--warn);
+        background: var(--warn-soft);
+        border-color: transparent;
+      }
+
+      .connection {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        margin-bottom: 1.15rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+
+      .connection[hidden] {
+        display: none !important;
+      }
+
+      .connection-copy {
+        min-width: 0;
+      }
+
+      .connection-title {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .connection p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.825rem;
+      }
+
+      .connection-actions {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .connection-actions > * {
+        white-space: nowrap;
+      }
+
+      .connection-actions .button,
+      .connection-actions button {
+        display: inline-block;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.5rem 0.8rem;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .connection-actions .button {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .connection-actions .button:hover {
+        background: #2a322e;
+      }
+
+      .connection-actions button.secondary {
+        background: var(--surface);
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      .connection-actions button.secondary:hover {
+        background: #e8eee9;
       }
 
       .layout {
@@ -519,6 +597,23 @@
         font-family: var(--mono);
         font-size: 0.8em;
       }
+
+      @media (max-width: 760px) {
+        .connection {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .connection-actions {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          text-align: center;
+        }
+      }
     </style>
   </head>
   <body>
@@ -544,6 +639,17 @@
           <div id="status" class="missing" role="status">checking…</div>
         </div>
       </header>
+
+      <div class="connection" id="connection" hidden>
+        <div class="connection-copy">
+          <strong class="connection-title" id="connection-title">Connect an extension</strong>
+          <p id="connection-message"></p>
+        </div>
+        <div class="connection-actions">
+          <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+          <button class="secondary" id="recheck" type="button">Check again</button>
+        </div>
+      </div>
 
       <div class="layout">
         <div class="form-col">
@@ -720,6 +826,9 @@
         "path, circle, rect, ellipse, polygon, polyline, line, g, text, use";
 
       const statusEl = document.getElementById("status");
+      const connectionEl = document.getElementById("connection");
+      const connectionTitle = document.getElementById("connection-title");
+      const connectionMessage = document.getElementById("connection-message");
       const descriptionEl = document.getElementById("description");
       const samplesEl = document.getElementById("samples");
       const createBtn = document.getElementById("create");
@@ -966,14 +1075,28 @@
       }
 
       function refreshAvailability() {
+        const usableContext =
+          window.isSecureContext &&
+          location.origin !== "null" &&
+          window.top === window;
         if (isInferenceAvailable()) {
           statusEl.textContent = "ready";
           statusEl.className = "ready";
+          connectionEl.hidden = true;
+          if (activeController) return true;
           setBusy(false);
           return true;
         }
         statusEl.textContent = "unavailable";
         statusEl.className = "missing";
+        connectionEl.hidden = false;
+        connectionTitle.textContent = usableContext
+          ? "Connect an extension"
+          : "Open a supported page";
+        connectionMessage.textContent = usableContext
+          ? "Install Inference Bridge, then reload this page to get started."
+          : "Open this demo in a top-level HTTPS or localhost page. File URLs are not supported.";
+        if (activeController) return false;
         createBtn.disabled = true;
         descriptionEl.disabled = true;
         resetBtn.disabled = currentSvg == null;
@@ -1207,12 +1330,14 @@
 
       window.addEventListener("pagehide", revokePreview);
 
+      document.getElementById("recheck").addEventListener("click", refreshAvailability);
+      window.addEventListener("focus", refreshAvailability);
+      window.addEventListener("pageshow", refreshAvailability);
+
       if (!refreshAvailability()) {
-        metaEl.textContent =
-          "window.inference is missing — install Inference Bridge and open this page over https or localhost.";
         void waitForInference()
           .then(() => {
-            if (refreshAvailability()) metaEl.textContent = "";
+            refreshAvailability();
           })
           .catch(() => {
             /* stay unavailable after timeout */

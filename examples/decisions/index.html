@@ -16,6 +16,8 @@
         --paper: #fafcf9;
         --accent: #0d7a5f;
         --danger: #a61e1e;
+        --warn: #8a5a00;
+        --warn-soft: #f5edd8;
         --font: "IBM Plex Sans", system-ui, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, monospace;
       }
@@ -33,7 +35,7 @@
       .source svg { display: block; width: 1.05rem; height: 1.05rem; }
       .gallery:hover, .source:hover { color: var(--accent); }
       .gallery:focus-visible, .source:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-      #connection-status { padding: 0.2rem 0.5rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: 0.72rem var(--mono); white-space: nowrap; }
+      #connection-status { padding: 0.2rem 0.5rem; border: 1px solid transparent; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font: 0.72rem var(--mono); white-space: nowrap; }
       #connection-status[data-ready="true"] { color: var(--accent); background: #d8efe6; border-color: #b7dccf; }
       h1 { margin: 0 0 0.35rem; font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 500; letter-spacing: -0.035em; }
       .intro { margin: 0 0 1.75rem; color: var(--muted); max-width: 45rem; }
