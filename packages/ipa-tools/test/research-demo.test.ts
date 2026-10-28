@@ -14,9 +14,9 @@ if (!packageImport) throw new Error("Research demo import is missing.");
 const demo = new Function("ipaTools", `
   const { ${packageImport[1]} } = ipaTools;
   ${script.slice(packageImport[0].length).split(setupMarker)[0]}
-  return { availability, answerSegments, createResearchTools, LIMITS, runResearch };
+  return { availability, answerSegments, createResearchTools, LIMITS, runResearch, showResearchError };
 `)(ipaTools);
-const { availability, answerSegments, createResearchTools, LIMITS } = demo;
+const { availability, answerSegments, createResearchTools, LIMITS, showResearchError } = demo;
 
 function runResearch({ inference, input, ...runOptions }: ReturnType<typeof options> & {
   signal?: AbortSignal;
@@ -46,6 +46,15 @@ function inference(...turns: ChatChunk[][]) {
 }
 function options(provider = inference([search()], [read()], [answer()])) {
   return { inference: provider, input: "How did GPS reach civilians?", fetchImpl: vi.fn(async () => pages()) };
+}
+function view() {
+  const node = () => ({ hidden: false, textContent: "", dataset: {}, append() {} });
+  const nodes: Record<string, ReturnType<typeof node>> = {
+    error: { ...node(), hidden: true }, status: node(), "activity-state": node(),
+    "empty-activity": node(), activity: node(),
+  };
+  vi.stubGlobal("document", { getElementById: (id: string) => nodes[id] ?? null, createElement: node });
+  return nodes;
 }
 afterEach(() => {
   vi.useRealTimers();
@@ -188,7 +197,9 @@ describe("Topic Explorer demo", () => {
     const run = runResearch({ ...opts, signal: controller.signal, onEvent: (e: unknown) => events.push(e) });
     await vi.waitFor(() => expect(opts.inference.request).toHaveBeenCalledOnce());
     controller.abort();
-    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    const cancelled = await run.then(() => { throw new Error("expected cancellation"); }, (error) => error);
+    expect(cancelled).toMatchObject({ name: "AbortError" });
+    expect(cancelled).not.toMatchObject({ name: "InferenceError", code: "aborted" });
     const count = events.length; release(); await Promise.resolve();
     expect(events).toHaveLength(count);
     expect(opts.fetchImpl).not.toHaveBeenCalled();
@@ -200,8 +211,31 @@ describe("Topic Explorer demo", () => {
     const run = runResearch({ ...opts, signal: controller.signal, onEvent: (e: any) => {
       if (e.type === "tool_started") queueMicrotask(() => controller.abort());
     } });
-    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    const cancelled = await run.then(() => { throw new Error("expected cancellation"); }, (error) => error);
+    expect(cancelled).toMatchObject({ name: "AbortError" });
+    expect(cancelled).not.toMatchObject({ name: "InferenceError", code: "aborted" });
     expect(opts.inference.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows limit failures and hides the error banner only for Stop", () => {
+    const nodes = view();
+    const aborted = Object.assign(new Error("Request aborted"), { name: "InferenceError", code: "aborted" });
+    showResearchError(aborted, AbortSignal.abort());
+    expect(nodes.error.hidden).toBe(true);
+    expect(nodes.status.textContent).toBe("Research stopped. No completed answer.");
+    expect(nodes["activity-state"].textContent).toBe("Stopped");
+
+    const live = new AbortController().signal;
+    showResearchError(Object.assign(new Error("Model output limit reached. Try a narrower question."), { code: "output_limit" }), live);
+    expect(nodes.error.hidden).toBe(false);
+    expect(nodes.error.textContent).toContain("output limit");
+    expect(nodes.status.textContent).toBe("No completed answer. Any articles already read remain below.");
+    expect(nodes["activity-state"].textContent).toBe("Failed");
+
+    showResearchError(aborted, live);
+    expect(nodes.error.hidden).toBe(false);
+    expect(nodes.error.textContent).toBe("Request aborted");
+    expect(nodes["activity-state"].textContent).toBe("Failed");
   });
 
   it("applies network and whole-run deadlines even when external work ignores abort", async () => {
