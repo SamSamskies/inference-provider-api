@@ -82,17 +82,17 @@ export function createAgent(config: CreateAgentOptions): Agent {
       const emit = (event: AgentEvent) => options.onEvent?.(event);
       let result: AgentRunResult;
       try {
-        emit({ type: "agent_started", agentName: name });
         if (typeof input !== "string" ||
             (options.history !== undefined && !Array.isArray(options.history))) {
           throw makeInferenceError("invalid_request", "Agent run requires string input and an optional history array.");
         }
-        if (options.signal?.aborted) {
-          throw makeInferenceError("aborted", "Request aborted");
-        }
         if (options.maxRounds !== undefined &&
             (!Number.isInteger(options.maxRounds) || options.maxRounds < 1)) {
           throw makeInferenceError("invalid_request", "Agent maxRounds must be a positive integer.");
+        }
+        emit({ type: "agent_started", agentName: name });
+        if (options.signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
         }
         let request = customRequest;
         if (!request) {

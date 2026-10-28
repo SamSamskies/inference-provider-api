@@ -412,7 +412,7 @@ every provider call.
 
 | `type` | Additional fields / meaning |
 | --- | --- |
-| `agent_started` | Run has begun |
+| `agent_started` | Run has begun, after input/`maxRounds` checks |
 | `request_accepted` | A provider round was accepted |
 | `text_delta` / `reasoning_delta` | `content`, when the provider emits it |
 | `tool_started` | `id`, `name`, parsed `arguments`; immediately before execution |

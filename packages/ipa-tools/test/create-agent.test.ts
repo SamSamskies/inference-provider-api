@@ -178,9 +178,25 @@ describe("createAgent", () => {
 
   it.each([0, -1, 1.5, Infinity, NaN])("rejects invalid agent maxRounds %s before requesting", async (maxRounds) => {
     const request = mockRequest([answer]);
-    await expect(createAgent({ name: "Test", instructions: "", request }).run("hi", { maxRounds }))
+    const events: AgentEvent[] = [];
+    await expect(createAgent({ name: "Test", instructions: "", request })
+      .run("hi", { maxRounds, onEvent: (event) => events.push(event) }))
       .rejects.toMatchObject({ code: "invalid_request" });
     expect(request).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(["agent_failed"]);
+  });
+
+  it.each([
+    { input: 1, options: {} },
+    { input: "hi", options: { history: { not: "array" } } },
+  ])("rejects invalid input or history before agent_started: %j", async ({ input, options }) => {
+    const request = mockRequest([answer]);
+    const events: AgentEvent[] = [];
+    await expect(createAgent({ name: "Test", instructions: "", request })
+      .run(input as never, { ...options, onEvent: (event) => events.push(event) }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(request).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(["agent_failed"]);
   });
 
   it.each(["executor", "serialization", "arguments", "missing_handler"])("reports tool and agent failure for %s errors", async (kind) => {
