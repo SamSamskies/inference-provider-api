@@ -20,13 +20,29 @@ HTTPS or localhost is required. `getFeatures().toolCalling === true` is checked
 before any inference; the feature flag does not guarantee that the selected model
 can fulfill tool requests. Setup, permission, provider, API and network errors are
 shown on the page. The compact header matches the other demos, with a readiness
-badge; the connection/setup panel appears only when needed. Late extension injection
-is detected briefly, with a manual "Check again" control in that panel and checks
-when the page regains focus.
+badge; the connection/setup panel appears only when needed. `isInferenceAvailable()`
+and `getFeatures()` check readiness immediately; `waitForInference()` detects late
+extension injection in the background. The setup panel also has a manual "Check
+again" control, and readiness is checked when the page regains focus.
 
-The helper loads from the pinned `https://esm.sh/ipa-tools@3.2.0` on first use.
-Google Fonts is optional; system fonts are the fallback. CDN failures and loading
-timeouts leave the setup UI usable. The gallery and Pages workflow include the demo.
+The script imports the helpers from the pinned `https://esm.sh/ipa-tools@3.2.0`
+at the top, as in the Nostr demo. The module must load before the page's controls
+initialize. Google Fonts is optional; system fonts are the fallback. The gallery
+and Pages workflow include the demo.
+
+## Reading the code
+
+The entire demo is in `index.html`, like the other examples. Its script has two
+sections:
+
+- **Research:** `runResearch(question, options)` defines the agent with `name`,
+  `instructions`, and `tools`, then calls `agent.run()`. It uses
+  the default `window.inference` route from the package README. Wikipedia tools,
+  cancellation, limits, and answer validation live here, without DOM updates.
+- **View:** named functions render activity, sources, answers, and errors.
+  `explore()` passes the question and view callbacks to `runResearch()`.
+  Connection setup uses the discovery helpers above, and `isInferenceError()`
+  identifies IPA errors for cancellation and provider-specific guidance.
 
 ## Research flow
 
@@ -76,7 +92,7 @@ never automatically retries or hammers a busy API.
 
 ## Bounds and cancellation
 
-`research.js` centralizes the application limits:
+The `LIMITS` constant in `index.html` centralizes the application limits:
 
 | Limit | Value |
 | --- | --- |
@@ -90,7 +106,6 @@ never automatically retries or hammers a busy API.
 | Combined streamed text/reasoning; final answer | 24,000 characters each |
 | Network request, including response body | 15 seconds |
 | Research run | 2 minutes |
-| Initial helper load | 15 seconds |
 
 Stop aborts the run, model request and fetches. The UI also releases on cancellation
 or deadlines if an external implementation ignores abort; late events are ignored.
@@ -108,8 +123,9 @@ Wikipedia text attribution and the CC BY-SA 4.0 license are shown with the sourc
 ## Verification
 
 Run `npm test` from the repository root. The deterministic research integration
-tests in `packages/ipa-tools/test/research-demo.test.ts` use the real `createAgent`
-loop with mocked IPA streams and Wikimedia responses. They cover multi-step
+tests in `packages/ipa-tools/test/research-demo.test.ts` load the inline script
+before its page event setup and use the real `createAgent` loop with mocked IPA
+streams and Wikimedia responses. They cover multi-step
 research, source provenance, empty results, validation, feature gating, failures,
 rate limits, truncation, byte/tool/round/output bounds, timeouts and cancellation.
 No provider calls or secrets are needed for these tests.
