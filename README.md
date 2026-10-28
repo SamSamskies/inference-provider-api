@@ -38,6 +38,13 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/) — triage a message with typed category, urgency, and reply-needed judgments ([source](./examples/decisions/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
+### Apps using IPA
+
+IPA-first, with a hosted fallback if no extension is installed:
+
+- [Trending Nostr](https://trendingnostr.vercel.app) — trending notes with Ask AI ([source](https://github.com/SamSamskies/trendingnostr))
+- [Advanced Nostr Search](https://advancednostrsearch.vercel.app) — search plus Ask AI ([source](https://github.com/SamSamskies/advancednostrsearch))
+
 ## Motivation
 
 AI-powered web applications often have to:

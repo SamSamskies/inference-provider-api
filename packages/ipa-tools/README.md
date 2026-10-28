@@ -209,7 +209,7 @@ Chrome Prompt API requirements, download disclosure, and mapping caveats live in
 
 ### Hosted / custom HTTP fallback
 
-Pass any object that implements `InferenceBackend`. A minimal same-origin JSON endpoint looks like this (consent, quotas, and auth headers stay in your app):
+Pass any object that implements `InferenceBackend`. A minimal same-origin JSON endpoint looks like this (consent, quotas, and auth headers stay in your app). Live examples of this pattern: [Trending Nostr](https://trendingnostr.vercel.app) and [Advanced Nostr Search](https://advancednostrsearch.vercel.app).
 
 ```ts
 import {
