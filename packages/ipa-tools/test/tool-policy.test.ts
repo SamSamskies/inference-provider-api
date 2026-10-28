@@ -138,28 +138,36 @@ describe("tool policies", () => {
 
   it.each(["validation", "approval"] as const)("aborts pending %s promptly and consumes late resolution/rejection", async (stage) => {
     for (const late of ["resolve", "reject"]) {
-      const controller = new AbortController();
-      const pending = deferred<boolean>();
-      const entered = deferred<void>();
-      const hook = () => { entered.resolve(); return pending.promise; };
-      const approval = vi.fn(stage === "approval" ? hook : () => true);
-      const { options, execute, onToolError, onToolResult, request } = setup({
-        validateArguments: stage === "validation" ? hook : () => true, requiresApproval: true,
-      }, { signal: controller.signal, onApprovalRequest: approval });
-      const removeListener = vi.spyOn(controller.signal, "removeEventListener");
-      const run = runTools(options);
-      const rejected = expect(run).rejects.toMatchObject({ code: "aborted" });
-      await entered.promise;
-      controller.abort();
-      await rejected;
-      if (late === "resolve") pending.resolve(true); else pending.reject(new Error("too late"));
-      await Promise.resolve();
-      expect(execute).not.toHaveBeenCalled();
-      expect(onToolResult).not.toHaveBeenCalled();
-      expect(onToolError).toHaveBeenCalledOnce();
-      expect(request).toHaveBeenCalledOnce();
-      if (stage === "validation") expect(approval).not.toHaveBeenCalled();
-      expect(removeListener).toHaveBeenCalledWith("abort", expect.any(Function));
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+      process.on("unhandledRejection", onUnhandled);
+      try {
+        const controller = new AbortController();
+        const pending = deferred<boolean>();
+        const entered = deferred<void>();
+        const hook = () => { entered.resolve(); return pending.promise; };
+        const approval = vi.fn(stage === "approval" ? hook : () => true);
+        const { options, execute, onToolError, onToolResult, request } = setup({
+          validateArguments: stage === "validation" ? hook : () => true, requiresApproval: true,
+        }, { signal: controller.signal, onApprovalRequest: approval });
+        const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+        const run = runTools(options);
+        const rejected = expect(run).rejects.toMatchObject({ code: "aborted" });
+        await entered.promise;
+        controller.abort();
+        await rejected;
+        if (late === "resolve") pending.resolve(true); else pending.reject(new Error("too late"));
+        await new Promise((r) => setTimeout(r));
+        expect(unhandled).toEqual([]);
+        expect(execute).not.toHaveBeenCalled();
+        expect(onToolResult).not.toHaveBeenCalled();
+        expect(onToolError).toHaveBeenCalledOnce();
+        expect(request).toHaveBeenCalledOnce();
+        if (stage === "validation") expect(approval).not.toHaveBeenCalled();
+        expect(removeListener).toHaveBeenCalledWith("abort", expect.any(Function));
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
     }
   });
 

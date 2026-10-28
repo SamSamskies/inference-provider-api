@@ -456,11 +456,13 @@ async function awaitToolGate(action: () => boolean | Promise<boolean>, signal?: 
       signal.addEventListener("abort", onAbort, { once: true });
     }
   });
+  const pending = Promise.resolve().then(() => {
+    if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
+    return action();
+  });
+  pending.catch(() => {});
   try {
-    const result = await Promise.race([Promise.resolve().then(() => {
-      if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
-      return action();
-    }), aborted]);
+    const result = await Promise.race([pending, aborted]);
     if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
     return result;
   } finally {
