@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Topic Explorer — IPA research agent</title>
+    <meta name="description" content="Follow a browser-native AI agent as it searches Wikipedia, reads articles, and answers with sources. No application API keys." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Inference Provider API" />
+    <meta property="og:title" content="Topic Explorer — IPA research agent" />
+    <meta property="og:description" content="Ask a question. Follow the research. Explore the sources." />
+    <meta property="og:url" content="https://samsamskies.github.io/inference-provider-api/research/" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="app-header">
+        <h1>Topic Explorer <span>research agent</span></h1>
+        <div class="header-meta">
+          <a class="gallery" href="../">All examples</a>
+          <a class="source" href="https://github.com/SamSamskies/inference-provider-api/tree/main/examples/research" target="_blank" rel="noopener noreferrer" aria-label="Source on GitHub">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8" /></svg>
+          </a>
+          <span id="connection-status" role="status">checking…</span>
+        </div>
+      </header>
+      <main>
+        <p class="lede">Ask a question. Follow the research. Explore the sources.</p>
+
+        <section id="connection" class="connection" aria-label="Extension connection" hidden>
+          <div><strong id="connection-label">Connect an extension</strong>
+            <p id="connection-help">Requires Inference Bridge and a model that supports function tools.</p></div>
+          <div class="connection-actions">
+            <a id="install" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+            <button id="recheck" class="quiet" type="button">Check again</button>
+          </div>
+        </section>
+
+        <form id="research-form">
+          <label for="question">What would you like to understand?</label>
+          <div class="question-box">
+            <textarea id="question" rows="2" maxlength="1000" required placeholder="How did GPS become available to civilians?" aria-describedby="research-scope"></textarea>
+            <div class="form-actions"><span id="question-count">0 / 1,000</span><button id="explore" type="submit" disabled>Explore topic <span aria-hidden="true">↗</span></button><button id="stop" class="stop" type="button" hidden>Stop research</button></div>
+          </div>
+          <div class="starters" aria-label="Try a question">
+            <button type="button" data-prompt="How did GPS become available to civilians?">GPS for everyone</button>
+            <button type="button" data-prompt="How was CRISPR discovered?">Discovering CRISPR</button>
+            <button type="button" data-prompt="Compare solar and nuclear power, with sources.">Solar or nuclear?</button>
+            <button type="button" data-prompt="Why does bread rise, and how is sourdough different?">The science of bread</button>
+          </div>
+          <p id="research-scope" class="scope">Researches English Wikipedia. Encyclopedia coverage can be incomplete or dated; this is not live web search.</p>
+          <p class="privacy">Your question and retrieved excerpts go to the provider you choose in Inference Bridge. Searches go directly to Wikipedia. Credentials stay in the extension.</p>
+        </form>
+
+        <p id="status" class="status" role="status">Choose a question to begin.</p>
+        <p id="error" class="error" role="alert" hidden></p>
+        <div class="workspace">
+          <section class="answer-panel" aria-labelledby="answer-heading" aria-busy="false">
+            <div class="section-heading"><h2 id="answer-heading">Your research</h2><span id="source-count">No sources yet</span></div>
+            <div id="empty-answer" class="empty-answer"><div class="empty-path" aria-hidden="true"><span>Question</span><i></i><span>Articles</span><i></i><span>Understanding</span></div><p>The agent will search for articles, read promising results, and bring what it finds together here.</p></div>
+            <div id="answer" class="answer" hidden></div>
+            <section id="sources-section" class="sources-section" aria-labelledby="sources-heading" hidden>
+              <h3 id="sources-heading">Sources consulted</h3>
+              <p>Articles actually read during this run. Links verify retrieval, not every claim in the answer.</p>
+              <ul id="sources"></ul>
+              <p class="attribution">Wikipedia text is available under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>. See each article’s history for contributors. The answer is an AI-generated synthesis.</p>
+            </section>
+          </section>
+          <aside class="activity-panel" aria-labelledby="activity-heading">
+            <div class="section-heading"><h2 id="activity-heading">Agent activity</h2><span id="activity-state">Ready</span></div>
+            <p id="empty-activity">Watch each search and article read as it happens.</p>
+            <ol id="activity" class="activity" aria-live="polite" aria-relevant="additions text"></ol>
+          </aside>
+        </div>
+        <footer>Runs in your browser with <a href="https://github.com/SamSamskies/inference-provider-api/tree/main/packages/ipa-tools#createagent" target="_blank" rel="noopener noreferrer">ipa-tools createAgent()</a>. No application-operated inference backend or application API keys. Your extension may use cloud providers or local model servers.</footer>
+      </main>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -323,6 +323,11 @@ If the stream ends without `done`, throws `provider_error` (`Stream ended withou
 
 ## `createAgent`
 
+Try [Topic Explorer](https://samsamskies.github.io/inference-provider-api/research/)
+([source and tool limits](../../examples/research/)): a browser-native research
+agent with read-only Wikipedia tools, an activity timeline, cancellation, and
+citations linked only to retrieved articles.
+
 An optional wrapper around `runTools()`. Define system instructions and named
 function tools together; each `run()` builds the conversation and delegates the
 loop.
