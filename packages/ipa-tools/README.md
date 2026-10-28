@@ -4,7 +4,7 @@
 
 Application helpers and TypeScript types for the [Inference Provider API](https://github.com/SamSamskies/inference-provider-api) (`window.inference`).
 
-This package is **not** part of the injected API. Streaming stays on `window.inference.request`. Use `ipa-tools` for types, draining a stream to `done`, and the page-executed function-tool loop.
+This package is **not** part of the injected API. Streaming stays on `window.inference.request`. Use `ipa-tools` for types, draining a stream to `done`, the page-executed function-tool loop, and lightweight agents.
 
 ## Install
 
@@ -321,6 +321,146 @@ const done = await complete(
 
 If the stream ends without `done`, throws `provider_error` (`Stream ended without a done chunk.`). Errors from `request` are re-thrown as-is.
 
+## `createAgent`
+
+An optional wrapper around `runTools()`. Define system instructions and named
+function tools together; each `run()` builds the conversation and delegates the
+loop. This helper is available in the repository's next release;
+it is not in the pinned `3.0.0` CDN examples above.
+
+The following assumes your app supplies `searchArticles(query, signal)` and
+`readArticle(title, signal)`. They perform the actual work in the page.
+
+```ts
+import { createAgent, getFeatures } from "ipa-tools";
+
+// Parsed arguments are unknown. JSON Schema describes the tool to the model;
+// it does not validate its output. Check arguments before performing work.
+function stringArgument(args: unknown, key: string): string {
+  if (!args || typeof args !== "object" || !(key in args)) {
+    throw new Error(`Missing ${key}`);
+  }
+  const value = (args as Record<string, unknown>)[key];
+  if (typeof value !== "string") throw new Error(`Invalid ${key}`);
+  return value;
+}
+
+const agent = createAgent({
+  name: "Topic Explorer",
+  instructions: "Research topics using tools and cite actual sources.",
+  tools: {
+    searchArticles: {
+      description: "Search encyclopedic articles",
+      parameters: {
+        type: "object", properties: { query: { type: "string" } }, required: ["query"],
+      },
+      execute: (args, { signal }) => searchArticles(stringArgument(args, "query"), signal),
+    },
+    readArticle: {
+      description: "Read an article",
+      parameters: {
+        type: "object", properties: { title: { type: "string" } }, required: ["title"],
+      },
+      execute: (args, { signal }) => readArticle(stringArgument(args, "title"), signal),
+    },
+  },
+});
+
+const controller = new AbortController();
+// Call inside your app's user action; getFeatures() throws if IPA is missing.
+if (getFeatures().toolCalling !== true) throw new Error("Function tools are unsupported.");
+const result = await agent.run("How was GPS opened to civilians?", {
+  maxRounds: 8,
+  signal: controller.signal,
+  onEvent(event) {
+    if (event.type === "tool_started") console.log(event.id, event.name, event.arguments);
+    if (event.type === "tool_completed") console.log(event.id, event.result);
+    if (event.type === "tool_failed") console.error(event.id, event.error);
+    if (event.type === "text_delta") console.log(event.content);
+  },
+});
+
+if (result.stopReason === "end_turn") console.log(result.output);
+else console.log("Round limit reached; tools ran, but no final answer was requested.");
+
+// Explicit continuation; no conversation is saved inside the agent.
+const followUp = await agent.run("Explain the key dates.", { history: result.messages });
+```
+
+The helper maintains message history during each run, including assistant tool
+calls and tool results, and returns the full conversation as `result.messages`.
+The agent object is **stateless between runs**: it does not automatically save
+that history. Pass `{ history: result.messages }` to continue a conversation, as
+shown above. Omitting `history` starts a new conversation.
+
+`name` labels events; `instructions` supplies the system message. Supplied
+`history` precedes the current user input. A leading system message in `history`
+is replaced with the current instructions, so reusing `result.messages` from this
+agent or another does not stack two system prompts. Each run has independent
+state, including when runs overlap. Creating an agent does not resolve IPA or
+send a request.
+
+`AgentRunResult` extends `RunToolsResult`: `messages`, `final`, and `stopReason`
+remain available. `output` extracts text from the final assistant message
+(joining text parts if needed). It is `""` for `max_rounds` and nontext output.
+Streamed text may include intermediate commentary; it is not the final answer.
+`maxRounds` defaults to 5 and must be a positive integer. Last-round tools still
+execute before a `max_rounds` result. `options` and `toolChoice` pass through on
+every provider call.
+
+`AgentEvent` is a discriminated union with `agentName` on every event:
+
+| `type` | Additional fields / meaning |
+| --- | --- |
+| `agent_started` | Run has begun, after input/`maxRounds` checks |
+| `request_accepted` | A provider round was accepted |
+| `text_delta` / `reasoning_delta` | `content`, when the provider emits it |
+| `tool_started` | `id`, `name`, parsed `arguments`; immediately before execution |
+| `tool_completed` | `id`, `name`, serialized `result`; safe to append as tool content |
+| `tool_failed` | `id`, `name`, original `error` |
+| `agent_completed` | Full `result`; check its `stopReason` for a round limit |
+| `agent_failed` | Original `error`; the run promise rejects with the same error |
+
+Events are synchronous and ordered. Observers should not throw; their exceptions
+propagate, except `agent_completed` and `agent_failed`, which preserve the run
+result or original error. A parsing or missing-handler failure emits
+`tool_failed` without `tool_started`; a malformed call lacking an ID/name fails
+the run without a tool event. Executor, serialization, and cancellation failures reject the run;
+errors are not converted to tool content or retried. Tool IDs come from the
+provider, so scope them to the current run in your UI.
+
+`signal` reaches every inference request and each executor's second argument.
+Executors must pass it to their own asynchronous work to stop promptly. The loop
+checks cancellation before further execution and after work returns; it cannot
+interrupt a handler or custom request that ignores its signal. Cancellation is
+an `agent_failed` event with an `aborted` error, and a `tool_failed` event if it
+interrupts an executing tool.
+
+The default route resolves the current `window.inference` and requires
+`getFeatures().toolCalling === true` when tools are declared. Missing discovery
+or a missing flag fails before a provider call; a text-only agent needs no tool
+flag. This reports an IPA capability, not a guarantee that every selected model
+supports tools. Handle provider errors and let users choose a compatible model.
+
+Inject `request` at creation for deterministic tests or a custom client:
+
+```ts
+const testAgent = createAgent({
+  name: "Test", instructions: "Be concise.",
+  request: async function* () {
+    yield { type: "done", model: "mock", message: { role: "assistant", content: "Hello" } };
+  },
+});
+console.log((await testAgent.run("Hi")).output); // Hello
+```
+
+Custom requests own capability checks. For a `createInference()` client, pass
+`request: (req) => inference.request(req)`; its existing feature checks apply.
+Use direct `runTools()` below for separate declaration/executor maps, hosted
+search tools, image output requests, or its individual callbacks. `createAgent`
+adds no runtime dependencies, schema validation, approval flow, or persistent
+memory, and does not change `window.inference`.
+
 ## `runTools`
 
 Page-executed multi-round function-tool loop:
@@ -358,6 +498,14 @@ const { final, messages } = await runTools({
 Handlers run in the page. The package never talks to providers or API keys.
 
 `options` (`temperature`, `reasoningEffort`) are forwarded on every round. `onAccepted` fires when a round yields `accepted`. `maxRounds` (default 5) is the max provider calls: if the last round has `toolCalls`, handlers still run and the result returns with `stopReason: "max_rounds"` instead of throwing. A text `done` is `stopReason: "end_turn"`. Use `maxRounds: 1` to run tools once and stop without a follow-up model turn.
+
+`onToolCall({ id, name, arguments })` fires after argument parsing, before
+execution. `onToolResult({ id, name, result })` fires after successful execution,
+cancellation checks, and serialization; `result` is the tool-message string.
+`onToolError({ id, name, error })` reports parsing, missing-handler, execution,
+serialization, or cancellation errors for calls with a valid ID/name. The loop
+still rejects on these errors. These observers are synchronous; exceptions
+propagate.
 
 ### When `toolCalling`, `webSearch`, `imageInput`, or `imageOutput` is not advertised
 
@@ -407,6 +555,7 @@ try {
 | Types | SPEC.md types + `Window` augmentation |
 | `complete` | Drain `request` to one `done` chunk |
 | `runTools` | Page-executed tool loop |
+| `createAgent` | Instructions, named function tools, and typed activity events over `runTools` |
 | `createInference` | IPA-first client (`complete` / `request` / `runTools` / `probe()`) |
 | `isInferenceError` | `error.code` check |
 | `waitForInference` | Background poll until injected (do not await on first paint) |
