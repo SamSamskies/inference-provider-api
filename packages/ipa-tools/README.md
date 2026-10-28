@@ -16,11 +16,11 @@ Zero runtime dependencies. Browser ESM only (no Node APIs).
 
 ### CDN / no bundler
 
-Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@3.0.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
+Native modules cannot resolve the bare specifier `ipa-tools`. Import from a CDN URL (or an import map). Pin a version (`@3.1.0`); for stronger supply-chain control, vendor `dist/` from npm instead of a transforming CDN.
 
 ```html
 <script type="module">
-  import { complete, runTools } from "https://esm.sh/ipa-tools@3.0.0";
+  import { complete, runTools } from "https://esm.sh/ipa-tools@3.1.0";
 
   const { message } = await complete({
     method: "chat",
@@ -36,7 +36,7 @@ Import map equivalent:
 <script type="importmap">
   {
     "imports": {
-      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@3.0.0/+esm"
+      "ipa-tools": "https://cdn.jsdelivr.net/npm/ipa-tools@3.1.0/+esm"
     }
   }
 </script>
@@ -325,8 +325,7 @@ If the stream ends without `done`, throws `provider_error` (`Stream ended withou
 
 An optional wrapper around `runTools()`. Define system instructions and named
 function tools together; each `run()` builds the conversation and delegates the
-loop. This helper is available in the repository's next release;
-it is not in the pinned `3.0.0` CDN examples above.
+loop.
 
 The following assumes your app supplies `searchArticles(query, signal)` and
 `readArticle(title, signal)`. They perform the actual work in the page.
