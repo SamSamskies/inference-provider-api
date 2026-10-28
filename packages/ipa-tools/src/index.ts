@@ -86,6 +86,11 @@ export {
   type RunToolsResult,
   type RunToolsStopReason,
   type ToolExecutor,
+  type ToolRunContext,
+  type ToolPolicy,
+  type ToolArgumentValidator,
+  type ToolApprovalRequest,
+  type ToolApprovalHandler,
 } from "./run-tools.js";
 export {
   createInference,

@@ -354,9 +354,10 @@ console.log(
 );
 ```
 
-This tool takes no arguments. For tools that accept arguments, validate them in
-`execute` before performing work: parsed arguments are `unknown`, and JSON Schema
-describes the tool to the model without validating its output.
+This tool takes no arguments. For tools that accept arguments, add
+`validateArguments` (see [tool policies](#tool-validation-and-app-approval)) or
+validate them in `execute` before performing work: parsed arguments are `unknown`,
+and JSON Schema describes the tool to the model without validating its output.
 
 The helper maintains message history during each run, including assistant tool
 calls and tool results, and returns the full conversation as `result.messages`.
@@ -391,8 +392,9 @@ every provider call.
 | `agent_started` | Run has begun, after input/`maxRounds` checks |
 | `request_accepted` | A provider round was accepted |
 | `text_delta` / `reasoning_delta` | `content`, when the provider emits it |
-| `tool_started` | `id`, `name`, parsed `arguments`; immediately before execution |
-| `tool_completed` | `id`, `name`, serialized `result`; safe to append as tool content |
+| `tool_started` | `id`, `name`, parsed `arguments`; before validation, approval, and execution |
+| `tool_approval_requested` | `id`, `name`, parsed `arguments`, `round`, `maxRounds`, `signal`, and declared `tool`; before the app approval handler |
+| `tool_completed` | `id`, `name`, serialized `result`; the content returned by the app's handler |
 | `tool_failed` | `id`, `name`, original `error` |
 | `agent_completed` | Full `result`; check its `stopReason` for a round limit |
 | `agent_failed` | Original `error`; the run promise rejects with the same error |
@@ -401,7 +403,7 @@ Events are synchronous and ordered. Observers should not throw; their exceptions
 propagate, except `agent_completed` and `agent_failed`, which preserve the run
 result or original error. A parsing or missing-handler failure emits
 `tool_failed` without `tool_started`; a malformed call lacking an ID/name fails
-the run without a tool event. Executor, serialization, and cancellation failures reject the run;
+the run without a tool event. Validation, approval, executor, serialization, and cancellation failures reject the run;
 errors are not converted to tool content or retried. Tool IDs come from the
 provider, so scope them to the current run in your UI.
 
@@ -410,7 +412,7 @@ Executors must pass it to their own asynchronous work to stop promptly. The loop
 checks cancellation before further execution and after work returns; it cannot
 interrupt a handler or custom request that ignores its signal. Cancellation is
 an `agent_failed` event with an `aborted` error, and a `tool_failed` event if it
-interrupts an executing tool.
+interrupts a tool's validation, approval, or execution.
 
 The default route resolves the current `window.inference` and requires
 `getFeatures().toolCalling === true` when tools are declared. Missing discovery
@@ -434,8 +436,9 @@ Custom requests own capability checks. For a `createInference()` client, pass
 `request: (req) => inference.request(req)`; its existing feature checks apply.
 Use direct `runTools()` below for separate declaration/executor maps, hosted
 search tools, image output requests, or its individual callbacks. `createAgent`
-adds no runtime dependencies, schema validation, approval flow, or persistent
-memory, and does not change `window.inference`.
+adds no runtime dependencies or persistent memory. Validation and approval are
+optional app-owned hooks; there is no built-in schema engine or approval UI,
+and no change to `window.inference`.
 
 ## `runTools`
 
@@ -475,13 +478,134 @@ Handlers run in the page. The package never talks to providers or API keys.
 
 `options` (`temperature`, `reasoningEffort`) are forwarded on every round. `onAccepted` fires when a round yields `accepted`. `maxRounds` (default 5) is the max provider calls: if the last round has `toolCalls`, handlers still run and the result returns with `stopReason: "max_rounds"` instead of throwing. A text `done` is `stopReason: "end_turn"`. Use `maxRounds: 1` to run tools once and stop without a follow-up model turn.
 
-`onToolCall({ id, name, arguments })` fires after argument parsing, before
-execution. `onToolResult({ id, name, result })` fires after successful execution,
+`onToolCall({ id, name, arguments })` fires after argument parsing and policy
+lookup, before validation, approval, and execution. `onToolResult({ id, name, result })` fires after successful execution,
 cancellation checks, and serialization; `result` is the tool-message string.
-`onToolError({ id, name, error })` reports parsing, missing-handler, execution,
-serialization, or cancellation errors for calls with a valid ID/name. The loop
+`onToolError({ id, name, error })` reports parsing, missing-handler, policy,
+validation, approval, execution, serialization, result-limit, or cancellation errors for calls with a valid ID/name. The loop
 still rejects on these errors. These observers are synchronous; exceptions
 propagate.
+
+### Tool validation and app approval
+
+These hooks run in the application. Inference Bridge's origin/provider grants
+permit inference and offered tool descriptions; they do **not** approve later
+page-side actions such as sending a message, deleting data, or making a purchase.
+Mark consequential tools with `requiresApproval: true` and collect an explicit
+decision in the app before executing them. Read-only tools can omit that flag.
+
+On `createAgent`, put `validateArguments` and `requiresApproval` on each tool,
+and pass `onApprovalRequest` to `agent.run()`:
+
+```ts
+const agent = createAgent({
+  name: "Drafts",
+  instructions: "Help manage drafts. Ask before deleting one.",
+  tools: {
+    deleteDraft: {
+      description: "Delete a draft by ID",
+      parameters: {
+        type: "object", properties: { draftId: { type: "string" } },
+        required: ["draftId"], additionalProperties: false,
+      },
+      validateArguments(args) {
+        if (!args || typeof args !== "object" || Array.isArray(args)) return false;
+        const value = args as Record<string, unknown>;
+        return Object.keys(value).length === 1 && typeof value.draftId === "string" &&
+          /^[a-zA-Z0-9_-]{1,80}$/.test(value.draftId);
+      },
+      requiresApproval: true,
+      async execute(args, { signal }) {
+        // A boolean validator does not narrow unknown in a separate handler.
+        const { draftId } = args as { draftId: string };
+        const response = await fetch(`/api/drafts/${draftId}`, { method: "DELETE", signal });
+        if (!response.ok) throw new Error("Draft deletion failed");
+        return { deleted: true }; // Return only bounded, nonsecret information.
+      },
+    },
+  },
+});
+
+const controller = new AbortController();
+await agent.run("Delete draft abc", {
+  signal: controller.signal,
+  maxToolResultChars: 8_000,
+  onApprovalRequest: ({ name, arguments: args }) => {
+    return window.confirm(`Allow ${name} with arguments ${JSON.stringify(args)}?`);
+  },
+});
+```
+
+When the model requests `deleteDraft`, the helper pauses and calls
+`onApprovalRequest`. Clicking **OK** returns `true`, so `execute` runs. Clicking
+**Cancel** returns `false`, so the tool never executes and the run rejects with
+`permission_denied`. `requiresApproval` itself does not display a dialog; your
+callback does. A custom dialog can return a `Promise<boolean>` instead.
+
+For `runTools()` (also `createInference().runTools()`), supply a separate
+`toolPolicies` map alongside `tools` and `execute`:
+
+```ts
+toolPolicies: {
+  search: {}, // Explicitly run without validation or approval.
+  deleteDraft: { validateArguments: validateDraftArguments, requiresApproval: true },
+},
+onApprovalRequest: ({ name, arguments: args }) => {
+  return window.confirm(`Allow ${name} with arguments ${JSON.stringify(args)}?`);
+},
+maxToolResultChars: 8_000,
+```
+
+If `toolPolicies` is supplied, every called tool needs an **own** entry; missing
+entries stop the run. `{}` explicitly opts a tool out of both guards. An agent
+creates entries for all its declared tools when any tool opts in. Without any
+policy hooks, existing callers keep their previous behavior.
+
+`validateArguments(args, context)` may be synchronous or asynchronous and must
+return exactly `true`. JSON parsing alone does not validate the declared schema.
+Use a small predicate or adapt your schema library, checking required fields,
+types, extra properties, lengths, and app constraints. A configured validator
+returning `false`, `undefined`, or another value fails with `invalid_request`;
+thrown/rejected errors propagate. Validation precedes approval and execution.
+No arguments are transformed. Tools without a validator remain unvalidated.
+
+The validator context and `ToolApprovalRequest` include tool-call `id`, `name`,
+one-based provider `round`, `maxRounds`, the run's `signal`, and the declared
+function `tool` when available (including its parameter schema). Approval adds
+parsed `arguments`. Policies are copied at run start. With policies configured,
+parsed arguments are deeply frozen for observers, hooks, and executors, so the
+approved values cannot change while a decision is pending. Clone them in a
+handler if local mutation is needed.
+
+For a required tool, only an approval response of exactly `true` permits the
+handler to run. A missing handler, `false`, or an invalid response rejects the
+run with `permission_denied`; thrown/rejected approval errors propagate. There
+is no retry, automatic grant, or error content sent to the model. The remaining
+tools and provider rounds stop; earlier side effects are not rolled back.
+`onToolError` reports the failure. Agents emit `tool_approval_requested` before
+the hook, followed by `tool_failed` and `agent_failed` on refusal/error. An
+approval event observer may abort or throw to stop before the hook is called.
+
+Validation and approval waits reject promptly with `aborted` when cancelled,
+even if the hook's promise never settles. Late decisions cannot execute tools;
+late rejections are consumed. Hooks should still use `signal` to stop their work
+and dismiss UI. Cancellation cannot undo a handler's side effects or interrupt
+a synchronous callback. Every call needs its own approval, including calls in
+the last allowed round; `maxRounds` still bounds provider calls, not tool count,
+elapsed time, or side effects. Use `AbortSignal.timeout()` or an app controller
+for a time limit.
+
+Handlers, hooks, events, errors, and returned history are page-side data and can
+expose secrets to page code or logs. Tool descriptions, input messages, and tool
+results can reach the selected model/provider. Redact secrets and personal data
+**inside the handler before returning**; return only task-relevant fields and
+bound external data before assembling a result. `maxToolResultChars` optionally
+rejects oversized serialized results before `onToolResult` or another model
+request (positive safe integer, UTF-16 code units, no truncation; unset preserves
+existing behavior). It does not redact, cap memory during serialization, or undo
+execution. Treat model arguments and retrieved tool content as untrusted, render
+them safely in the UI, and enforce authorization on your server. These hooks
+provide neither a remote sandbox nor a guarantee that arbitrary tools are safe.
 
 ### When `toolCalling`, `webSearch`, `imageInput`, or `imageOutput` is not advertised
 

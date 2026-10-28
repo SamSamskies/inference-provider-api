@@ -330,4 +330,111 @@ describe("createAgent", () => {
     }).run("hi", { onEvent: (event) => events.push(event) })).rejects.toMatchObject({ code: "invalid_request" });
     expect(events.at(-2)).toMatchObject({ type: "tool_failed", name: "toString", id: "c1" });
   });
+
+  it("validates and approves consequential tools while read-only tools run without prompting", async () => {
+    const request = mockRequest([done(call())], [done(call("send", "c2"))], [answer]);
+    const validate = vi.fn(() => true);
+    const send = vi.fn(() => "sent");
+    const approve = vi.fn(async () => true);
+    const events: AgentEvent[] = [];
+    const result = await createAgent({ name: "Test", instructions: "", request, tools: {
+      search,
+      send: { parameters: search.parameters, validateArguments: validate, requiresApproval: true, execute: send },
+    } }).run("hi", { onApprovalRequest: approve, onEvent: (event) => events.push(event) });
+    expect(result.output).toBe("GPS history [source]");
+    expect(validate).toHaveBeenCalledOnce();
+    expect(approve).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      id: "c2", name: "send", arguments: { query: "GPS" }, round: 2, maxRounds: 5,
+    }));
+    expect(send).toHaveBeenCalledOnce();
+    expect(events.map((event) => event.type)).toEqual([
+      "agent_started", "tool_started", "tool_completed", "tool_started",
+      "tool_approval_requested", "tool_completed", "agent_completed",
+    ]);
+    const offered = JSON.stringify(request.mock.calls[0]![0].tools);
+    for (const field of ["execute", "validateArguments", "requiresApproval", "toolPolicies", "onApprovalRequest"]) {
+      expect(offered).not.toContain(field);
+    }
+  });
+
+  it.each(["missing", "denied", "thrown", "invalid"])("stops with UI-visible events when approval is %s", async (kind) => {
+    const execute = vi.fn(() => "sent");
+    const error = new Error("approval failed");
+    const request = mockRequest([done(call())], [answer]);
+    const events: AgentEvent[] = [];
+    const onApprovalRequest = kind === "missing" ? undefined : () => {
+      if (kind === "thrown") throw error;
+      return kind === "invalid" ? "yes" as never : false;
+    };
+    const run = createAgent({ name: "Test", instructions: "", request, tools: {
+      search: { requiresApproval: true, execute },
+    } }).run("hi", { onApprovalRequest, onEvent: (event) => events.push(event) });
+    if (kind === "thrown") await expect(run).rejects.toBe(error);
+    else await expect(run).rejects.toMatchObject({ code: "permission_denied" });
+    expect(execute).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledOnce();
+    expect(events.map((event) => event.type)).toEqual([
+      "agent_started", "tool_started", "tool_approval_requested", "tool_failed", "agent_failed",
+    ]);
+  });
+
+  it("keeps approval decisions scoped to overlapping runs even with identical tool IDs", async () => {
+    let enter!: () => void;
+    let deny!: (value: boolean) => void;
+    const entered = new Promise<void>((resolve) => { enter = resolve; });
+    const pending = new Promise<boolean>((resolve) => { deny = resolve; });
+    const execute = vi.fn(() => "sent");
+    const request = mockRequest([done(call())], [done(call())], [answer]);
+    const agent = createAgent({ name: "Test", instructions: "", request, tools: {
+      search: { execute, requiresApproval: true },
+    } });
+    const first = agent.run("One", { onApprovalRequest: () => { enter(); return pending; } });
+    const rejected = expect(first).rejects.toMatchObject({ code: "permission_denied" });
+    await entered;
+    const second = await agent.run("Two", { onApprovalRequest: () => true });
+    expect(second.output).toBe("GPS history [source]");
+    deny(false);
+    await rejected;
+    expect(execute).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["abort", "throw"])("does not call the approval handler after the approval event observers %s", async (kind) => {
+    const controller = new AbortController();
+    const error = new Error("observer failed");
+    const approve = vi.fn(() => true);
+    const execute = vi.fn(() => "sent");
+    const run = createAgent({ name: "Test", instructions: "", request: mockRequest([done(call())]), tools: {
+      search: { execute, requiresApproval: true },
+    } }).run("hi", { signal: controller.signal, onApprovalRequest: approve, onEvent: (event) => {
+      if (event.type === "tool_approval_requested") {
+        if (kind === "abort") controller.abort(); else throw error;
+      }
+    } });
+    if (kind === "abort") await expect(run).rejects.toMatchObject({ code: "aborted" });
+    else await expect(run).rejects.toBe(error);
+    expect(approve).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("does not prompt or execute after failed validation and forwards result limits", async () => {
+    const execute = vi.fn(() => "large result");
+    const approve = vi.fn(() => true);
+    const events: AgentEvent[] = [];
+    const request = mockRequest([done(call())], [done(call())]);
+    const invalid = createAgent({ name: "Test", instructions: "", request, tools: {
+      search: { execute, validateArguments: () => false, requiresApproval: true },
+    } });
+    await expect(invalid.run("hi", { onApprovalRequest: approve, onEvent: (event) => events.push(event) }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(execute).not.toHaveBeenCalled();
+    expect(approve).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(["agent_started", "tool_started", "tool_failed", "agent_failed"]);
+
+    const bounded = createAgent({ name: "Test", instructions: "", request, tools: { search: { execute } } });
+    await expect(bounded.run("hi", { maxToolResultChars: 3 }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });

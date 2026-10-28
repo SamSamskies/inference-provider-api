@@ -10,7 +10,6 @@ import { makeInferenceError } from "./errors.js";
 import { getInference } from "./inference.js";
 import type {
   DoneChunk,
-  Inference,
   InferenceOptions,
   ChatRequest,
   ChatChunk,
@@ -22,6 +21,35 @@ import type {
 
 export type ToolExecutor = (args: unknown) => unknown | Promise<unknown>;
 
+export type ToolRunContext = {
+  readonly id: string;
+  readonly name: string;
+  /** One-based provider round and the configured provider-call limit. */
+  readonly round: number;
+  readonly maxRounds: number;
+  readonly signal?: AbortSignal;
+  /** The app's declared function tool, when available. */
+  readonly tool?: Extract<Tool, { type: "function" }>;
+};
+
+/** Return exactly true to accept; false, invalid returns, and throws stop the run. */
+export type ToolArgumentValidator = (
+  args: unknown, context: ToolRunContext
+) => boolean | Promise<boolean>;
+
+export type ToolPolicy = {
+  /** No built-in schema engine. Check the declared schema and app constraints here. */
+  validateArguments?: ToolArgumentValidator;
+  requiresApproval?: boolean;
+};
+
+export type ToolApprovalRequest = ToolRunContext & {
+  /** Parsed JSON, deeply frozen whenever toolPolicies is configured. */
+  readonly arguments: unknown;
+};
+
+export type ToolApprovalHandler = (request: ToolApprovalRequest) => boolean | Promise<boolean>;
+
 /** Why `runTools` stopped. `"end_turn"` is a text `done`; `"max_rounds"` is tools on the last provider call. */
 export type RunToolsStopReason = "end_turn" | "max_rounds";
 
@@ -29,6 +57,12 @@ export type RunToolsOptions = {
   messages: Message[];
   tools?: Tool[];
   execute?: Record<string, ToolExecutor>;
+  /** Opt in per run. Every executed tool must have an own entry; {} explicitly opts out of guards. */
+  toolPolicies?: Record<string, ToolPolicy>;
+  /** App-owned approval; required tools only execute on exactly true. */
+  onApprovalRequest?: ToolApprovalHandler;
+  /** Optional serialized result limit in UTF-16 code units; oversized results stop the run. */
+  maxToolResultChars?: number;
   toolChoice?: ToolChoice;
   /** Forwarded on every round. Same object each provider call. */
   options?: InferenceOptions;
@@ -46,7 +80,7 @@ export type RunToolsOptions = {
   }) => void;
   /** After execution, cancellation checks, and successful result serialization. */
   onToolResult?: (info: { id: string; name: string; result: string }) => void;
-  /** Parsing, missing-handler, execution, serialization, or cancellation failure. */
+  /** Parsing, policy, validation, approval, execution, serialization, or cancellation failure. */
   onToolError?: (info: { id: string; name: string; error: unknown }) => void;
   signal?: AbortSignal;
   /** Default `"chat"`. */
@@ -129,6 +163,8 @@ export async function runTools(
   const {
     tools,
     execute,
+    onApprovalRequest,
+    maxToolResultChars,
     maxRounds = 5,
     toolChoice,
     options: requestOptions,
@@ -159,6 +195,12 @@ export async function runTools(
       "maxRounds must be a positive number."
     );
   }
+  if (maxToolResultChars !== undefined &&
+      (!Number.isSafeInteger(maxToolResultChars) || maxToolResultChars < 1)) {
+    throw makeInferenceError("invalid_request", "maxToolResultChars must be a positive safe integer.");
+  }
+  // Copy app-owned policy before provider work or callbacks can change it mid-run.
+  const policies = snapshotToolPolicies(options.toolPolicies);
 
   let request = options.request;
   if (!request) {
@@ -301,8 +343,38 @@ export async function runTools(
         }
 
         const args = parseToolArguments(call.function?.arguments, name);
+        const policy = policies?.get(name);
+        if (policies && !policy) {
+          throw makeInferenceError("invalid_request", `No tool policy for "${name}".`);
+        }
+        if (policies) freezeArguments(args);
+        const context: ToolRunContext = Object.freeze({
+          id, name, round: round + 1, maxRounds, signal,
+          tool: tools?.find((tool): tool is Extract<Tool, { type: "function" }> =>
+            tool.type === "function" && tool.function.name === name),
+        });
         if (typeof onToolCall === "function") {
           onToolCall({ id, name, arguments: args });
+        }
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+        if (policy?.validateArguments !== undefined) {
+          const valid = await awaitToolGate(() => policy.validateArguments!(args, context), signal);
+          if (valid !== true) {
+            throw makeInferenceError("invalid_request", `Tool "${name}" arguments failed validation.`);
+          }
+        }
+        if (policy?.requiresApproval) {
+          if (typeof onApprovalRequest !== "function") {
+            throw makeInferenceError("permission_denied", `Tool "${name}" requires app approval.`);
+          }
+          const approved = await awaitToolGate(() => onApprovalRequest(
+            Object.freeze({ ...context, arguments: args })
+          ), signal);
+          if (approved !== true) {
+            throw makeInferenceError("permission_denied", `App approval denied for tool "${name}".`);
+          }
         }
         if (signal?.aborted) {
           throw makeInferenceError("aborted", "Request aborted");
@@ -312,6 +384,9 @@ export async function runTools(
           throw makeInferenceError("aborted", "Request aborted");
         }
         content = serializeToolResult(result);
+        if (maxToolResultChars !== undefined && content.length > maxToolResultChars) {
+          throw makeInferenceError("invalid_request", `Tool "${name}" result exceeds maxToolResultChars.`);
+        }
         if (signal?.aborted) {
           throw makeInferenceError("aborted", "Request aborted");
         }
@@ -342,6 +417,55 @@ export async function runTools(
     "provider_error",
     `Tool loop exceeded maxRounds (${maxRounds}).`
   );
+}
+
+function snapshotToolPolicies(policies: RunToolsOptions["toolPolicies"]): Map<string, ToolPolicy> | undefined {
+  if (policies === undefined) return undefined;
+  if (!policies || typeof policies !== "object" || Array.isArray(policies)) {
+    throw makeInferenceError("invalid_request", "toolPolicies must be a named object.");
+  }
+  return new Map(Object.entries(policies).map(([name, policy]) => {
+    if (!policy || typeof policy !== "object" || Array.isArray(policy) ||
+        (policy.validateArguments !== undefined && typeof policy.validateArguments !== "function") ||
+        (policy.requiresApproval !== undefined && typeof policy.requiresApproval !== "boolean")) {
+      throw makeInferenceError("invalid_request", `Invalid tool policy for "${name}".`);
+    }
+    return [name, { validateArguments: policy.validateArguments, requiresApproval: policy.requiresApproval }];
+  }));
+}
+
+/** Parsed JSON is acyclic. Iterate to avoid overflowing on deeply nested arguments. */
+function freezeArguments(args: unknown): void {
+  const pending = [args];
+  while (pending.length) {
+    const value = pending.pop();
+    if (value !== null && typeof value === "object") {
+      for (const child of Object.values(value)) pending.push(child);
+      Object.freeze(value);
+    }
+  }
+}
+
+/** Abort pending gates promptly; consume late rejections and never resume execution. */
+async function awaitToolGate(action: () => boolean | Promise<boolean>, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    if (signal) {
+      onAbort = () => reject(makeInferenceError("aborted", "Request aborted"));
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+  try {
+    const result = await Promise.race([Promise.resolve().then(() => {
+      if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
+      return action();
+    }), aborted]);
+    if (signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
+    return result;
+  } finally {
+    if (onAbort) signal!.removeEventListener("abort", onAbort);
+  }
 }
 
 function toolCallName(call: ToolCall): string | undefined {

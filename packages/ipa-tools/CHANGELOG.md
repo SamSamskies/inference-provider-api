@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional per-tool argument validation and app-owned approval hooks for `runTools()` and `createAgent()`, with explicit boolean decisions, frozen arguments, cancellation during pending hooks, and a typed agent approval-request event. Refusals stop the run before execution and surface through existing error callbacks/events.
+- Optional `maxToolResultChars` to reject oversized serialized tool results before observers or another model request, plus documentation of page-side exposure and app-owned redaction.
+
 ## [3.1.0] - 2026-10-28
 
 ### Added

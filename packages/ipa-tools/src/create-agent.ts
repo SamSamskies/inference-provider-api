@@ -1,6 +1,7 @@
 import { makeInferenceError } from "./errors.js";
 import { getInference } from "./inference.js";
-import { runTools, type RunToolsOptions, type RunToolsResult } from "./run-tools.js";
+import { runTools, type RunToolsOptions, type RunToolsResult,
+  type ToolPolicy, type ToolApprovalRequest } from "./run-tools.js";
 import type { Message, Tool } from "./types.js";
 
 export type AgentToolContext = {
@@ -8,10 +9,10 @@ export type AgentToolContext = {
   signal?: AbortSignal;
 };
 
-export type AgentTool = {
+export type AgentTool = ToolPolicy & {
   description?: string;
   parameters?: Record<string, unknown>;
-  /** Arguments are parsed JSON, not schema-validated. Validate before use. */
+  /** Parsed JSON; add validateArguments to check schema and app constraints before use. */
   execute: (args: unknown, context: AgentToolContext) => unknown | Promise<unknown>;
 };
 
@@ -37,12 +38,13 @@ export type AgentEvent = { agentName: string } & (
   | { type: "text_delta"; content: string }
   | { type: "reasoning_delta"; content: string }
   | { type: "tool_started"; id: string; name: string; arguments: unknown }
+  | ({ type: "tool_approval_requested" } & ToolApprovalRequest)
   | { type: "tool_completed"; id: string; name: string; result: string }
   | { type: "tool_failed"; id: string; name: string; error: unknown }
 );
 
 export type AgentRunOptions = Pick<RunToolsOptions,
-  "signal" | "maxRounds" | "options" | "toolChoice"
+  "signal" | "maxRounds" | "options" | "toolChoice" | "onApprovalRequest" | "maxToolResultChars"
 > & {
   /** Explicit history; passing a previous result.messages is supported. No state is retained. */
   history?: Message[];
@@ -112,6 +114,11 @@ export function createAgent(config: CreateAgentOptions): Agent {
         const execute = Object.fromEntries(descriptors.map(([toolName, tool]) => [
           toolName, (args: unknown) => tool.execute(args, { signal: options.signal }),
         ]));
+        const toolPolicies = descriptors.some(([, tool]) =>
+          tool.validateArguments !== undefined || tool.requiresApproval !== undefined)
+          ? Object.fromEntries(descriptors.map(([toolName, tool]) => [toolName, {
+            validateArguments: tool.validateArguments, requiresApproval: tool.requiresApproval,
+          }])) : undefined;
         const run = await runTools({
           messages,
           ...(tools.length ? { tools, execute } : {}),
@@ -120,6 +127,14 @@ export function createAgent(config: CreateAgentOptions): Agent {
           maxRounds: options.maxRounds,
           options: options.options,
           toolChoice: options.toolChoice,
+          toolPolicies,
+          maxToolResultChars: options.maxToolResultChars,
+          onApprovalRequest: (info) => {
+            emit({ type: "tool_approval_requested", agentName: name, ...info });
+            // An observer can abort while rendering the approval UI.
+            if (options.signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
+            return options.onApprovalRequest?.(info) ?? false;
+          },
           onAccepted: () => emit({ type: "request_accepted", agentName: name }),
           onDelta: (content) => emit({ type: "text_delta", agentName: name, content }),
           onReasoningDelta: (content) => emit({ type: "reasoning_delta", agentName: name, content }),

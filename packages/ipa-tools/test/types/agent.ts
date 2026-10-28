@@ -59,6 +59,12 @@ function render(event: AgentEvent) {
       event.result;
       break;
     }
+    case "tool_approval_requested": {
+      const args: unknown = event.arguments;
+      const round: number = event.round;
+      const signal: AbortSignal | undefined = event.signal;
+      break;
+    }
     case "tool_completed": {
       const content: string = event.result;
       const id: string = event.id;
