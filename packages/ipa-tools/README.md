@@ -327,70 +327,47 @@ An optional wrapper around `runTools()`. Define system instructions and named
 function tools together; each `run()` builds the conversation and delegates the
 loop.
 
-The following assumes your app supplies `searchArticles(query, signal)` and
-`readArticle(title, signal)`. They perform the actual work in the page.
+Paste this into your browser's DevTools console on a page with IPA enabled and
+a model that supports function tools:
 
-```ts
-import { createAgent, getFeatures } from "ipa-tools";
-
-// Parsed arguments are unknown. JSON Schema describes the tool to the model;
-// it does not validate its output. Check arguments before performing work.
-function stringArgument(args: unknown, key: string): string {
-  if (!args || typeof args !== "object" || !(key in args)) {
-    throw new Error(`Missing ${key}`);
-  }
-  const value = (args as Record<string, unknown>)[key];
-  if (typeof value !== "string") throw new Error(`Invalid ${key}`);
-  return value;
-}
+```javascript
+const { createAgent } = await import("https://esm.sh/ipa-tools@3.1.0");
 
 const agent = createAgent({
-  name: "Topic Explorer",
-  instructions: "Research topics using tools and cite actual sources.",
+  name: "Clock",
+  instructions: "Use the clock tool to answer questions about the current time.",
   tools: {
-    searchArticles: {
-      description: "Search encyclopedic articles",
-      parameters: {
-        type: "object", properties: { query: { type: "string" } }, required: ["query"],
-      },
-      execute: (args, { signal }) => searchArticles(stringArgument(args, "query"), signal),
-    },
-    readArticle: {
-      description: "Read an article",
-      parameters: {
-        type: "object", properties: { title: { type: "string" } }, required: ["title"],
-      },
-      execute: (args, { signal }) => readArticle(stringArgument(args, "title"), signal),
+    getCurrentTime: {
+      description: "Get the current date and time in UTC",
+      parameters: { type: "object", properties: {} },
+      execute: () => new Date().toISOString(),
     },
   },
 });
 
-const controller = new AbortController();
-// Call inside your app's user action; getFeatures() throws if IPA is missing.
-if (getFeatures().toolCalling !== true) throw new Error("Function tools are unsupported.");
-const result = await agent.run("How was GPS opened to civilians?", {
-  maxRounds: 8,
-  signal: controller.signal,
-  onEvent(event) {
-    if (event.type === "tool_started") console.log(event.id, event.name, event.arguments);
-    if (event.type === "tool_completed") console.log(event.id, event.result);
-    if (event.type === "tool_failed") console.error(event.id, event.error);
-    if (event.type === "text_delta") console.log(event.content);
-  },
-});
+const result = await agent.run("What time is it in UTC?");
 
-if (result.stopReason === "end_turn") console.log(result.output);
-else console.log("Round limit reached; tools ran, but no final answer was requested.");
-
-// Explicit continuation; no conversation is saved inside the agent.
-const followUp = await agent.run("Explain the key dates.", { history: result.messages });
+console.log(
+  result.stopReason === "end_turn"
+    ? result.output
+    : "Round limit reached."
+);
 ```
+
+This tool takes no arguments. For tools that accept arguments, validate them in
+`execute` before performing work: parsed arguments are `unknown`, and JSON Schema
+describes the tool to the model without validating its output.
 
 The helper maintains message history during each run, including assistant tool
 calls and tool results, and returns the full conversation as `result.messages`.
 The agent object is **stateless between runs**: it does not automatically save
-that history. Pass `{ history: result.messages }` to continue a conversation, as
-shown above. Omitting `history` starts a new conversation.
+that history. Pass `{ history: result.messages }` to continue a conversation.
+Omitting `history` starts a new conversation:
+
+```javascript
+const followUp = await agent.run("What date is that?", { history: result.messages });
+console.log(followUp.output);
+```
 
 `name` labels events; `instructions` supplies the system message. Supplied
 `history` precedes the current user input. A leading system message in `history`
