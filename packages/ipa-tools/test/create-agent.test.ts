@@ -92,6 +92,24 @@ describe("createAgent", () => {
     expect(request.mock.calls[0]![0].tools).toBeUndefined();
   });
 
+  it("replaces a mismatched leading system message instead of stacking instructions", async () => {
+    const request = mockRequest([answer]);
+    const history: Message[] = [
+      { role: "system", content: "Old instructions" },
+      { role: "user", content: "Earlier question" },
+      { role: "assistant", content: "Earlier answer" },
+    ];
+    await createAgent({ name: "Explorer", instructions: "Be helpful", request })
+      .run("Follow up", { history });
+    expect(request.mock.calls[0]![0].messages).toEqual([
+      { role: "system", content: "Be helpful" },
+      { role: "user", content: "Earlier question" },
+      { role: "assistant", content: "Earlier answer" },
+      { role: "user", content: "Follow up" },
+    ]);
+    expect(history[0]).toEqual({ role: "system", content: "Old instructions" });
+  });
+
   it("keeps overlapping runs' messages, events, and signals separate", async () => {
     let release!: () => void;
     let entered!: () => void;

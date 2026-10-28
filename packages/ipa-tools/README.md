@@ -394,8 +394,9 @@ that history. Pass `{ history: result.messages }` to continue a conversation, as
 shown above. Omitting `history` starts a new conversation.
 
 `name` labels events; `instructions` supplies the system message. Supplied
-`history` precedes the current user input. Reusing `result.messages` avoids
-duplicating an identical leading instructions message. Each run has independent
+`history` precedes the current user input. A leading system message in `history`
+is replaced with the current instructions, so reusing `result.messages` from this
+agent or another does not stack two system prompts. Each run has independent
 state, including when runs overlap. Creating an agent does not resolve IPA or
 send a request.
 

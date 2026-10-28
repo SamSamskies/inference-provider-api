@@ -104,11 +104,10 @@ export function createAgent(config: CreateAgentOptions): Agent {
         }
 
         const history = options.history ?? [];
-        const first = history[0];
-        // Full result.messages can be reused without accumulating our system message.
-        const messages: Message[] = first?.role === "system" && first.content === instructions
-          ? [...history]
-          : [{ role: "system", content: instructions }, ...history];
+        // Replace a leading system message so reused result.messages (this agent
+        // or another) never stack two instructions prompts.
+        const rest = history[0]?.role === "system" ? history.slice(1) : history;
+        const messages: Message[] = [{ role: "system", content: instructions }, ...rest];
         messages.push({ role: "user", content: input });
         const execute = Object.fromEntries(descriptors.map(([toolName, tool]) => [
           toolName, (args: unknown) => tool.execute(args, { signal: options.signal }),
