@@ -55,7 +55,7 @@
       }
 
       .wrap {
-        max-width: 52rem;
+        max-width: 80rem;
         margin: 0 auto;
         padding: 2.5rem 1.5rem 3.5rem;
       }
@@ -107,7 +107,7 @@
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
         gap: 1.1rem;
       }
 
@@ -573,99 +573,6 @@
           </div>
         </a>
 
-        <a class="card" href="./social/">
-          <div class="thumb thumb-social" aria-hidden="true">
-            <div class="row">
-              <div class="av"></div>
-              <div class="lines">
-                <div class="line w1"></div>
-                <div class="line w2"></div>
-                <div class="line w3"></div>
-              </div>
-            </div>
-            <div class="pill">Ask AI</div>
-          </div>
-          <div class="card-body">
-            <h2>Social post</h2>
-            <p>
-              Read-only post and replies with a Grok-like Ask AI panel that summarizes
-              the thread and answers follow-ups.
-            </p>
-            <span class="cta">Open demo →</span>
-          </div>
-        </a>
-
-        <a class="card" href="./nostr/">
-          <div class="thumb thumb-nostr" aria-hidden="true">
-            <div class="cardish"></div>
-            <div class="chip">asking a question</div>
-          </div>
-          <div class="card-body">
-            <h2>Nostr feed</h2>
-            <p>
-              A feed of Nostr notes. Uses IPA tool calling to filter notes
-              using natural language.
-            </p>
-            <span class="cta">Open demo →</span>
-          </div>
-        </a>
-
-        <a class="card" href="./charts/">
-          <div class="thumb thumb-charts" aria-hidden="true">
-            <div class="chip">render_chart</div>
-            <div class="bars">
-              <div class="bar b1"></div>
-              <div class="bar b2"></div>
-              <div class="bar b3"></div>
-              <div class="bar b4"></div>
-            </div>
-          </div>
-          <div class="card-body">
-            <h2>Charts</h2>
-            <p>
-              Ask for a chart in plain language. IPA tool calling draws bar,
-              line, or pie charts from a fixed dataset.
-            </p>
-            <span class="cta">Open demo →</span>
-          </div>
-        </a>
-
-        <a class="card" href="./translate/">
-          <div class="thumb thumb-translate" aria-hidden="true">
-            <div class="rule"></div>
-            <div class="line a"></div>
-            <div class="line b"></div>
-            <div class="line c"></div>
-            <div class="select">ES · Translate</div>
-          </div>
-          <div class="card-body">
-            <h2>Translate</h2>
-            <p>
-              Short haiku with a language selector. Uses
-              <code>ipa-tools</code> <code>complete</code> to translate the poem.
-            </p>
-            <span class="cta">Open demo →</span>
-          </div>
-        </a>
-
-        <a class="card" href="./avatar/">
-          <div class="thumb thumb-avatar" aria-hidden="true">
-            <div class="disc">
-              <div class="eye l"></div>
-              <div class="eye r"></div>
-              <div class="beak"></div>
-            </div>
-          </div>
-          <div class="card-body">
-            <h2>Avatar</h2>
-            <p>
-              Describe a character, generate an SVG avatar with
-              <code>ipa-tools</code> <code>complete</code>, then download PNG.
-            </p>
-            <span class="cta">Open demo →</span>
-          </div>
-        </a>
-
         <a class="card" href="./speech/">
           <div class="thumb thumb-speech" aria-hidden="true">
             <span style="--height: 1rem"></span>
@@ -697,6 +604,99 @@
             <p>
               Triage a message with System One: choose a category, score urgency,
               and check whether a reply is needed.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./social/">
+          <div class="thumb thumb-social" aria-hidden="true">
+            <div class="row">
+              <div class="av"></div>
+              <div class="lines">
+                <div class="line w1"></div>
+                <div class="line w2"></div>
+                <div class="line w3"></div>
+              </div>
+            </div>
+            <div class="pill">Ask AI</div>
+          </div>
+          <div class="card-body">
+            <h2>Social post</h2>
+            <p>
+              Read-only post and replies with a Grok-like Ask AI panel that summarizes
+              the thread and answers follow-ups.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./charts/">
+          <div class="thumb thumb-charts" aria-hidden="true">
+            <div class="chip">render_chart</div>
+            <div class="bars">
+              <div class="bar b1"></div>
+              <div class="bar b2"></div>
+              <div class="bar b3"></div>
+              <div class="bar b4"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <h2>Charts</h2>
+            <p>
+              Ask for a chart in plain language. IPA tool calling draws bar,
+              line, or pie charts from a fixed dataset.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./avatar/">
+          <div class="thumb thumb-avatar" aria-hidden="true">
+            <div class="disc">
+              <div class="eye l"></div>
+              <div class="eye r"></div>
+              <div class="beak"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <h2>Avatar</h2>
+            <p>
+              Describe a character, generate an SVG avatar with
+              <code>ipa-tools</code> <code>complete</code>, then download PNG.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./nostr/">
+          <div class="thumb thumb-nostr" aria-hidden="true">
+            <div class="cardish"></div>
+            <div class="chip">asking a question</div>
+          </div>
+          <div class="card-body">
+            <h2>Nostr feed</h2>
+            <p>
+              A feed of Nostr notes. Uses IPA tool calling to filter notes
+              using natural language.
+            </p>
+            <span class="cta">Open demo →</span>
+          </div>
+        </a>
+
+        <a class="card" href="./translate/">
+          <div class="thumb thumb-translate" aria-hidden="true">
+            <div class="rule"></div>
+            <div class="line a"></div>
+            <div class="line b"></div>
+            <div class="line c"></div>
+            <div class="select">ES · Translate</div>
+          </div>
+          <div class="card-body">
+            <h2>Translate</h2>
+            <p>
+              Short haiku with a language selector. Uses
+              <code>ipa-tools</code> <code>complete</code> to translate the poem.
             </p>
             <span class="cta">Open demo →</span>
           </div>
