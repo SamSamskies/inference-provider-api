@@ -524,7 +524,7 @@ try {
 
 `getInference()` throws immediately if it is missing. Prefer `isInferenceError` over `instanceof` — injectors may reconstruct errors across isolated worlds.
 
-## API surface (v1)
+## API surface
 
 | Export | Role |
 | --- | --- |
@@ -537,7 +537,7 @@ try {
 | `waitForInference` | Background poll until injected (do not await on first paint) |
 | `getInference` / `getFeatures` / `isInferenceAvailable` | Resolve or check `window.inference` |
 
-Out of v1: UI, injecting onto `window.inference`, MCP and other unspec'd hosted tools, streaming `toolCall` chunks. Hosted `{ type: "web_search" }` and image content parts (`imageInput` / `imageOutput`, `output.images`) are in the types.
+Out of scope: UI, injecting onto `window.inference`, MCP and other unspec'd hosted tools, streaming `toolCall` chunks. Hosted `{ type: "web_search" }` and image content parts (`imageInput` / `imageOutput`, `output.images`) are in the types.
 
 ## License
 
