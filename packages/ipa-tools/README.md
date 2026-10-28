@@ -422,9 +422,10 @@ every provider call.
 | `agent_failed` | Original `error`; the run promise rejects with the same error |
 
 Events are synchronous and ordered. Observers should not throw; their exceptions
-propagate. A parsing or missing-handler failure emits `tool_failed` without
-`tool_started`; a malformed call lacking an ID/name fails the run without a
-tool event. Executor, serialization, and cancellation failures reject the run;
+propagate, except `agent_completed` and `agent_failed`, which preserve the run
+result or original error. A parsing or missing-handler failure emits
+`tool_failed` without `tool_started`; a malformed call lacking an ID/name fails
+the run without a tool event. Executor, serialization, and cancellation failures reject the run;
 errors are not converted to tool content or retried. Tool IDs come from the
 provider, so scope them to the current run in your UI.
 

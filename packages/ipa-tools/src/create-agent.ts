@@ -46,7 +46,7 @@ export type AgentRunOptions = Pick<RunToolsOptions,
 > & {
   /** Explicit history; passing a previous result.messages is supported. No state is retained. */
   history?: Message[];
-  /** Synchronous observer, in execution order. Exceptions propagate; handlers should not throw. */
+  /** Synchronous observer, in execution order. Handlers should not throw; exceptions propagate except on terminal events, which preserve the run outcome. */
   onEvent?: (event: AgentEvent) => void;
 };
 
@@ -138,7 +138,8 @@ export function createAgent(config: CreateAgentOptions): Agent {
         try { emit({ type: "agent_failed", agentName: name, error }); } catch { /* observer failed */ }
         throw error;
       }
-      emit({ type: "agent_completed", agentName: name, result });
+      // Preserve the successful result even if the observer throws on completion.
+      try { emit({ type: "agent_completed", agentName: name, result }); } catch { /* observer failed */ }
       return result;
     },
   };

@@ -149,6 +149,17 @@ describe("createAgent", () => {
     } })).rejects.toBe(error);
   });
 
+  it("returns the run result when the completion observer throws", async () => {
+    const request = mockRequest([answer]);
+    const result = await createAgent({ name: "Test", instructions: "", request }).run("hi", {
+      onEvent: (event) => {
+        if (event.type === "agent_completed") throw new Error("Observer failed");
+      },
+    });
+    expect(result.output).toBe("GPS history [source]");
+    expect(result.stopReason).toBe("end_turn");
+  });
+
   it("executes last-round tools, keeps max_rounds, and exposes no final output", async () => {
     const request = mockRequest([done(call())], [answer]);
     const execute = vi.fn(search.execute);
