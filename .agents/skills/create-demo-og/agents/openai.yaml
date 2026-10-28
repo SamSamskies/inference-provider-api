@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Demo OG Image"
+  short_description: "Create matching OG cards for IPA demo apps"
+  default_prompt: "Use $create-demo-og to add a matching OG image and social metadata for the selected demo."
