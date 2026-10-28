@@ -45,7 +45,7 @@ jobs:
           cp examples/charts/data.json _site/charts/data.json
           cp examples/speech/index.html _site/speech/index.html
           cp examples/decisions/index.html _site/decisions/index.html
-          cp examples/research/index.html examples/research/app.js examples/research/research.js examples/research/style.css _site/research/
+          cp examples/research/index.html _site/research/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

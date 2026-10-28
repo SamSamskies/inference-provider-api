@@ -1,6 +1,32 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAgent, type ChatChunk, type ChatRequest } from "../src/index.js";
-import { availability, answerSegments, createResearchTools, LIMITS, runResearch } from "../../../examples/research/research.js";
+import { readFileSync } from "node:fs";
+import * as ipaTools from "../src/index.js";
+import type { ChatChunk, ChatRequest } from "../src/index.js";
+
+// Exercise the standalone example's actual code without attaching page listeners.
+// Replace the CDN import with the real local package; inference stays mocked.
+const html = readFileSync(new URL("../../../examples/research/index.html", import.meta.url), "utf8");
+const script = html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+const setupMarker = "// Connect the view to page events.";
+if (!script?.includes(setupMarker)) throw new Error("Research demo script or page setup is missing.");
+const packageImport = script.match(/^\s*import\s*\{([^}]+)\}\s*from "https:\/\/esm\.sh\/ipa-tools@3\.2\.0";/);
+if (!packageImport) throw new Error("Research demo import is missing.");
+const demo = new Function("ipaTools", `
+  const { ${packageImport[1]} } = ipaTools;
+  ${script.slice(packageImport[0].length).split(setupMarker)[0]}
+  return { availability, answerSegments, createResearchTools, LIMITS, runResearch, showResearchError };
+`)(ipaTools);
+const { availability, answerSegments, createResearchTools, LIMITS, showResearchError } = demo;
+
+function runResearch({ inference, input, ...runOptions }: ReturnType<typeof options> & {
+  signal?: AbortSignal;
+  onEvent?: (event: any) => void;
+  onSources?: (sources: any) => void;
+  limits?: typeof LIMITS;
+}) {
+  vi.stubGlobal("window", { inference });
+  return demo.runResearch(input, runOptions);
+}
 
 const page = { pageid: 11866, ns: 0, index: 1, title: "Global Positioning System",
   canonicalurl: "https://en.wikipedia.org/wiki/Global_Positioning_System", extract: "GPS became available for civilian use." };
@@ -19,9 +45,21 @@ function inference(...turns: ChatChunk[][]) {
   })) };
 }
 function options(provider = inference([search()], [read()], [answer()])) {
-  return { createAgent, inference: provider, input: "How did GPS reach civilians?", fetchImpl: vi.fn(async () => pages()) };
+  return { inference: provider, input: "How did GPS reach civilians?", fetchImpl: vi.fn(async () => pages()) };
 }
-afterEach(() => vi.useRealTimers());
+function view() {
+  const node = () => ({ hidden: false, textContent: "", dataset: {}, append() {} });
+  const nodes: Record<string, ReturnType<typeof node>> = {
+    error: { ...node(), hidden: true }, status: node(), "activity-state": node(),
+    "empty-activity": node(), activity: node(),
+  };
+  vi.stubGlobal("document", { getElementById: (id: string) => nodes[id] ?? null, createElement: node });
+  return nodes;
+}
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("Topic Explorer demo", () => {
   it("searches then reads over three model rounds, preserves source metadata, and emits progress", async () => {
@@ -48,11 +86,15 @@ describe("Topic Explorer demo", () => {
   });
 
   it("rejects missing/unsupported extensions and insecure or framed contexts before provider/network work", async () => {
-    expect(availability(undefined).ready).toBe(false);
-    expect(availability({ request() {} }).ready).toBe(false);
-    expect(availability({ request() {}, getFeatures() { throw Error(); } }).ready).toBe(false);
-    expect(availability(inference(), false).ready).toBe(false);
-    expect(availability(inference(), true, false).ready).toBe(false);
+    vi.stubGlobal("window", {});
+    expect(availability().ready).toBe(false);
+    vi.stubGlobal("window", { inference: { request() {} } });
+    expect(availability().ready).toBe(false);
+    vi.stubGlobal("window", { inference: { request() {}, getFeatures() { throw Error(); } } });
+    expect(availability().ready).toBe(false);
+    vi.stubGlobal("window", { inference: inference() });
+    expect(availability(false).ready).toBe(false);
+    expect(availability(true, false).ready).toBe(false);
     const opts = options();
     opts.inference.getFeatures = () => ({ toolCalling: false });
     await expect(runResearch(opts)).rejects.toMatchObject({ code: "unavailable" });
@@ -153,8 +195,11 @@ describe("Topic Explorer demo", () => {
       yield answer();
     } }));
     const run = runResearch({ ...opts, signal: controller.signal, onEvent: (e: unknown) => events.push(e) });
+    await vi.waitFor(() => expect(opts.inference.request).toHaveBeenCalledOnce());
     controller.abort();
-    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    const cancelled = await run.then(() => { throw new Error("expected cancellation"); }, (error) => error);
+    expect(cancelled).toMatchObject({ name: "AbortError" });
+    expect(cancelled).not.toMatchObject({ name: "InferenceError", code: "aborted" });
     const count = events.length; release(); await Promise.resolve();
     expect(events).toHaveLength(count);
     expect(opts.fetchImpl).not.toHaveBeenCalled();
@@ -166,8 +211,31 @@ describe("Topic Explorer demo", () => {
     const run = runResearch({ ...opts, signal: controller.signal, onEvent: (e: any) => {
       if (e.type === "tool_started") queueMicrotask(() => controller.abort());
     } });
-    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    const cancelled = await run.then(() => { throw new Error("expected cancellation"); }, (error) => error);
+    expect(cancelled).toMatchObject({ name: "AbortError" });
+    expect(cancelled).not.toMatchObject({ name: "InferenceError", code: "aborted" });
     expect(opts.inference.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows limit failures and hides the error banner only for Stop", () => {
+    const nodes = view();
+    const aborted = Object.assign(new Error("Request aborted"), { name: "InferenceError", code: "aborted" });
+    showResearchError(aborted, AbortSignal.abort());
+    expect(nodes.error.hidden).toBe(true);
+    expect(nodes.status.textContent).toBe("Research stopped. No completed answer.");
+    expect(nodes["activity-state"].textContent).toBe("Stopped");
+
+    const live = new AbortController().signal;
+    showResearchError(Object.assign(new Error("Model output limit reached. Try a narrower question."), { code: "output_limit" }), live);
+    expect(nodes.error.hidden).toBe(false);
+    expect(nodes.error.textContent).toContain("output limit");
+    expect(nodes.status.textContent).toBe("No completed answer. Any articles already read remain below.");
+    expect(nodes["activity-state"].textContent).toBe("Failed");
+
+    showResearchError(aborted, live);
+    expect(nodes.error.hidden).toBe(false);
+    expect(nodes.error.textContent).toBe("Request aborted");
+    expect(nodes["activity-state"].textContent).toBe("Failed");
   });
 
   it("applies network and whole-run deadlines even when external work ignores abort", async () => {
