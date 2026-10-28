@@ -133,7 +133,10 @@ export function createAgent(config: CreateAgentOptions): Agent {
             emit({ type: "tool_approval_requested", agentName: name, ...info });
             // An observer can abort while rendering the approval UI.
             if (options.signal?.aborted) throw makeInferenceError("aborted", "Request aborted");
-            return options.onApprovalRequest?.(info) ?? false;
+            if (typeof options.onApprovalRequest !== "function") {
+              throw makeInferenceError("permission_denied", `Tool "${info.name}" requires app approval.`);
+            }
+            return options.onApprovalRequest(info);
           },
           onAccepted: () => emit({ type: "request_accepted", agentName: name }),
           onDelta: (content) => emit({ type: "text_delta", agentName: name, content }),

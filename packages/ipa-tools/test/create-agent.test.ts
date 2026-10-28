@@ -370,7 +370,11 @@ describe("createAgent", () => {
       search: { requiresApproval: true, execute },
     } }).run("hi", { onApprovalRequest, onEvent: (event) => events.push(event) });
     if (kind === "thrown") await expect(run).rejects.toBe(error);
-    else await expect(run).rejects.toMatchObject({ code: "permission_denied" });
+    else await expect(run).rejects.toMatchObject({
+      code: "permission_denied",
+      message: kind === "missing" ? 'Tool "search" requires app approval.' :
+        'App approval denied for tool "search".',
+    });
     expect(execute).not.toHaveBeenCalled();
     expect(request).toHaveBeenCalledOnce();
     expect(events.map((event) => event.type)).toEqual([
