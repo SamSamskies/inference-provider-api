@@ -126,6 +126,8 @@ Function tools, hosted search, image input/output, typed decisions, and speech r
 
 An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
 
+An inference/tool-description grant does not approve every side effect an application might execute. Page-owned tools can use `ipa-tools`' optional [argument validation and app approval hooks](./packages/ipa-tools/README.md#tool-validation-and-app-approval) before executing consequential actions.
+
 ## Non-goals
 
 - Replacing provider SDKs
