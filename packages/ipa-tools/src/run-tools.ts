@@ -44,6 +44,10 @@ export type RunToolsOptions = {
     name: string;
     arguments: unknown;
   }) => void;
+  /** After execution, cancellation checks, and successful result serialization. */
+  onToolResult?: (info: { id: string; name: string; result: string }) => void;
+  /** Parsing, missing-handler, execution, serialization, or cancellation failure. */
+  onToolError?: (info: { id: string; name: string; error: unknown }) => void;
   signal?: AbortSignal;
   /** Default `"chat"`. */
   method?: "chat";
@@ -133,6 +137,8 @@ export async function runTools(
     onDelta,
     onReasoningDelta,
     onToolCall,
+    onToolResult,
+    onToolError,
     signal,
     method = "chat",
   } = options;
@@ -219,10 +225,10 @@ export async function runTools(
       }
     }
 
+    if (signal?.aborted) {
+      throw makeInferenceError("aborted", "Request aborted");
+    }
     if (!done) {
-      if (signal?.aborted) {
-        throw makeInferenceError("aborted", "Request aborted");
-      }
       throw makeInferenceError(
         "provider_error",
         "Stream ended without a done chunk."
@@ -282,33 +288,51 @@ export async function runTools(
         );
       }
 
-      const executor =
-        execute && typeof execute === "object" ? execute[name] : undefined;
-      if (typeof executor !== "function") {
-        throw makeInferenceError(
-          "invalid_request",
-          `No execute handler for tool "${name}".`
-        );
-      }
+      let content: string;
+      try {
+        const executor =
+          execute && typeof execute === "object" && Object.hasOwn(execute, name)
+            ? execute[name] : undefined;
+        if (typeof executor !== "function") {
+          throw makeInferenceError(
+            "invalid_request",
+            `No execute handler for tool "${name}".`
+          );
+        }
 
-      const args = parseToolArguments(call.function?.arguments, name);
-      if (typeof onToolCall === "function") {
-        onToolCall({ id, name, arguments: args });
-      }
-      const result = await executor(args);
-      if (signal?.aborted) {
-        throw makeInferenceError("aborted", "Request aborted");
+        const args = parseToolArguments(call.function?.arguments, name);
+        if (typeof onToolCall === "function") {
+          onToolCall({ id, name, arguments: args });
+        }
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+        const result = await executor(args);
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+        content = serializeToolResult(result);
+        if (signal?.aborted) {
+          throw makeInferenceError("aborted", "Request aborted");
+        }
+      } catch (error) {
+        onToolError?.({ id, name, error });
+        throw error;
       }
       messages = [
         ...messages,
         {
           role: "tool",
           toolCallId: id,
-          content: serializeToolResult(result),
+          content,
         },
       ];
+      onToolResult?.({ id, name, result: content });
     }
 
+    if (signal?.aborted) {
+      throw makeInferenceError("aborted", "Request aborted");
+    }
     if (round === maxRounds - 1) {
       return { messages, final: done, stopReason: "max_rounds" };
     }

@@ -69,6 +69,16 @@ export {
 } from "./inference.js";
 export { complete, type CompleteOptions } from "./complete.js";
 export {
+  createAgent,
+  type Agent,
+  type AgentEvent,
+  type AgentRunOptions,
+  type AgentRunResult,
+  type AgentTool,
+  type AgentToolContext,
+  type CreateAgentOptions,
+} from "./create-agent.js";
+export {
   parseToolArguments,
   runTools,
   serializeToolResult,

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional `createAgent()` helper over `runTools()`, with named app-owned function tools, system instructions, explicit conversation history, final text and full loop results, typed activity events, capability checks, bounded rounds, and cancellation forwarded to tool handlers.
+- `runTools()` result/error callbacks with tool IDs, including serialization failures. Only own executor-map entries are dispatched; cancellation is also checked before execution and after stream exhaustion or result callbacks.
+
 ## [3.0.0] - 2026-10-23
 
 ### Breaking
