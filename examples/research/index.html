@@ -274,6 +274,10 @@
           checkAbort(controller.signal);
           validateAnswer(result, sources, limits);
           return { ...result, sources: [...sources.values()] };
+        } catch (error) {
+          // Limit/timeout abort the inner controller. runTools often rejects with
+          // code "aborted"; prefer the abort reason so the view can show it.
+          throw controller.signal.aborted ? (controller.signal.reason ?? error) : error;
         } finally {
           clearTimeout(timer);
           signal?.removeEventListener("abort", abort);
@@ -810,7 +814,8 @@
 
       function showResearchError(error, signal) {
         const code = isInferenceError(error) ? error.code : "unknown";
-        const cancelled = signal.aborted || code === "aborted" || error?.name === "AbortError";
+        // Inner limit/timeout aborts can surface as code "aborted" without Stop.
+        const cancelled = signal.aborted;
         const message = cancelled
           ? "Research stopped. No completed answer."
           : (error?.message ?? String(error));
