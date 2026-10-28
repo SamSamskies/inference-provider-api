@@ -582,6 +582,9 @@ handler to run. A missing handler, `false`, or an invalid response rejects the
 run with `permission_denied`; thrown/rejected approval errors propagate. There
 is no retry, automatic grant, or error content sent to the model. The remaining
 tools and provider rounds stop; earlier side effects are not rolled back.
+A later failure in the same assistant turn does not return `result.messages`,
+so a retry must not send that tool-call turn with only some `role: "tool"`
+replies; start a new user turn or include a result for every call.
 `onToolError` reports the failure. Agents emit `tool_approval_requested` before
 the hook, followed by `tool_failed` and `agent_failed` on refusal/error. An
 approval event observer may abort or throw to stop before the hook is called.
