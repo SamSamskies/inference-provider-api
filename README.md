@@ -27,7 +27,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 ### Example Applications
 
 - [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))
-- [Topic Explorer](https://samsamskies.github.io/inference-provider-api/research/) — a browser-native research agent that searches Wikipedia, reads articles, and answers with sources and live activity ([source](./examples/research/))
+- [Topic Explorer](https://samsamskies.github.io/inference-provider-api/research/) — a browser-native research agent built with [`ipa-tools`](./packages/ipa-tools) `createAgent` that searches Wikipedia, reads articles, and answers with sources and live activity ([source](./examples/research/))
 - [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
 - [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 - [Translate demo](https://samsamskies.github.io/inference-provider-api/translate/) — short haiku translated with [`ipa-tools`](./packages/ipa-tools) `complete` ([source](./examples/translate/))
