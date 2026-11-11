@@ -1,6 +1,6 @@
 # Topic Explorer
 
-A browser-native research agent built with `ipa-tools` **3.2.0** `createAgent()`.
+A browser-native research agent built with `ipa-tools` **3.3.0** `createAgent()`.
 It searches English Wikipedia, chooses and reads articles, and synthesizes an
 answer with source markers. The activity timeline reflects actual tool execution.
 
@@ -25,7 +25,7 @@ and `getFeatures()` check readiness immediately; `waitForInference()` detects la
 extension injection in the background. The setup panel also has a manual "Check
 again" control, and readiness is checked when the page regains focus.
 
-The script imports the helpers from the pinned `https://esm.sh/ipa-tools@3.2.0`
+The script imports the helpers from the pinned `https://esm.sh/ipa-tools@3.3.0`
 at the top, as in the Nostr demo. The module must load before the page's controls
 initialize. Google Fonts is optional; system fonts are the fallback. The gallery
 and Pages workflow include the demo.
