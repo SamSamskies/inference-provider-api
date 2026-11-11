@@ -24,6 +24,8 @@ Then ask your agent to add an IPA-powered feature to your app. The skill guides 
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge). See its [installation guide](https://github.com/SamSamskies/inference-bridge#installation) for development builds.
 
+Bridge follow-up for [decision implementation limits (#87)](https://github.com/SamSamskies/inference-provider-api/issues/87): choose, document, and enforce conservative browser resource caps for question count and payload size independently of IPA. Retain provider/model-specific enforcement, including smaller route limits, and describe these caps as Bridge policy rather than IPA requirements.
+
 ### Example Applications
 
 - [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))
@@ -125,6 +127,8 @@ const features = window.inference.getFeatures?.() ?? {};
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
 Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. See the [speech examples](./examples/speech/README.md) for uploads, format discovery and playback, URL input, and cancellation.
+
+Typed decisions require nonempty `questions`; question-count and payload-size maxima are documented and enforced by each implementation, and selected providers/models may impose smaller limits. `methods.decide: true` advertises method and primitive support, not a request-size guarantee. Handle `invalid_request` for exceeded limits; implementations must not silently truncate input or automatically split a request to fit them. Applications may explicitly submit multiple requests when appropriate. See the [decision validation rules](./SPEC.md#decision-request-and-validation).
 
 ### Permissions
 

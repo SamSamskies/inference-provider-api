@@ -99,7 +99,10 @@ type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 type DecideRequest = {
   method: "decide";
   state: DecisionState;
-  /** 1–64 questions over the same state; no dependencies between answers. */
+  /**
+   * Nonempty questions over the same state; implementation/route limits apply.
+   * No dependencies between answers.
+   */
   questions: Record<string, DecisionQuestion>;
   signal?: AbortSignal;
 };
@@ -253,6 +256,7 @@ type TranscriptionInputConstraint = {
 type InferenceFeatures = {
   /** Chat is required. Absent or false optional methods mean unsupported. */
   methods?: {
+    /** All three decision primitives and refusals; request size limits apply. */
     decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
     /** true means MP3 only; an object declares exactly its nonempty format list. */
@@ -440,8 +444,8 @@ Rules:
 16. Implementations that do not support image output must reject `output.images: true` with `invalid_request` — including implementations that omit `getFeatures`. Extra keys under `output` are ignored (forward compatible). If the page does not set `output.images: true`, implementations must not put `ImagePart`s on `done.message` (text only, as today).
 17. Advertising `imageInput` / `imageOutput` does not guarantee that the user's provider or model can see or draw. Applications must still handle a text-only `done` when they set `output.images: true`. If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that, do not complete a normal chat reply — see Images.
 
-18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` is the legacy MP3-only advertisement; an object declares exactly its nonempty `outputMediaTypes` list, with every entry a `SynthesisMediaType`. A WAV-only implementation may advertise `{ outputMediaTypes: ["audio/wav"] }`. `false` or missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
-19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`; do not substitute chat, omit questions, drop media, or silently change the approved route.
+18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals, not unlimited capacity or a guarantee that a selected route accepts any particular request size. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` is the legacy MP3-only advertisement; an object declares exactly its nonempty `outputMediaTypes` list, with every entry a `SynthesisMediaType`. A WAV-only implementation may advertise `{ outputMediaTypes: ["audio/wav"] }`. `false` or missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
+19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`, except that [decision resource-limit violations](#decision-request-and-validation) are `invalid_request`; do not substitute chat, omit questions, drop media, or silently change the approved route.
 20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Speech discovery may describe the identity-free union of possible routes; approval must filter to matching input constraints or requested synthesis formats. Advertising a synthesis format does not guarantee the currently approved provider/model/voice route can produce it. No provider/model/voice identities or account state belong in discovery.
 
 ### Request options
@@ -744,8 +748,9 @@ Provider protocols, endpoint names, and model catalogs remain implementation det
 
 Feature-detect `getFeatures().methods?.decide === true` before use. This flag
 describes API support, independently of credentials, installed models, or site
-approval. It covers `noul`, `choice`, and `score`; there are no per-provider or
-per-primitive discovery flags in this draft.
+approval. It covers `noul`, `choice`, and `score`, not unlimited capacity or a
+guarantee that a selected route accepts any particular request size. There are
+no per-provider, per-primitive, or limits-discovery flags in this draft.
 
 The request has only `method`, `state`, `questions`, and optional `signal`.
 Reject unknown top-level or question fields with `invalid_request`, including
@@ -760,25 +765,35 @@ implementations may offer different defaults from chat.
   functions, symbols, BigInts, binary objects, and custom objects such as
   `Date`, `Map`, or instances with custom serialization. Do not silently coerce
   or drop non-JSON values. Shared references without cycles are allowed.
-- `questions` must be a plain object with 1–64 own entries. Every id must be a
+- `questions` must be a plain object with at least one own entry. Every id must be a
   non-whitespace string; preserve ids exactly in `done.answers`. Each question
   has `type` and non-whitespace string `instructions`, plus `criteria` as below.
   Ids correlate answers; put the actual question in `instructions`.
 - All questions are evaluated against the same state independently. An answer
   cannot refer to another answer in the same request. Applications make a later
   request when a decision depends on an earlier result.
-- The UTF-8 encoding of `JSON.stringify({ state, questions })` must not exceed
-  **63 KiB (64,512 bytes)**. This excludes `method`, `signal`, and provider-added
-  fields. Reject deeper than **64 levels**, counting this wrapper as depth 0
-  and each object-property or array-element descent as one level, including
-  primitive leaves. These are API envelope limits, not a guarantee that every
-  selected model has enough context for the maximum input.
+- Implementations must document and enforce conservative resource limits,
+  including maximum question counts and payload sizes. IPA fixes no universal
+  question-count or payload-size maximum. Document how payload size is measured
+  (for example, UTF-8 bytes of `JSON.stringify({ state, questions })`) and which
+  fields it includes. Selected providers/models may impose smaller limits.
+  Reject requests exceeding any applicable limit with `invalid_request` and a
+  useful explanation identifying the exceeded limit, including its value when
+  known. Enforce locally known limits before provider inference I/O, and before
+  approval whenever possible; check route-specific limits once the route is
+  selected. When a limit cannot be checked locally, translate upstream limit
+  rejections to `invalid_request` with a useful explanation and yield no `done`.
+- Reject deeper than **64 levels**, counting the `{ state, questions }` wrapper
+  as depth 0 and each object-property or array-element descent as one level,
+  including primitive leaves.
 - On first iteration, validate and snapshot `state` and `questions` before
   approval or provider I/O. Later page mutations must not alter the approved
   request. `signal` remains a cancellation handle and is never serialized.
-  Do not truncate input to fit a route's limits. URLs or image-like strings
-  inside state are ordinary data; the implementation must not fetch them or
-  interpret them as media attachments.
+  Implementations must not silently truncate questions or state, or automatically
+  split one decision request into multiple provider calls to fit a limit.
+  Applications may explicitly submit multiple requests when appropriate.
+  URLs or image-like strings inside state are ordinary data; the implementation
+  must not fetch them or interpret them as media attachments.
 
 | Question type | `criteria` | Answer |
 | --- | --- | --- |
@@ -833,7 +848,8 @@ answers into refusals. Native wire shapes may be mapped (for example a boolean
 predicate to `noul`, or ordered levels to zero-based score indices), but do not
 emulate typed decisions by prompting a chat model and parsing generated text or
 inventing probabilities. If the selected route cannot honor a well-formed
-request, fail with `unavailable` and yield no `done`.
+request, fail with `unavailable` and yield no `done`, except for applicable
+resource-limit violations, which use `invalid_request` as specified above.
 
 The normal cancellation rules apply during permission and provider work.
 Aborting throws `aborted`, cancels in-flight provider work, and yields no

@@ -33,6 +33,25 @@ and cancellation during approval and provider work. No provider I/O may happen
 before permission resolves; abort and iterator closure must cancel unfinished
 work. The helper propagates stream errors rather than accepting them as success.
 
+Decision question-count and payload-size maxima are implementation-defined, not
+universal IPA ceilings. A request with 65 questions or more than 63 KiB of
+serialized `state` + `questions` is not inherently invalid. A successful stream
+for a request within an implementation's and selected route's limits must still
+correlate every answer exactly, regardless of size. `methods.decide: true` does
+not guarantee that a particular request size fits.
+
+Implementation suites must test their documented question-count and payload-size
+boundaries (including how bytes/fields are counted), smaller selected-route
+limits, and requests exceeding each applicable limit. Expect `invalid_request`
+with a useful explanation, no `done`, and no provider inference I/O for locally
+known failures; reject before approval whenever possible. Also test translating
+upstream limit rejections when a limit cannot be checked locally. Assert that
+questions/state are not silently truncated and one request is not automatically
+split into multiple provider calls to fit a limit. Keep structural validation,
+answer correlation, approval snapshot isolation, and cancellation checks at
+these boundaries. Choice-count, score-level, and 64-level nesting limits remain
+unchanged.
+
 For synthesis, pass the request so its output type is checked. Existing
 `assertSpeechStream("synthesize", stream)` calls still check the MP3 default:
 

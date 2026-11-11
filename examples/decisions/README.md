@@ -51,8 +51,12 @@ Every answer is checked for `type: "refusal"` before reading its values. One
 refusal leaves other answers usable; all refusals are still a completed request.
 A refusal is distinct from a zero probability, missing answer, or permission denial.
 Editing the message clears the previous results so they cannot be mistaken for
-judgments about the new text. Oversized requests are disabled using the spec's
-63 KiB UTF-8 limit for `JSON.stringify({ state, questions })`.
+judgments about the new text. The demo imposes no fixed payload-size maximum.
+The extension must document and enforce conservative question-count and
+payload-size limits, and the selected provider/model may impose smaller limits.
+`methods.decide: true` does not guarantee capacity for a particular request size.
+Limit failures appear as `invalid_request` with the implementation's explanation;
+the demo does not automatically shorten the message or split the request.
 
 The urgency score is a probability-weighted position from 0 (routine) to 2
 (critical), and can be fractional. Choice and Score confidence summarize their
@@ -84,6 +88,9 @@ input. See TypeSafe's
   completed result.** and enabled controls. Deny permission or select an
   unavailable route: expect useful guidance and no stale result.
 - Edit the message after success: old results and result JSON should clear.
-  Blank or oversized UTF-8 input should disable submission. Try a missing or
-  malformed answer with a test injector: no partial success should be displayed.
+  Blank input should disable submission. Input above 63 KiB should remain
+  submittable when decision support is advertised; use a test injector to verify
+  both success and a route's `invalid_request` limit error, with its explanation
+  visible and no stale result. Try a missing or malformed answer with a test
+  injector: no partial success should be displayed.
 - Check keyboard focus, narrow mobile layout, and the gallery's **Decisions** link.

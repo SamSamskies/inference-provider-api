@@ -118,6 +118,12 @@ decision. The user selects the provider/model and grants decision permission
 separately from chat or speech. Iterate `request({ method: "decide", state,
 questions })` for `accepted` then `done.answers`; there are no deltas. Check
 each answer's `type` for refusal before consuming probabilities or values.
+`questions` must be nonempty. Implementations document and enforce their own
+question-count and payload-size limits; selected providers/models may have
+smaller limits. The feature flag does not guarantee capacity for a particular
+request size. Exceeding an applicable limit throws `invalid_request`; requests
+must not be silently truncated or automatically split. Applications may
+explicitly submit multiple requests when appropriate.
 See the spec's [decision example and validation rules](../../SPEC.md#typed-decisions-system-one).
 An injector's experimental decision namespace does not advertise stable support.
 
