@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image inspection — IPA Decisions</title>
+    <meta name="description" content="Inspect a local photo for visible damage with native image input and typed decisions." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./decisions.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="brand">IPA Decisions<span>Native image input</span></p>
+        <nav class="header-meta" aria-label="Examples">
+          <a class="gallery" href="./">Inbox triage</a>
+          <a class="gallery" href="../">All examples</a>
+          <a class="source" href="https://github.com/SamSamskies/inference-provider-api/blob/main/examples/decisions/images.html" target="_blank" rel="noopener noreferrer" aria-label="Source on GitHub">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8" /></svg>
+          </a>
+          <span id="connection-status">Checking…</span>
+        </nav>
+      </header>
+      <h1>Image inspection</h1>
+      <p class="intro">Choose a photo of an item and check for visible damage. A typed judgment from the image itself, with a probability you can inspect.</p>
+      <div class="connection" id="connection">
+        <div>
+          <strong id="connection-title">Checking image support</strong>
+          <p id="connection-message">Your extension must support images in Decisions.</p>
+        </div>
+        <div class="actions">
+          <a class="button" href="https://github.com/SamSamskies/inference-bridge#installation" target="_blank" rel="noopener noreferrer">Get Inference Bridge</a>
+          <button class="secondary" id="recheck" type="button">Check again</button>
+        </div>
+      </div>
+      <div class="workspace image-workspace">
+        <section class="panel">
+          <h2>Your image</h2>
+          <form id="image-form">
+            <label for="image-file">Choose a local image</label>
+            <p class="hint" id="file-hint">Supported types will appear when your extension is ready.</p>
+            <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-describedby="file-hint file-error" disabled required />
+            <p class="error" id="file-error" hidden></p>
+            <figure id="image-figure" hidden>
+              <div class="image-stage"><img id="image-preview" width="640" height="480" alt="Selected item to inspect for damage" /></div>
+              <figcaption id="file-meta"></figcaption>
+            </figure>
+            <div class="image-stage" id="empty-image"><p>Choose an image to preview it here. Nothing is sent until you click Inspect image and your extension approves the request.</p></div>
+            <div class="actions">
+              <button id="inspect" type="submit" disabled>Inspect image</button>
+              <button class="secondary" id="clear-image" type="button" disabled>Clear image</button>
+              <button class="secondary" id="cancel-image" type="button" hidden>Cancel</button>
+            </div>
+            <p class="status" id="request-status" role="status">Choose an image to get started.</p>
+          </form>
+          <p class="privacy">Your selected image and the question go to the provider you approve in your extension. Image Decisions require separate permission from text Decisions and chat images.</p>
+        </section>
+        <section class="panel" id="results-panel" aria-busy="false">
+          <h2>Visible damage</h2>
+          <p class="question">Does the item have a crack, tear, or dent?</p>
+          <p class="hint">Ignores shadows and damage to the packaging.</p>
+          <div class="empty" id="empty-result">Inspect an image to see the probability of visible damage.</div>
+          <div id="image-result" hidden>
+            <p class="image-result" id="damage-answer"></p>
+            <meter id="damage-meter" min="0" max="1" value="0" aria-label="Probability of visible damage"></meter>
+            <div class="scale-labels" id="damage-scale"><span>Unlikely · 0%</span><span>Likely · 100%</span></div>
+            <p class="metadata" id="damage-description"></p>
+            <p class="metadata" id="result-meta"></p>
+          </div>
+          <p class="error" id="request-error" hidden></p>
+        </section>
+      </div>
+      <div class="developer">
+        <details><summary>Request outline</summary><pre tabindex="0" role="region" aria-label="Request outline"><code id="request-json">Choose an image to build a request. Binary data is omitted from this outline.</code></pre></details>
+        <details><summary>Result JSON</summary><pre tabindex="0" role="region" aria-label="Result JSON"><code id="result-json">No completed result yet.</code></pre></details>
+      </div>
+      <footer>A probability near 50% means uncertainty about damage, rather than moderate damage. A judgment is not a guarantee of correctness. <a href="https://github.com/SamSamskies/inference-provider-api/blob/main/examples/decisions/README.md">Developer notes</a></footer>
+    </main>
+    <script type="module" src="./images.mjs"></script>
+  </body>
+</html>

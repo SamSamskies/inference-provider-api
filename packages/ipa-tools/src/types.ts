@@ -61,6 +61,13 @@ export type DecisionJsonValue =
 
 export type DecisionState = string | DecisionJsonValue[] | { [key: string]: DecisionJsonValue };
 
+/** Inline image only. String data is raw base64, never a data URL. */
+export type DecisionImageAttachment = {
+  type: "image";
+  mediaType: ImageMediaType;
+  data: string | Blob;
+};
+
 export type NoulQuestion = {
   type: "noul";
   instructions: string;
@@ -86,6 +93,8 @@ export type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 export type DecideRequest = {
   method: "decide";
   state: DecisionState;
+  /** Shared native images; only advertised decisionMedia.imageMediaTypes. */
+  attachments?: DecisionImageAttachment[];
   /**
    * Nonempty questions over the same state; implementation/route limits apply.
    * No dependencies between answers.
@@ -249,6 +258,8 @@ export type InferenceFeatures = {
     /** true means MP3 only; an object declares exactly its nonempty format list. */
     synthesize?: boolean | { outputMediaTypes: SynthesisMediaType[] };
   };
+  /** Independent of chat imageInput; requires methods.decide === true. */
+  decisionMedia?: { imageMediaTypes: ImageMediaType[] };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
    * on request. Absent or false means unsupported.

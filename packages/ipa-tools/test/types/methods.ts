@@ -4,7 +4,7 @@ import { complete, createInference, type ChatRequest, type ChatChunk,
   type InferenceDoneFor, type SynthesizeRequest, type SynthesisChunk,
   type TranscribeRequest, type TranscriptionChunk, type TranscriptionMediaSource,
   type DecideRequest, type DecisionChunk, type DecisionDoneChunk,
-  type DecisionAnswer, type DecisionState,
+  type DecisionAnswer, type DecisionState, type DecisionImageAttachment, type InferenceFeatures,
 } from "../../src/index.js";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends
@@ -30,6 +30,20 @@ const chatStream = ipa.request(chat);
 const transcriptionStream = ipa.request(transcribe);
 const synthesisStream = ipa.request(synthesize);
 const decisionStream = ipa.request(decide);
+const imageAttachment: DecisionImageAttachment = { type: "image", mediaType: "image/png", data: new Blob() };
+const decisionWithImages = { ...decide, attachments: [imageAttachment] } satisfies DecideRequest;
+const imageDecisionStream = ipa.request(decisionWithImages);
+type ImageDecisionInference = Assert<Equal<typeof imageDecisionStream, AsyncIterable<DecisionChunk>>>;
+const imageFeatures: InferenceFeatures = { methods: { decide: true }, decisionMedia: { imageMediaTypes: ["image/png"] } };
+const booleanCompatibility: boolean | undefined = imageFeatures.methods?.decide;
+// @ts-expect-error decision attachments do not accept remote URLs
+const remoteDecisionImage: DecisionImageAttachment = { type: "image", url: "https://example.com/a.png" };
+// @ts-expect-error mediaType is required even for a Blob
+const missingImageType: DecisionImageAttachment = { type: "image", data: new Blob() };
+// @ts-expect-error PDFs are not decision images
+const pdfDecisionImage: DecisionImageAttachment = { type: "image", mediaType: "application/pdf", data: "YQ==" };
+// @ts-expect-error method support stays boolean
+const objectDecisionFeature: InferenceFeatures = { methods: { decide: { imageMediaTypes: ["image/png"] } } };
 const unionStream = ipa.request(anyRequest);
 type ChatInference = Assert<Equal<typeof chatStream, AsyncIterable<ChatChunk>>>;
 type TranscriptionInference = Assert<Equal<typeof transcriptionStream, AsyncIterable<TranscriptionChunk>>>;

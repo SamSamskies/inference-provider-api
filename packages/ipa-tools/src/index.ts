@@ -14,6 +14,7 @@ export type {
   DecideRequest,
   DecisionJsonValue,
   DecisionState,
+  DecisionImageAttachment,
   DecisionQuestion,
   NoulQuestion,
   ChoiceQuestion,

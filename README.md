@@ -38,6 +38,7 @@ Bridge follow-up for [decision implementation limits (#87)](https://github.com/S
 - [Charts demo](https://samsamskies.github.io/inference-provider-api/charts/) — natural-language charts via IPA tool calling (`render_chart` generative UI) ([source](./examples/charts/))
 - [Speech demo](https://samsamskies.github.io/inference-provider-api/speech/) — transcribe an uploaded file, generate speech, and play MP3 or WAV ([source](./examples/speech/))
 - [Decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/) — triage a message with typed category, urgency, and reply-needed judgments ([source](./examples/decisions/))
+- [Image decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/images.html) — choose and preview a local image, then inspect it for visible damage when decision-image support is advertised ([source](./examples/decisions/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
 
 ### Apps using IPA
@@ -122,6 +123,7 @@ const features = window.inference.getFeatures?.() ?? {};
 | [Image input](./SPEC.md#images) | `features.imageInput` | Image parts in user or assistant messages |
 | [Image output](./SPEC.md#images) | `features.imageOutput` | `output: { images: true }`; image parts appear on `done.message.content` |
 | [Typed decisions](./SPEC.md#typed-decisions-system-one) | `features.methods?.decide` | `method: "decide"` with JSON `state` and named `noul` / `choice` / `score` questions; `accepted` then `done.answers`, including per-question refusals |
+| [Decision images](./SPEC.md#decision-media) | `features.methods?.decide === true` and `features.decisionMedia?.imageMediaTypes` | Optional shared inline image `attachments`; native media, separate consent, same typed answers |
 | [Transcription](./SPEC.md#bounded-speech) | `features.methods?.transcribe?.acceptedMedia` | `method: "transcribe"` with completed `media`; text on `done.transcript` |
 | [Speech synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 by default, optional advertised WAV in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
@@ -135,6 +137,12 @@ Typed decisions require nonempty `questions`; question-count and payload-size ma
 The injector obtains permission for the calling origin before sending content to a provider. The user chooses the provider and model. Remembered grants bind that route to the origin and method (plus voice for synthesis); changing a global default does not rewrite existing grants. A remembered denial blocks the origin.
 
 Function tools, hosted search, image input/output, typed decisions, and speech require their own approval; a plain chat grant does not cover them. The approval UI must identify offered tools and capabilities, but a request preview is optional. Decision approval identifies question ids/types. Applications should disclose what page tools may send before the first request because later tool results can be sent without another preview.
+
+Decision images require a separate MIME-scoped media grant; existing text-only
+decision or chat-image grants do not cover them. Approval lists each attachment's
+type and decoded size. See the [browser image examples and Bridge follow-up](./examples/decisions/README.md#native-image-example).
+Unadvertised or malformed images are `invalid_request`; an advertised type
+unsupported on the selected route is `unavailable`. State URLs remain ordinary data.
 
 An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
 

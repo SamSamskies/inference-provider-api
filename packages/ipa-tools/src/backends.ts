@@ -1,11 +1,12 @@
 import { isInferenceError, makeInferenceError } from "./errors.js";
 import { getInference, isInferenceAvailable } from "./inference.js";
-import { supportsSynthesis, supportsTranscription } from "./methods.js";
+import { supportsDecisionMedia, supportsSynthesis, supportsTranscription } from "./methods.js";
 import type {
   Inference,
   InferenceFeatures,
   ChatRequest,
   InferenceMethod,
+  ImageMediaType,
 } from "./types.js";
 
 /**
@@ -60,6 +61,7 @@ export type ResolveOptions = {
 type ResolveRequestOptions = {
   method?: InferenceMethod;
   mediaType?: string;
+  decisionImageMediaTypes?: ImageMediaType[];
   signal?: AbortSignal;
   /** When true, skip a fallback whose `getFeatures().toolCalling` is not true. */
   needsTools?: boolean;
@@ -154,6 +156,7 @@ export function normalizeFallbacks(
 type CapabilityNeeds = {
   method: InferenceMethod;
   mediaType?: string;
+  decisionImageMediaTypes: ImageMediaType[];
   tools: boolean;
   webSearch: boolean;
   imageInput: boolean;
@@ -166,6 +169,7 @@ function capabilityNeedsFrom(
   return {
     method: resolveOptions?.method ?? "chat",
     mediaType: resolveOptions?.mediaType,
+    decisionImageMediaTypes: resolveOptions?.decisionImageMediaTypes ?? [],
     tools: resolveOptions?.needsTools === true,
     webSearch: resolveOptions?.needsWebSearch === true,
     imageInput: resolveOptions?.needsImageInput === true,
@@ -184,7 +188,7 @@ function featuresSupportNeeded(
   features: InferenceFeatures,
   needs: CapabilityNeeds
 ): boolean {
-  if (needs.method === "decide" && features.methods?.decide !== true) {
+  if (needs.method === "decide" && !supportsDecisionMedia(features, needs.decisionImageMediaTypes)) {
     return false;
   }
   if (needs.method === "transcribe" && !supportsTranscription(features, needs.mediaType)) {
@@ -217,7 +221,11 @@ function backendSupportsNeeded(
 
 function capabilitySkipMessage(needs: CapabilityNeeds): string {
   const labels: string[] = [];
-  if (needs.method === "decide") labels.push("typed decisions");
+  if (needs.method === "decide") {
+    labels.push(needs.decisionImageMediaTypes.length
+      ? `decision images (${needs.decisionImageMediaTypes.join(", ")})`
+      : "typed decisions");
+  }
   if (needs.method === "transcribe") {
     labels.push(`transcription${needs.mediaType ? ` of ${needs.mediaType}` : ""}`);
   }
@@ -256,6 +264,7 @@ function shouldRetryCapabilitySkip(
   })[CAPABILITY_SKIP];
   if (!skipped) return false;
   if (skipped.method !== needs.method || skipped.mediaType !== needs.mediaType) return true;
+  if (skipped.decisionImageMediaTypes.join() !== needs.decisionImageMediaTypes.join()) return true;
   if (skipped.tools && !needs.tools) return true;
   if (skipped.webSearch && !needs.webSearch) return true;
   if (skipped.imageInput && !needs.imageInput) return true;

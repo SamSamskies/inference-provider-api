@@ -127,6 +127,15 @@ explicitly submit multiple requests when appropriate.
 See the spec's [decision example and validation rules](../../SPEC.md#typed-decisions-system-one).
 An injector's experimental decision namespace does not advertise stable support.
 
+`DecisionImageAttachment` describes optional shared inline `attachments` on
+`DecideRequest`: `{ type: "image", mediaType: ImageMediaType, data: string | Blob }`.
+Strings are raw base64; URLs are excluded. Discover accepted MIME types through
+`decisionMedia.imageMediaTypes`, separately from boolean `methods.decide` and
+chat `imageInput`. Text-only decisions (including `attachments: []`) remain
+compatible. The injector owns byte/format validation, documented count/size
+limits, first-iteration snapshotting, native forwarding, and separate media
+approval. See the [browser image example](../../examples/decisions/README.md#native-image-example).
+
 For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
 `InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk
 by its payload, since `type: "done"` is shared:
@@ -193,6 +202,11 @@ See the [format-aware Blob example](../../examples/speech/README.md#text-to-an-m
 For decisions, both the backend and created client must advertise
 `methods.decide: true`. A chat-only backend is skipped before `create()`,
 including downloads or session setup; there is no decision-to-chat emulation.
+Image requests additionally require every attachment MIME type in
+`decisionMedia.imageMediaTypes` on both backend and created/cached client before
+delegation. The helper checks capability/schema without reading Blobs; the
+implementation validates bytes/encoding/limits. Selected-route `unavailable`
+errors propagate without retrying or dropping attachments.
 
 Apps import backend packages themselves (no string aliases in `ipa-tools`):
 

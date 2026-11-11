@@ -94,3 +94,52 @@ input. See TypeSafe's
   visible and no stale result. Try a missing or malformed answer with a test
   injector: no partial success should be displayed.
 - Check keyboard focus, narrow mobile layout, and the gallery's **Decisions** link.
+
+## Native image demo
+
+Open **Image inspection** from the inbox demo, or visit
+[`/decisions/images.html`](https://samsamskies.github.io/inference-provider-api/decisions/images.html)
+after deployment (locally, `/decisions/images.html`). No console setup is needed.
+
+1. Use an injector advertising `methods.decide === true` and at least one
+   `decisionMedia.imageMediaTypes` entry. The page explains missing support and
+   checks again after delayed injection, page focus, or **Check again**.
+2. Choose a supported local image. The page shows a local preview, type, and
+   exact byte size; selecting a file does not send it to a provider.
+3. Click **Inspect image**, approve decision-image access in your extension,
+   and view the probability of visible damage. **Cancel** works while waiting
+   for approval or inference. You can replace or clear the file to start over.
+
+The separate page keeps image judgments distinct from inbox triage. The
+[image request module](./inspect-image.mjs) calls
+`window.inference.request({ method: "decide", state, attachments, questions, signal })`
+with a shared native Blob attachment. Chat `imageInput` alone does not enable
+file selection. Current text-only injectors continue to run the inbox demo.
+Spec support does not establish that a particular Bridge release implements it.
+
+The injector validates actual bytes and its documented media limits. The UI
+shows `invalid_request` details for malformed/oversized input and `unavailable`
+guidance for an unsupported selected route, without stripping media or switching
+to chat. Existing text Decisions and chat-image grants do not authorize these
+attachments. Refusal is shown separately from a zero probability. Replacing or
+clearing a file clears old results; cancellation ignores late responses.
+Preview object URLs are released on replacement, clear, and page exit.
+
+Use a test injector to check missing support, MIME-specific gating, successful
+inspection at 0% and 100%, refusal, malformed output, permission denial,
+size-limit errors, unsupported saved routes, cancellation before/after
+`accepted`, late results, and file replacement. Inspect the request outline
+and result JSON, test keyboard controls and narrow layouts, and confirm that
+only the explicitly selected image reaches the approved native route.
+
+## Inference Bridge follow-up
+
+After this shape is settled, implement it in Inference Bridge before advertising
+`decisionMedia`: map shared images natively to Gemini/OpenAI decision input,
+filter approval routes by media support/limits, add the image list and sizes to
+Decisions approval, and persist separate MIME-scoped decision-media grants.
+Keep existing grants text-only. Implement snapshot-preserving page/extension
+encoding, preflight and upstream-limit error mapping, cancellation, and temporary
+upload cleanup. Run the [media conformance checks](../../packages/ipa-tools/test/conformance/README.md#decision-media)
+against the injector and live native routes; do not advertise unsupported
+provider modalities or graduate support using mocks alone.
