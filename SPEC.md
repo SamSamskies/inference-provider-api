@@ -74,6 +74,13 @@ type DecisionJsonValue =
 
 type DecisionState = string | DecisionJsonValue[] | { [key: string]: DecisionJsonValue };
 
+/** Inline image only. String data is raw base64, never a data URL. */
+type DecisionImageAttachment = {
+  type: "image";
+  mediaType: ImageMediaType;
+  data: string | Blob;
+};
+
 type NoulQuestion = {
   type: "noul";
   instructions: string;
@@ -99,6 +106,8 @@ type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 type DecideRequest = {
   method: "decide";
   state: DecisionState;
+  /** Shared native images; only advertised decisionMedia.imageMediaTypes. */
+  attachments?: DecisionImageAttachment[];
   /**
    * Nonempty questions over the same state; implementation/route limits apply.
    * No dependencies between answers.
@@ -262,6 +271,8 @@ type InferenceFeatures = {
     /** true means MP3 only; an object declares exactly its nonempty format list. */
     synthesize?: boolean | { outputMediaTypes: SynthesisMediaType[] };
   };
+  /** Independent of chat imageInput; requires methods.decide === true. */
+  decisionMedia?: { imageMediaTypes: ImageMediaType[] };
   /**
    * Implementation accepts function tools, toolChoice, and tool messages
    * on request. Absent or false means unsupported.
@@ -398,6 +409,9 @@ const features = window.inference.getFeatures?.() ?? {};
 if (features.methods?.decide) {
   // decide returns typed answers over a shared JSON state
 }
+if (features.methods?.decide === true && features.decisionMedia?.imageMediaTypes.includes("image/png")) {
+  // decide also accepts shared inline PNG attachments
+}
 if (features.methods?.transcribe) {
   // transcribe accepts the advertised acceptedMedia constraints
 }
@@ -447,6 +461,7 @@ Rules:
 18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals, not unlimited capacity or a guarantee that a selected route accepts any particular request size. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` is the legacy MP3-only advertisement; an object declares exactly its nonempty `outputMediaTypes` list, with every entry a `SynthesisMediaType`. A WAV-only implementation may advertise `{ outputMediaTypes: ["audio/wav"] }`. `false` or missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
 19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`, except that [decision resource-limit violations](#decision-request-and-validation) are `invalid_request`; do not substitute chat, omit questions, drop media, or silently change the approved route.
 20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Speech discovery may describe the identity-free union of possible routes; approval must filter to matching input constraints or requested synthesis formats. Advertising a synthesis format does not guarantee the currently approved provider/model/voice route can produce it. No provider/model/voice identities or account state belong in discovery.
+21. `decisionMedia.imageMediaTypes` declares exactly the image MIME types accepted in decision `attachments`. When present, it must be a nonempty, duplicate-free list of canonical `ImageMediaType` values and `methods.decide` must be `true`. Missing `decisionMedia` means text/JSON decisions only; an empty or malformed list advertises no media support. `methods.decide` remains a boolean. This capability is independent of chat `imageInput` / `imageOutput`, speech, and grants. It may describe an identity-free union of implemented routes; it must not change based on the selected model, credentials, permission, or account. Unadvertised attachment types are `invalid_request`; advertised types unavailable on the approved route are `unavailable`. See [Decision media](#decision-media) for validation, route checks, and consent.
 
 ### Request options
 
@@ -738,11 +753,15 @@ Prefer disabling Allow so the user never hits the error; if the request still pr
 
 ### Typed decisions (System One)
 
-`method: "decide"` evaluates a shared `state` against named, typed `questions`.
+`method: "decide"` evaluates a shared `state` and optional native image
+`attachments` against named, typed `questions`.
 It returns probabilities and bounded decisions for application code, rather
 than a chat message. The vocabulary follows the [TypeSafe primitives](https://docs.typesafe.ai/primitives)
 and can be mapped to native decision APIs such as [Ollama System One](https://docs.ollama.com/api/systemone).
 Provider protocols, endpoint names, and model catalogs remain implementation details.
+Native image mappings are also possible with [Gemini Decisions](https://aistudio.google.com/docs/decisions-api#input)
+and [OpenAI Decisions](https://developers.openai.com/api/docs/guides/decisions#check-an-image-for-visible-damage).
+This does not advertise every modality those providers accept.
 
 #### Decision request and validation
 
@@ -751,9 +770,10 @@ describes API support, independently of credentials, installed models, or site
 approval. It covers `noul`, `choice`, and `score`, not unlimited capacity or a
 guarantee that a selected route accepts any particular request size. There are
 no per-provider, per-primitive, or limits-discovery flags in this draft.
+Optional image support is discovered separately through `decisionMedia.imageMediaTypes`.
 
-The request has only `method`, `state`, `questions`, and optional `signal`.
-Reject unknown top-level or question fields with `invalid_request`, including
+The request has only `method`, `state`, `questions`, and optional `attachments`
+and `signal`. Reject unknown top-level, attachment, or question fields with `invalid_request`, including
 page-selected `provider`, `model`, `keep_alive`, `messages`, `tools`, `output`,
 `options`, or `stream`. The user chooses the decision provider and model;
 implementations may offer different defaults from chat.
@@ -769,30 +789,32 @@ implementations may offer different defaults from chat.
   non-whitespace string; preserve ids exactly in `done.answers`. Each question
   has `type` and non-whitespace string `instructions`, plus `criteria` as below.
   Ids correlate answers; put the actual question in `instructions`.
-- All questions are evaluated against the same state independently. An answer
+- All questions are evaluated against the same state and all attachments independently. An answer
   cannot refer to another answer in the same request. Applications make a later
   request when a decision depends on an earlier result.
 - Implementations must document and enforce conservative resource limits,
   including maximum question counts and payload sizes. IPA fixes no universal
   question-count or payload-size maximum. Document how payload size is measured
   (for example, UTF-8 bytes of `JSON.stringify({ state, questions })`) and which
-  fields it includes. Selected providers/models may impose smaller limits.
+  fields it includes. Count media separately as specified in [Decision media](#decision-media),
+  rather than charging base64 text against the JSON-state allowance.
+  Selected providers/models may impose smaller limits.
   Reject requests exceeding any applicable limit with `invalid_request` and a
   useful explanation identifying the exceeded limit, including its value when
   known. Enforce locally known limits before provider inference I/O, and before
   approval whenever possible; check route-specific limits once the route is
   selected. When a limit cannot be checked locally, translate upstream limit
   rejections to `invalid_request` with a useful explanation and yield no `done`.
-- Reject deeper than **64 levels**, counting the `{ state, questions }` wrapper
+- Reject deeper than **64 levels**, counting the `{ state, questions, attachments }` wrapper
   as depth 0 and each object-property or array-element descent as one level,
   including primitive leaves.
-- On first iteration, validate and snapshot `state` and `questions` before
+- On first iteration, validate and snapshot `state`, `questions`, and `attachments` before
   approval or provider I/O. Later page mutations must not alter the approved
   request. `signal` remains a cancellation handle and is never serialized.
   Implementations must not silently truncate questions or state, or automatically
   split one decision request into multiple provider calls to fit a limit.
   Applications may explicitly submit multiple requests when appropriate.
-  URLs or image-like strings inside state are ordinary data; the implementation
+  URLs, media-shaped objects, or image-like strings inside state are ordinary data; the implementation
   must not fetch them or interpret them as media attachments.
 
 | Question type | `criteria` | Answer |
@@ -801,9 +823,84 @@ implementations may offer different defaults from chat.
 | `choice` | Object with 2–26 non-whitespace option keys and string or null descriptions; null means the key needs no extra description | `{ type: "choice", choice, probabilities, confidence }` |
 | `score` | Array of 2–10 string level descriptions, ordered from index 0 | `{ type: "score", score, legend, probabilities, confidence }` |
 
-This draft deliberately bounds the portable envelope to string instructions
-and descriptions. Structured instructions/criteria, media attachments, and
-additional primitives supported by some native APIs are outside this envelope.
+This draft deliberately bounds question instructions and descriptions to strings.
+Structured instructions/criteria, per-question attachments, and additional
+primitives supported by some native APIs are outside this envelope.
+
+#### Decision media
+
+`attachments` is optional. Omission and `[]` both mean a text/JSON-only request
+and require no media capability or media grant. If present it must be a dense
+array of plain `DecisionImageAttachment` objects with exactly `type`,
+`mediaType`, and `data`. Every attachment is shared evidence available to every
+question, in array order, alongside the complete state. Instructions can refer
+to images by their zero-based attachment index; no per-question or provider ids
+are added. State remains required, including for image-only evidence (`{}` is
+valid). Binary objects are still forbidden inside `state`.
+
+- `type` must be `"image"`. `mediaType` must be a canonical `"image/jpeg"`,
+  `"image/png"`, `"image/webp"`, or `"image/gif"` and explicitly advertised in
+  `decisionMedia.imageMediaTypes`. No MIME parameters, aliases, or wildcards.
+- `data` is either a nonempty raw RFC 4648 standard base64 string (standard
+  alphabet and canonical padding; no whitespace, URL-safe encoding, or `data:` prefix), or a nonempty
+  page-owned `Blob` (including `File`). `mediaType` is required in both forms.
+  A nonempty `Blob.type` must match it exactly. An empty Blob type is allowed
+  when `mediaType` is explicit. Validate decoded image format against the
+  declared type; reject corrupt bytes and type mismatches with `invalid_request`.
+  A MIME label or file extension alone is insufficient validation.
+- `url`, URI/file handles, extra metadata, audio, video, and PDFs are
+  `invalid_request`. Do not reuse chat's URL-resolution behavior for decisions.
+  Neither the page transport nor a privileged host may fetch a URL found in
+  decision input. The application may explicitly acquire a Blob before making
+  a request, subject to its own permissions and CORS.
+
+Implementations must document and enforce maximum attachment counts, decoded
+bytes per attachment, total decoded attachment bytes, and total encoded
+transport size (including base64 expansion and envelope overhead), in addition
+to the existing state/question limits. Count each shared attachment once per
+request, regardless of question count. Document any decoded image dimensions,
+pixel/frame limits, or other constraints used to bound decoding and native
+provider work. IPA sets no universal media byte/count ceiling. Avoid allocating
+unbounded decoded data: check encoded length or Blob size before reading or
+decoding, then validate actual bytes. Media base64 is not ordinary state text;
+measure UTF-8 state/questions and decoded/transport media budgets explicitly.
+
+Validate schema, encoding, format, counts, and all locally known size limits
+before provider inference I/O, and before prompting whenever possible. Once a
+route is selected, check its MIME/format support and smaller limits, including
+dimensions or animation constraints. Approval choices must exclude routes
+known to be incompatible. A saved route is never silently replaced. A valid,
+advertised image type unsupported on that route is `unavailable`; exceeding a
+route limit is `invalid_request`. Known preflight failures yield no `accepted`.
+Translate upstream size/count/format-limit rejections that could not be checked
+locally to `invalid_request`, identifying the failing attachment index or budget
+and the applicable limit/value when known. Yield no `done` on any failure.
+
+The first-iteration snapshot includes array order, attachment objects, MIME
+types, and exact bytes. Copy references to immutable Blobs or encode them before
+an isolated-world hop; mutations or replacement of page arrays/objects during
+encoding or approval must not change the snapshot. Validate and approve this
+same snapshot and forward its exact bytes. No image bytes, state, questions,
+or provider uploads may reach a provider before consent. Do not eagerly read
+Blobs or start transport/provider work when `request()` merely returns an iterable.
+
+Adapters must forward images as native media together with state to the native
+decision API. Internal inline-data encodings and temporary provider uploads or
+file handles are adapter details, never page-facing fields. Do not silently
+omit, resize, truncate, replace images with OCR/captions/transcripts, emulate
+decisions with chat, or split the request. If the route cannot consume the
+complete native input, fail as above. The answers, per-question refusals, and
+`accepted` → `done` stream are unchanged.
+
+Cancellation must interrupt local encoding/validation, pending permission,
+uploads, and inference. Stop scheduling work and suppress late results even
+when underlying work cannot be interrupted. Iterator closure and navigation
+also cancel unfinished work. The transport owns releasing encoded copies,
+buffers, object URLs, and request references on success, denial, failure, abort,
+or closure. Adapters own cancelling uploads/inference and deleting temporary
+provider media on every exit where the provider supports deletion; otherwise
+document retention/expiry and do not reuse handles across requests or origins.
+No provider handles, credentials, or temporary-media URLs may leak to the page.
 
 #### Decision answers and stream
 
@@ -863,8 +960,23 @@ A persistent grant binds the approved decision provider and model. Changing
 that route requires fresh approval; changing global defaults must not rewrite
 saved grants. Blocking an origin continues to block every method.
 
+Decision media is a separate grant identity within `decide`, scoped to the
+approved image MIME-type set as well as origin/provider/model. Existing or
+migrated decision grants are text/JSON-only. Neither a text-only decision grant
+nor a chat `imageInput` grant authorizes any decision attachment. A media request
+requires a new prompt unless a decision-media grant covers every attachment
+type; widening that type set requires fresh approval. A covering persistent
+grant may authorize later images of those types within the implementation and
+route limits without another prompt. It does not authorize URLs, other media
+modalities, or a different route. Text-only requests may reuse the same route
+without acquiring media permission.
+
 Approval must identify the decision operation, provider/model, and question
-ids/types. A state or question-content preview is optional and may be
+ids/types. For media requests it must also explicitly identify native image
+input and list every attachment by index, MIME type, and decoded byte size,
+plus the attachment count and total decoded bytes. Thumbnails are optional;
+if shown they must come from the approved snapshot without remote fetching.
+A state or question-content preview is optional and may be
 truncated, but the selected provider receives the complete bounded request.
 No request content may reach a provider before permission resolves. Result
 values never authorize the implementation to execute application actions;
@@ -911,6 +1023,11 @@ try {
 The shared [decision conformance assertions](./packages/ipa-tools/test/conformance/decisions.mjs)
 check successful stream order and answer invariants. Mock fixtures verify the
 contract; they do not certify live provider availability or model accuracy.
+The [image inspection demo](./examples/decisions/images.html) and its
+[browser request module](./examples/decisions/inspect-image.mjs) show separate
+MIME feature detection, local file input, refusal handling, cancellation, and
+unsupported selected routes. [Media conformance support](./packages/ipa-tools/test/conformance/README.md#decision-media)
+covers malformed/over-limit requests and approval snapshot/cancellation hooks.
 
 ### Bounded speech
 
@@ -1104,6 +1221,11 @@ Hosted web search is implementation- or provider-executed, not page-executed. Th
 
 Image parts in `messages` and `output.images` are each distinct from chat, function tools, and hosted search. A chat-only grant covers neither. Listing an image-input label when `messages` contain `ImagePart`s, and an image-output label when `output.images` is true, is required so the user can refuse photos leaving the page independently of receiving generated media. Thumbnails in the permission UI are optional. The host must not fetch `{ url }` itself; page-side resolve keeps local models offline.
 
+Decision attachments have their own [media grant and approval](#decision-permission).
+Chat image grants and existing text/JSON decision grants do not cover them.
+Native image bytes are part of the immutable approved input; neither ordinary
+URLs nor media-shaped values in decision state cause network fetching.
+
 ### Out of scope for this draft
 
 - `method: "image"` (would duplicate chat and force a later migration)
@@ -1111,7 +1233,7 @@ Image parts in `messages` and `output.images` are each distinct from chat, funct
 - Streaming partial images (`image_delta`)
 - Size / quality / aspect-ratio enums (later `options` keys, ignore-if-unsupported)
 - Embeddings
-- Decision media attachments, structured instructions/criteria, additional question types, partial answers, and page-selected decision routes or generation controls
+- Decision audio/video/PDF attachments, remote media URLs, provider file handles, per-question attachments, structured instructions/criteria, additional question types, partial answers, and page-selected decision routes or generation controls
 - Live/unbounded audio, realtime or duplex speech sessions, and conversational audio understanding through chat
 - Transcription translation, timestamps, segments, confidence, diarization, and transcript replacement
 - Synthesis formats other than MP3 and WAV (including raw PCM), page-selected model/voice IDs, voice cloning, custom voice enrollment, multi-speaker audio, and speaking-rate/style controls

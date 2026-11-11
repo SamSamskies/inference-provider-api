@@ -1,0 +1,19 @@
+{
+  "method": "decide",
+  "state": {
+    "item": "attachment 0"
+  },
+  "attachments": [
+    {
+      "type": "image",
+      "mediaType": "image/png",
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+    }
+  ],
+  "questions": {
+    "damaged": {
+      "type": "noul",
+      "instructions": "Is attachment 0 visibly damaged?"
+    }
+  }
+}

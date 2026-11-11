@@ -10,7 +10,7 @@ import {
 } from "./backends.js";
 import { complete } from "./complete.js";
 import { makeInferenceError } from "./errors.js";
-import { assertRequestMethod, synthesisMediaType, transcriptionMediaType } from "./methods.js";
+import { assertRequestMethod, decisionImageMediaTypes, synthesisMediaType, transcriptionMediaType } from "./methods.js";
 import type { CompleteOptions } from "./complete.js";
 import {
   runTools,
@@ -130,6 +130,7 @@ function requestWithResolver<R extends InferenceRequest>(
       }
       const inference = await resolver.resolve({
         method: request.method,
+        decisionImageMediaTypes: request.method === "decide" ? decisionImageMediaTypes(request) : undefined,
         mediaType: request.method === "transcribe" ? transcriptionMediaType(request) :
           request.method === "synthesize" ? synthesisMediaType(request) : undefined,
         needsTools,

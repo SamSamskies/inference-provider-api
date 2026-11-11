@@ -45,6 +45,10 @@ jobs:
           cp examples/charts/data.json _site/charts/data.json
           cp examples/speech/index.html _site/speech/index.html
           cp examples/decisions/index.html _site/decisions/index.html
+          cp examples/decisions/inspect-image.mjs _site/decisions/inspect-image.mjs
+          cp examples/decisions/images.html _site/decisions/images.html
+          cp examples/decisions/images.mjs _site/decisions/images.mjs
+          cp examples/decisions/decisions.css _site/decisions/decisions.css
           cp examples/research/index.html _site/research/index.html
 
       - name: Configure Pages
