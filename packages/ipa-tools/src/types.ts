@@ -86,7 +86,10 @@ export type DecisionQuestion = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 export type DecideRequest = {
   method: "decide";
   state: DecisionState;
-  /** 1–64 questions over the same state; no dependencies between answers. */
+  /**
+   * Nonempty questions over the same state; implementation/route limits apply.
+   * No dependencies between answers.
+   */
   questions: Record<string, DecisionQuestion>;
   signal?: AbortSignal;
 };
@@ -240,6 +243,7 @@ export type TranscriptionInputConstraint = {
 export type InferenceFeatures = {
   /** Chat is required. Absent or false optional methods mean unsupported. */
   methods?: {
+    /** All three decision primitives and refusals; request size limits apply. */
     decide?: boolean;
     transcribe?: { acceptedMedia: TranscriptionInputConstraint[] };
     /** true means MP3 only; an object declares exactly its nonempty format list. */

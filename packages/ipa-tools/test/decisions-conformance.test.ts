@@ -24,6 +24,24 @@ describe("shared decision stream conformance assertions", () => {
     expect(await assertDecisionStream(request, stream([accepted, refused]))).toEqual(refused);
   });
 
+  it.each([
+    { count: 65, state: "ticket", label: "65 questions" },
+    { count: 1, state: "é".repeat(33_000), label: "a payload above 63 KiB" },
+    { count: 1_000, state: "ticket", label: "1,000 questions" },
+  ])("checks successful streams with $label when implementation/route limits allow them", async ({ count, state }) => {
+    const ids = Array.from({ length: count }, (_, i) => `q${i}`);
+    const largerRequest = { method: "decide", state, questions: Object.fromEntries(
+      ids.map((id) => [id, { type: "noul", instructions: "Does the ticket describe a bug?" }]),
+    ) };
+    const largerDone = { type: "done", model: "mock", answers: Object.fromEntries(
+      ids.map((id) => [id, { type: "noul", noul: 0.75 }]),
+    ) };
+    expect(await assertDecisionStream(largerRequest, stream([accepted, largerDone]))).toEqual(largerDone);
+    delete largerDone.answers[ids[count - 1]!];
+    await expect(assertDecisionStream(largerRequest, stream([accepted, largerDone])))
+      .rejects.toThrow("answers must match the requested ids exactly");
+  });
+
   it("allows tied choices, fractional scores, and rounded distributions without renormalizing", async () => {
     const rounded = structuredClone(done);
     rounded.answers.team = { type: "choice", choice: "billing", probabilities: { billing: 0.5, technical: 0.5, other: 0 }, confidence: 0.25 };

@@ -74,7 +74,7 @@
       form > .actions { margin-top: 1.25rem; }
       .hint, .metadata, footer { color: var(--muted); font-size: 0.8rem; }
       .hint { margin: 0.6rem 0 0; }
-      .hint[data-invalid="true"], .error { color: var(--danger); }
+      .error { color: var(--danger); }
       .status { min-height: 1.5rem; margin: 0.9rem 0 0; font-size: 0.85rem; color: var(--muted); }
       .error { margin: 0.4rem 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
       .privacy { margin: 1.25rem 0 0; color: var(--muted); font-size: 0.8rem; }
@@ -156,7 +156,7 @@
             </select>
             <label for="message">Message</label>
             <textarea id="message" required aria-describedby="input-hint">Our checkout stopped working after this morning’s update. Every customer sees a blank page after clicking Pay, and we have no workaround. Can you investigate now and let us know when it’s fixed?</textarea>
-            <p class="hint" id="input-hint">Edit the example or paste your own message.</p>
+            <p class="hint" id="input-hint">Edit the example or paste your own message. Request size limits depend on your extension and selected provider/model.</p>
             <div class="actions">
               <button id="analyze" type="submit" disabled>Analyze message</button>
               <button class="secondary" id="cancel" type="button" hidden>Cancel</button>
@@ -260,13 +260,9 @@
       function updateControls() {
         const busy = Boolean(controller);
         const request = buildRequest();
-        const tooLarge = new TextEncoder().encode(JSON.stringify({ state: request.state, questions })).byteLength > 64_512;
         message.disabled = busy;
         sample.disabled = busy;
-        message.setAttribute("aria-invalid", String(tooLarge));
-        el("input-hint").dataset.invalid = String(tooLarge);
-        el("input-hint").textContent = tooLarge ? "This message is too large. Shorten it to fit a 63 KiB request." : "Edit the example or paste your own message.";
-        el("analyze").disabled = busy || !supported || !request.state.message || tooLarge;
+        el("analyze").disabled = busy || !supported || !request.state.message;
         el("cancel").hidden = !busy;
         el("cancel").disabled = Boolean(controller?.signal.aborted);
         el("results-panel").setAttribute("aria-busy", String(busy));
@@ -399,7 +395,7 @@
           } else {
             const guidance = {
               permission_denied: "Allow Decisions for this site in your extension, then try again.",
-              invalid_request: "Check the message and try again.",
+              invalid_request: "Check the message and your extension's request limits. If it exceeds a size limit, shorten it and try again.",
               unavailable: "Check the Decisions provider and model selected in your extension.",
               provider_error: "Try again or choose another Decisions provider in your extension.",
             };
