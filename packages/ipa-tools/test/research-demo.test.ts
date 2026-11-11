@@ -9,7 +9,7 @@ const html = readFileSync(new URL("../../../examples/research/index.html", impor
 const script = html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
 const setupMarker = "// Connect the view to page events.";
 if (!script?.includes(setupMarker)) throw new Error("Research demo script or page setup is missing.");
-const packageImport = script.match(/^\s*import\s*\{([^}]+)\}\s*from "https:\/\/esm\.sh\/ipa-tools@3\.2\.0";/);
+const packageImport = script.match(/^\s*import\s*\{([^}]+)\}\s*from "https:\/\/esm\.sh\/ipa-tools@3\.3\.0";/);
 if (!packageImport) throw new Error("Research demo import is missing.");
 const demo = new Function("ipaTools", `
   const { ${packageImport[1]} } = ipaTools;

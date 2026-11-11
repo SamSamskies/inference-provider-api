@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-11-11
+
 ### Added
 
 - Optional `DecideRequest.attachments`, exported `DecisionImageAttachment`, and separate `decisionMedia.imageMediaTypes` discovery, preserving boolean decision support and text-only requests. Fallback routing checks decision image types before creation and delegation; byte validation and consent remain implementation responsibilities.
