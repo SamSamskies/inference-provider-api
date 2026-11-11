@@ -174,6 +174,13 @@ describe("browser native image example", () => {
     vi.stubGlobal("window", { inference: inference({ methods: { decide: true }, imageInput: true }, delegated) });
     await expect(inspectImage(imageRequest.attachments![0])).rejects.toMatchObject({ code: "invalid_request" });
     expect(delegated).not.toHaveBeenCalled();
+    for (const decisionMedia of [{}, { imageMediaTypes: "image/png" }]) {
+      vi.stubGlobal("window", { inference: inference({ methods: { decide: true }, decisionMedia } as InferenceFeatures, delegated) });
+      await expect(inspectImage(imageRequest.attachments![0])).rejects.toMatchObject({ code: "invalid_request" });
+    }
+    vi.stubGlobal("window", { inference: { getFeatures: () => { throw new Error("boom"); }, request: vi.fn() } });
+    await expect(inspectImage(imageRequest.attachments![0])).rejects.toMatchObject({ code: "invalid_request" });
+    expect(delegated).not.toHaveBeenCalled();
     const error = makeInferenceError("unavailable", "Saved route cannot see images.");
     vi.stubGlobal("window", { inference: { getFeatures: () => features, request: async function* () { throw error; } } });
     await expect(inspectImage(imageRequest.attachments![0])).rejects.toBe(error);

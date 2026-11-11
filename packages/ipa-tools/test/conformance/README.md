@@ -129,7 +129,7 @@ const { assertDecisionFailure, invalidDecisionMediaRequests } =
 const request = await fetch("/conformance/decisions-image-request.json").then((r) => r.json());
 const features = window.inference?.getFeatures?.() ?? {};
 if (features.methods?.decide !== true ||
-    !features.decisionMedia?.imageMediaTypes.includes("image/png")) {
+    !features.decisionMedia?.imageMediaTypes?.includes("image/png")) {
   throw new Error("Native PNG decision input is not advertised.");
 }
 await assertDecisionStream(request, window.inference.request(request));

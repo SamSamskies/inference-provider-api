@@ -12,9 +12,10 @@ export function imageDecisionRequest(image) {
 
 export async function inspectImage(image, { signal, onAccepted = () => {} } = {}) {
   const inference = window.inference;
-  const features = inference?.getFeatures?.() ?? {};
-  if (features.methods?.decide !== true ||
-    !features.decisionMedia?.imageMediaTypes.includes(image.mediaType)) {
+  let features;
+  try { features = inference?.getFeatures?.() ?? {}; } catch { features = {}; }
+  const types = features.decisionMedia?.imageMediaTypes;
+  if (features.methods?.decide !== true || !Array.isArray(types) || !types.includes(image.mediaType)) {
     throw Object.assign(new Error(`Decision images (${image.mediaType}) are not advertised.`), {
       code: "invalid_request",
     });

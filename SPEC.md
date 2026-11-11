@@ -409,7 +409,7 @@ const features = window.inference.getFeatures?.() ?? {};
 if (features.methods?.decide) {
   // decide returns typed answers over a shared JSON state
 }
-if (features.methods?.decide === true && features.decisionMedia?.imageMediaTypes.includes("image/png")) {
+if (features.methods?.decide === true && features.decisionMedia?.imageMediaTypes?.includes("image/png")) {
   // decide also accepts shared inline PNG attachments
 }
 if (features.methods?.transcribe) {
