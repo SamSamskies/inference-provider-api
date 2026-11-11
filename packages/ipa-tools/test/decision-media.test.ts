@@ -73,6 +73,15 @@ describe("decision image capability routing", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  it("names only the missing image types when text decisions are supported", async () => {
+    const { route } = backend({ methods: { decide: true } });
+    await expect(collect(createInference({ fallbacks: [route] }).request(imageRequest)))
+      .rejects.toMatchObject({
+        code: "invalid_request",
+        message: "No configured backend supports decision images (image/png).",
+      });
+  });
+
   it("requires all attachment types, including on created and cached instances", async () => {
     const delegated = vi.fn();
     const textFeatures = { methods: { decide: true } };

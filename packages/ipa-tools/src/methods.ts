@@ -118,7 +118,12 @@ export function assertRequestMethod(
   if (request.method === "chat") return;
   if (request.method === "decide") {
     if (supportsDecisionMedia(features, decisionImageMediaTypes(request))) return;
-    throw makeInferenceError("invalid_request", "Decisions or their image media types are not advertised.");
+    throw makeInferenceError(
+      "invalid_request",
+      features.methods?.decide === true && decisionImageMediaTypes(request).length
+        ? "Decision image media types are not advertised."
+        : "Typed decisions are not advertised."
+    );
   }
   if (request.method === "transcribe") {
     if (supportsTranscription(features, transcriptionMediaType(request))) return;

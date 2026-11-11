@@ -221,8 +221,11 @@ function backendSupportsNeeded(
 
 function capabilitySkipMessage(needs: CapabilityNeeds): string {
   const labels: string[] = [];
-  if (needs.method === "decide") labels.push("typed decisions");
-  if (needs.decisionImageMediaTypes.length) labels.push(`decision images (${needs.decisionImageMediaTypes.join(", ")})`);
+  if (needs.method === "decide") {
+    labels.push(needs.decisionImageMediaTypes.length
+      ? `decision images (${needs.decisionImageMediaTypes.join(", ")})`
+      : "typed decisions");
+  }
   if (needs.method === "transcribe") {
     labels.push(`transcription${needs.mediaType ? ` of ${needs.mediaType}` : ""}`);
   }
