@@ -104,7 +104,8 @@ export function mountImageDemo(doc = document, win = window) {
       selected = file;
       el("image-figure").hidden = false;
       el("empty-image").hidden = true;
-      el("file-meta").textContent = `${file.name} · ${file.type} · ${file.size.toLocaleString()} bytes`;
+      const size = file.size < 1_000_000 ? `${(file.size / 1_000).toFixed(1)} kB` : `${(file.size / 1_000_000).toFixed(1)} MB`;
+      el("file-meta").textContent = `${file.name} · ${file.type} · ${size}`;
       el("request-json").textContent = JSON.stringify(imageDecisionRequest({ mediaType: file.type,
         data: `[File: ${file.size} bytes; binary omitted from outline]` }), null, 2);
       el("request-status").textContent = "Image ready. Inspect it when you’re ready to send it.";
