@@ -68,7 +68,7 @@ describe("native decision image UI", () => {
     const first = choose();
     expect(nodes["image-file"].value).toBe(first.name);
     expect(nodes["image-figure"].hidden).toBe(false);
-    expect(nodes["file-meta"].textContent).toContain("bytes");
+    expect(nodes["file-meta"].textContent).toBe("photo.png · image/png · 0.0 kB");
     expect(nodes.inspect.disabled).toBe(false);
     expect(ipa.request).not.toHaveBeenCalled();
     choose(); expect(win.URL.revokeObjectURL).toHaveBeenCalledTimes(1);
