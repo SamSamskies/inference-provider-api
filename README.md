@@ -24,10 +24,6 @@ Then ask your agent to add an IPA-powered feature to your app. The skill guides 
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge). See its [installation guide](https://github.com/SamSamskies/inference-bridge#installation) for development builds.
 
-Bridge now implements Google Gemini decisions and native decision images. For these recently merged features, use a current development build and check the advertised capabilities. In **Options → Providers**, save your Google AI Studio key, then select **Google Gemini → gemini-decision-1** in **Options → Decisions**. Decisions use separate defaults and site approvals from chat.
-
-Bridge also documents and enforces its own question-count, payload-size, and image limits, including smaller provider/model limits, completing the follow-up for [decision implementation limits (#87)](https://github.com/SamSamskies/inference-provider-api/issues/87). See its [typed decisions guide](https://github.com/SamSamskies/inference-bridge#typed-decisions-system-one) and the [demo's provider and image support](./examples/decisions/README.md#inference-bridge-support).
-
 ### Example Applications
 
 - [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))

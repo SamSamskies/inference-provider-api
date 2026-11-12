@@ -136,14 +136,6 @@ compatible. The injector owns byte/format validation, documented count/size
 limits, first-iteration snapshotting, native forwarding, and separate media
 approval. See the [native image demo](../../examples/decisions/README.md#native-image-demo).
 
-Current [Inference Bridge development builds](https://github.com/SamSamskies/inference-bridge#installation)
-support Gemini decisions (`gemini-decision-1`) and native JPEG, PNG, and WebP
-decision attachments on compatible routes. Configure the provider/model in the
-extension's **Options → Decisions**; page code uses the same portable request.
-See the [demo's Bridge support table](../../examples/decisions/README.md#inference-bridge-support)
-for provider and image limits. Keep feature detection for older builds and
-other injectors.
-
 For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
 `InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk
 by its payload, since `type: "done"` is shared:
