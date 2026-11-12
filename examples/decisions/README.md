@@ -108,7 +108,8 @@ after deployment (locally, `/decisions/images.html`). No console setup is needed
    `decisionMedia.imageMediaTypes` entry. The page explains missing support and
    checks again after delayed injection, page focus, or **Check again**.
 2. Choose a supported local image. The page shows a local preview, type, and
-   exact byte size; selecting a file does not send it to a provider.
+   readable size (B, kB, or MB); selecting a file does not send it to a
+   provider.
 3. Click **Inspect image**, approve decision-image access in your extension,
    and view the probability of visible damage. **Cancel** works while waiting
    for approval or inference. You can replace or clear the file to start over.

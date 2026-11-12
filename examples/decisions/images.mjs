@@ -87,6 +87,12 @@ export function mountImageDemo(doc = document, win = window) {
     el("request-status").textContent = message;
   }
 
+  function formatBytes(bytes) {
+    if (bytes < 1_000) return `${bytes} B`;
+    if (bytes < 1_000_000) return `${(bytes / 1_000).toFixed(1)} kB`;
+    return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  }
+
   function chooseImage() {
     const file = fileInput.files?.[0];
     clearSelection(false);
@@ -104,8 +110,7 @@ export function mountImageDemo(doc = document, win = window) {
       selected = file;
       el("image-figure").hidden = false;
       el("empty-image").hidden = true;
-      const size = file.size < 1_000_000 ? `${(file.size / 1_000).toFixed(1)} kB` : `${(file.size / 1_000_000).toFixed(1)} MB`;
-      el("file-meta").textContent = `${file.name} · ${file.type} · ${size}`;
+      el("file-meta").textContent = `${file.name} · ${file.type} · ${formatBytes(file.size)}`;
       el("request-json").textContent = JSON.stringify(imageDecisionRequest({ mediaType: file.type,
         data: `[File: ${file.size} bytes; binary omitted from outline]` }), null, 2);
       el("request-status").textContent = "Image ready. Inspect it when you’re ready to send it.";
