@@ -53,14 +53,14 @@
         <section class="panel" aria-labelledby="message-heading">
           <h2 id="message-heading">Incoming message</h2>
           <form id="triage-form">
-            <label for="sample">Try a fictional message</label>
+            <label for="sample">Choose a sample or write your own</label>
             <select id="sample">
               <option value="outage">Checkout outage</option>
               <option value="billing">Duplicate charge</option>
               <option value="sales">Pricing question</option>
               <option value="fyi">Just an FYI</option>
               <option value="unclear">Ambiguous follow-up</option>
-              <option value="custom" disabled>Custom message</option>
+              <option value="custom">Custom message — edit below</option>
             </select>
             <label for="message">Message</label>
             <textarea id="message" required aria-describedby="input-hint">Our checkout stopped working after this morning’s update. Every customer sees a blank page after clicking Pay, and we have no workaround. Can you investigate now and let us know when it’s fixed?</textarea>
@@ -330,7 +330,14 @@
         updateControls();
       }
 
-      sample.addEventListener("change", () => { message.value = samples[sample.value]; editMessage(); });
+      sample.addEventListener("change", () => {
+        if (sample.value === "custom") {
+          message.focus();
+          return;
+        }
+        message.value = samples[sample.value];
+        editMessage();
+      });
       message.addEventListener("input", () => { sample.value = "custom"; editMessage(); });
       el("triage-form").addEventListener("submit", analyze);
       el("cancel").addEventListener("click", () => {
