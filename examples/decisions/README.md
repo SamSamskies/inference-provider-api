@@ -12,9 +12,8 @@ three independent questions against the same message:
 
 ## Try it
 
-The app will be available at `/decisions/` on the
-[examples site](https://samsamskies.github.io/inference-provider-api/) after deployment.
-To run the branch locally from the repository root:
+Open the [live inbox-triage demo](https://samsamskies.github.io/inference-provider-api/decisions/).
+To run it locally from the repository root:
 
 ```bash
 npx serve examples
@@ -26,6 +25,10 @@ or loopback HTTP page, rather than a `file:` URL.
 1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge#installation)
    or another injector advertising `getFeatures().methods.decide === true`.
    In Bridge, configure a compatible provider/model in **Options → Decisions**.
+   For Gemini, save your Google AI Studio key in **Options → Providers**, then
+   select **Google Gemini** and **gemini-decision-1** in Decisions. Use a current
+   development build for the recently merged Gemini and native image support;
+   see [Bridge support](#inference-bridge-support) below.
    Capability discovery describes API support; the selected route still needs
    to be available. Provider setup and credentials stay in the extension.
 2. Choose a fictional sample or edit the message, then click **Analyze message**.
@@ -102,13 +105,15 @@ input. See TypeSafe's
 
 Open **Image inspection** from the inbox demo, or visit
 [`/decisions/images.html`](https://samsamskies.github.io/inference-provider-api/decisions/images.html)
-after deployment (locally, `/decisions/images.html`). No console setup is needed.
+(locally, `/decisions/images.html`). No console setup is needed.
 
 1. Use an injector advertising `methods.decide === true` and at least one
    `decisionMedia.imageMediaTypes` entry. The page explains missing support and
    checks again after delayed injection, page focus, or **Check again**.
+   Current Bridge development builds advertise JPEG, PNG, and WebP; choose a
+   compatible native image route such as Gemini's `gemini-decision-1`.
 2. Choose a supported local image. The page shows a local preview, type, and
-   exact byte size; selecting a file does not send it to a provider.
+   readable size (B, kB, or MB); selecting a file does not send it to a provider.
 3. Click **Inspect image**, approve decision-image access in your extension,
    and view the probability of visible damage. **Cancel** works while waiting
    for approval or inference. You can replace or clear the file to start over.
@@ -118,7 +123,7 @@ The separate page keeps image judgments distinct from inbox triage. The
 `window.inference.request({ method: "decide", state, attachments, questions, signal })`
 with a shared native Blob attachment. Chat `imageInput` alone does not enable
 file selection. Current text-only injectors continue to run the inbox demo.
-Spec support does not establish that a particular Bridge release implements it.
+Feature detection is still required for older installed builds and other injectors.
 
 The injector validates actual bytes and its documented media limits. The UI
 shows `invalid_request` details for malformed/oversized input and `unavailable`
@@ -135,14 +140,43 @@ size-limit errors, unsupported saved routes, cancellation before/after
 and result JSON, test keyboard controls and narrow layouts, and confirm that
 only the explicitly selected image reaches the approved native route.
 
-## Inference Bridge follow-up
+## Inference Bridge support
 
-After this shape is settled, implement it in Inference Bridge before advertising
-`decisionMedia`: map shared images natively to Gemini/OpenAI decision input,
-filter approval routes by media support/limits, add the image list and sizes to
-Decisions approval, and persist separate MIME-scoped decision-media grants.
-Keep existing grants text-only. Implement snapshot-preserving page/extension
-encoding, preflight and upstream-limit error mapping, cancellation, and temporary
-upload cleanup. Run the [media conformance checks](../../packages/ipa-tools/test/conformance/README.md#decision-media)
-against the injector and live native routes; do not advertise unsupported
-provider modalities or graduate support using mocks alone.
+[Bridge PR #136](https://github.com/SamSamskies/inference-bridge/pull/136) merged
+Gemini decisions, native shared image attachments, separate MIME-scoped image
+grants, approval-route filtering, snapshot-preserving encoding, cancellation,
+and resource-limit enforcement. Use the [development installation instructions](https://github.com/SamSamskies/inference-bridge#installation)
+for a build containing that change; a merge does not establish store availability.
+
+| Decision provider | Maximum questions | Native image input |
+| --- | --- | --- |
+| Google Gemini (`gemini-decision-1`) | 1,000 | Yes |
+| OpenAI (`gpt-6-luna`) | 400 | Yes |
+| OpenRouter | 1,000 | Only models whose decision catalog advertises image input |
+| PayPerQ | 1,000 | Unavailable |
+| Ollama local / Cloud | 64 | Only models advertising both decision and vision support |
+| Chrome On-device | 16 | Unavailable; Chrome only |
+
+Bridge's overall resource cap is 1,000 questions and 1 MiB of UTF-8 JSON for
+`{ state, questions }`, with smaller route-specific question and translated-body
+limits. These are implementation policies, not IPA requirements. Gemini supports
+all three primitives through its native decisions endpoint; audio, video, and
+PDF attachments are outside IPA's decision-image envelope.
+
+Bridge accepts up to four static JPEG, PNG, or WebP attachments, at most 20 MB
+decoded per image and 32 MB decoded total. The complete encoded page request and
+provider body must each fit within 48 MB. Smaller provider limits also apply,
+including Ollama Cloud's 4 MiB and 16 megapixels per image. See Bridge's
+[current limits and native image mappings](https://github.com/SamSamskies/inference-bridge#native-decision-images)
+for all transport and route budgets. Oversized requests fail with
+`invalid_request` and an explanation; images and state are not silently resized,
+truncated, omitted, or split into multiple requests.
+
+Image approval lists attachment metadata and remembers allowed MIME types for
+the exact origin, provider, and model. Existing text-decision and chat-image
+grants remain separate. A well-formed advertised image on an unsupported saved
+route fails with `unavailable`.
+
+The [media conformance checks](../../packages/ipa-tools/test/conformance/README.md#decision-media)
+remain available for injector validation. Their synthetic fixtures check the
+contract; live-provider behavior must be verified in the owning implementation.
