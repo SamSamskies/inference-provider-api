@@ -24,8 +24,6 @@ Then ask your agent to add an IPA-powered feature to your app. The skill guides 
 
 Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge). See its [installation guide](https://github.com/SamSamskies/inference-bridge#installation) for development builds.
 
-Bridge follow-up for [decision implementation limits (#87)](https://github.com/SamSamskies/inference-provider-api/issues/87): choose, document, and enforce conservative browser resource caps for question count and payload size independently of IPA. Retain provider/model-specific enforcement, including smaller route limits, and describe these caps as Bridge policy rather than IPA requirements.
-
 ### Example Applications
 
 - [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))
@@ -140,7 +138,7 @@ Function tools, hosted search, image input/output, typed decisions, and speech r
 
 Decision images require a separate MIME-scoped media grant; existing text-only
 decision or chat-image grants do not cover them. Approval lists each attachment's
-type and decoded size. See the [browser image examples and Bridge follow-up](./examples/decisions/README.md#native-image-example).
+type and decoded size. See the [native image demo](./examples/decisions/README.md#native-image-demo).
 Unadvertised or malformed images are `invalid_request`; an advertised type
 unsupported on the selected route is `unavailable`. State URLs remain ordinary data.
 

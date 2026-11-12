@@ -134,7 +134,7 @@ Strings are raw base64; URLs are excluded. Discover accepted MIME types through
 chat `imageInput`. Text-only decisions (including `attachments: []`) remain
 compatible. The injector owns byte/format validation, documented count/size
 limits, first-iteration snapshotting, native forwarding, and separate media
-approval. See the [browser image example](../../examples/decisions/README.md#native-image-example).
+approval. See the [native image demo](../../examples/decisions/README.md#native-image-demo).
 
 For callers holding a union, `InferenceChunkFor<R>` distributes over `R`;
 `InferenceDoneFor<R>` extracts its final result. Narrow a union's final chunk

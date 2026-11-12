@@ -12,9 +12,8 @@ three independent questions against the same message:
 
 ## Try it
 
-The app will be available at `/decisions/` on the
-[examples site](https://samsamskies.github.io/inference-provider-api/) after deployment.
-To run the branch locally from the repository root:
+Open the [live inbox-triage demo](https://samsamskies.github.io/inference-provider-api/decisions/).
+To run it locally from the repository root:
 
 ```bash
 npx serve examples
@@ -25,7 +24,8 @@ or loopback HTTP page, rather than a `file:` URL.
 
 1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge#installation)
    or another injector advertising `getFeatures().methods.decide === true`.
-   In Bridge, configure a compatible provider/model in **Options → Decisions**.
+   See Bridge’s [decisions guide](https://github.com/SamSamskies/inference-bridge#typed-decisions-system-one)
+   for provider setup and implementation limits.
    Capability discovery describes API support; the selected route still needs
    to be available. Provider setup and credentials stay in the extension.
 2. Choose a fictional sample or edit the message, then click **Analyze message**.
@@ -102,13 +102,13 @@ input. See TypeSafe's
 
 Open **Image inspection** from the inbox demo, or visit
 [`/decisions/images.html`](https://samsamskies.github.io/inference-provider-api/decisions/images.html)
-after deployment (locally, `/decisions/images.html`). No console setup is needed.
+(locally, `/decisions/images.html`). No console setup is needed.
 
 1. Use an injector advertising `methods.decide === true` and at least one
    `decisionMedia.imageMediaTypes` entry. The page explains missing support and
    checks again after delayed injection, page focus, or **Check again**.
 2. Choose a supported local image. The page shows a local preview, type, and
-   exact byte size; selecting a file does not send it to a provider.
+   readable size (B, kB, or MB); selecting a file does not send it to a provider.
 3. Click **Inspect image**, approve decision-image access in your extension,
    and view the probability of visible damage. **Cancel** works while waiting
    for approval or inference. You can replace or clear the file to start over.
@@ -118,7 +118,7 @@ The separate page keeps image judgments distinct from inbox triage. The
 `window.inference.request({ method: "decide", state, attachments, questions, signal })`
 with a shared native Blob attachment. Chat `imageInput` alone does not enable
 file selection. Current text-only injectors continue to run the inbox demo.
-Spec support does not establish that a particular Bridge release implements it.
+Feature detection is still required for older installed builds and other injectors.
 
 The injector validates actual bytes and its documented media limits. The UI
 shows `invalid_request` details for malformed/oversized input and `unavailable`
@@ -134,15 +134,3 @@ size-limit errors, unsupported saved routes, cancellation before/after
 `accepted`, late results, and file replacement. Inspect the request outline
 and result JSON, test keyboard controls and narrow layouts, and confirm that
 only the explicitly selected image reaches the approved native route.
-
-## Inference Bridge follow-up
-
-After this shape is settled, implement it in Inference Bridge before advertising
-`decisionMedia`: map shared images natively to Gemini/OpenAI decision input,
-filter approval routes by media support/limits, add the image list and sizes to
-Decisions approval, and persist separate MIME-scoped decision-media grants.
-Keep existing grants text-only. Implement snapshot-preserving page/extension
-encoding, preflight and upstream-limit error mapping, cancellation, and temporary
-upload cleanup. Run the [media conformance checks](../../packages/ipa-tools/test/conformance/README.md#decision-media)
-against the injector and live native routes; do not advertise unsupported
-provider modalities or graduate support using mocks alone.
