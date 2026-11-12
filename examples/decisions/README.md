@@ -88,6 +88,9 @@ input. See TypeSafe's
   completed result.** and enabled controls. Deny permission or select an
   unavailable route: expect useful guidance and no stale result.
 - Edit the message after success: old results and result JSON should clear.
+  **Custom message — edit below** should be selectable and focus the message
+  field without changing its text or results. Typing should select that option
+  automatically; choosing a sample should still load its fictional message.
   Blank input should disable submission. Input above 63 KiB should remain
   submittable when decision support is advertised; use a test injector to verify
   both success and a route's `invalid_request` limit error, with its explanation
