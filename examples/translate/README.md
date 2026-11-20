@@ -16,7 +16,7 @@ ollama pull translategemma
 
 **Live demo:** [https://samsamskies.github.io/inference-provider-api/translate/](https://samsamskies.github.io/inference-provider-api/translate/)
 
-1. Install [Inference Bridge](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) from the Chrome Web Store (or for development, [clone the repo](https://github.com/SamSamskies/inference-bridge) and load it unpacked from `chrome://extensions`)
+1. Install [Inference Bridge](https://github.com/SamSamskies/inference-bridge#installation) ([Chrome Web Store](https://chromewebstore.google.com/detail/inference-bridge/ekjldffogogadhfhgkibgkfdhhikfamd) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/inference-bridge))
 2. Open the [live demo](https://samsamskies.github.io/inference-provider-api/translate/), or serve this folder locally over a secure context:
 
    ```bash

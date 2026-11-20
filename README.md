@@ -28,7 +28,7 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 
 - [Examples index](https://samsamskies.github.io/inference-provider-api/) — gallery of demo apps ([source](./examples/index.html))
 - [Topic Explorer](https://samsamskies.github.io/inference-provider-api/research/) — a browser-native research agent built with [`ipa-tools`](./packages/ipa-tools) `createAgent` that searches Wikipedia, reads articles, and answers with sources and live activity ([source](./examples/research/))
-- [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — minimal chat UI that uses the API ([source](./examples/chat/))
+- [Chat demo](https://samsamskies.github.io/inference-provider-api/chat/) — streaming chat UI with reasoning, hosted web search, and image attachments ([source](./examples/chat/))
 - [Social demo](https://samsamskies.github.io/inference-provider-api/social/) — post + replies with a Grok-like Ask AI panel ([source](./examples/social/))
 - [Translate demo](https://samsamskies.github.io/inference-provider-api/translate/) — short haiku translated with [`ipa-tools`](./packages/ipa-tools) `complete` ([source](./examples/translate/))
 - [Avatar demo](https://samsamskies.github.io/inference-provider-api/avatar/) — describe a character, generate an SVG avatar with [`ipa-tools`](./packages/ipa-tools) `complete`, download PNG ([source](./examples/avatar/))
@@ -38,6 +38,11 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/inf
 - [Decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/) — triage a message with typed category, urgency, and reply-needed judgments ([source](./examples/decisions/))
 - [Image decisions demo](https://samsamskies.github.io/inference-provider-api/decisions/images.html) — choose and preview a local image, then inspect it for visible damage when decision-image support is advertised ([source](./examples/decisions/))
 - [Prompt API fallback demo](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/) — today-in-history fact via `createInference` with [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) when no extension is present ([source](./examples/prompt-api-fallback/))
+
+### Packages
+
+- [`ipa-tools`](./packages/ipa-tools) — TypeScript types, `complete()`, `runTools()`, `createAgent()`, and `createInference()` helpers for web apps
+- [`ipa-prompt-api-fallback`](./packages/ipa-prompt-api-fallback) — optional Chrome Prompt API (`LanguageModel`) fallback backend for `createInference()`
 
 ### Apps using IPA
 
@@ -126,25 +131,19 @@ const features = window.inference.getFeatures?.() ?? {};
 | [Speech synthesis](./SPEC.md#bounded-speech) | `features.methods?.synthesize` | `method: "synthesize"` with `text`; MP3 by default, optional advertised WAV in `audio_delta` chunks |
 | [Chat options](./SPEC.md#request-options) | `features.options?.reasoningEffort` / `features.options?.temperature` | Generation preferences in `options`; unsupported keys are ignored |
 
-Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. See the [speech examples](./examples/speech/README.md) for uploads, format discovery and playback, URL input, and cancellation.
-
-Typed decisions require nonempty `questions`; question-count and payload-size maxima are documented and enforced by each implementation, and selected providers/models may impose smaller limits. `methods.decide: true` advertises method and primitive support, not a request-size guarantee. Handle `invalid_request` for exceeded limits; implementations must not silently truncate input or automatically split a request to fit them. Applications may explicitly submit multiple requests when appropriate. See the [decision validation rules](./SPEC.md#decision-request-and-validation).
+Optional capabilities are independent. Unadvertised tools, hosted search, images, and optional methods are rejected with `invalid_request`. For typed decisions, question-count and payload-size limits are implementation- and model-defined (exceeding them throws `invalid_request` rather than silently truncating or splitting; see [decision validation rules](./SPEC.md#decision-request-and-validation)). See the [speech examples](./examples/speech/README.md) for uploads, format discovery and playback, URL input, and cancellation.
 
 ### Permissions
 
-The injector obtains permission for the calling origin before sending content to a provider. The user chooses the provider and model. Remembered grants bind that route to the origin and method (plus voice for synthesis); changing a global default does not rewrite existing grants. A remembered denial blocks the origin.
+- **Origin-scoped approval:** The injector obtains permission for the calling origin before sending content to a provider. The user chooses the provider and model; remembered grants bind that route to the origin and method (plus voice for synthesis), and changing a global default does not rewrite existing grants. A remembered denial blocks the origin.
+- **Per-capability grants:** Function tools, hosted search, image input/output, typed decisions, decision images, and speech each require their own approval — a plain chat grant does not cover them.
+  - Approval UIs identify offered tools/capabilities (and question IDs/types for decisions); a request preview is optional.
+  - Decision images require a separate MIME-scoped media grant that lists each attachment's type and decoded size (see the [native image demo](./examples/decisions/README.md#native-image-demo)).
+  - Disclose what page tools may send before the first request, since later tool results can be sent without another preview.
+- **`accepted` chunk:** Signals that permission has resolved (including via an existing grant); it does not prove a prompt appeared.
+- **App-side actions:** An inference or tool-description grant does not approve side effects executed by your page. Use `ipa-tools`' optional [argument validation and app approval hooks](./packages/ipa-tools/README.md#tool-validation-and-app-approval) before consequential actions.
 
-Function tools, hosted search, image input/output, typed decisions, and speech require their own approval; a plain chat grant does not cover them. The approval UI must identify offered tools and capabilities, but a request preview is optional. Decision approval identifies question ids/types. Applications should disclose what page tools may send before the first request because later tool results can be sent without another preview.
-
-Decision images require a separate MIME-scoped media grant; existing text-only
-decision or chat-image grants do not cover them. Approval lists each attachment's
-type and decoded size. See the [native image demo](./examples/decisions/README.md#native-image-demo).
-Unadvertised or malformed images are `invalid_request`; an advertised type
-unsupported on the selected route is `unavailable`. State URLs remain ordinary data.
-
-An `accepted` chunk means permission has resolved, including through an existing grant; it does not prove a prompt appeared. See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for details.
-
-An inference/tool-description grant does not approve every side effect an application might execute. Page-owned tools can use `ipa-tools`' optional [argument validation and app approval hooks](./packages/ipa-tools/README.md#tool-validation-and-app-approval) before executing consequential actions.
+See the specification's [behavior](./SPEC.md#behavior), [security](./SPEC.md#security), and capability-specific permission rules for full details.
 
 ## Non-goals
 
