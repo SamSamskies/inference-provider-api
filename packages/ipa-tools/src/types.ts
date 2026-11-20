@@ -144,7 +144,7 @@ export type InferenceOptions = {
 };
 
 /** Omitted or `"auto"` means the implementation / provider default. */
-export type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
+export type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high" | "xhigh";
 
 export type Message =
   | {
