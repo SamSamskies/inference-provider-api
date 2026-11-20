@@ -469,7 +469,7 @@ Rules:
 
 #### `reasoningEffort`
 
-Lets applications prefer less or more model reasoning / chain-of-thought (for example `"none"` or `"low"` for translation or autocomplete; `"high"` for harder multi-step tasks). It controls **generation**, not merely whether the page displays reasoning: omitting UI for `reasoning_delta` does not reduce latency or cost if the model still thinks.
+Lets applications prefer less or more model reasoning / chain-of-thought (for example `"none"` or `"low"` for translation or autocomplete; `"high"` or `"xhigh"` for harder multi-step tasks). It controls **generation**, not merely whether the page displays reasoning: omitting UI for `reasoning_delta` does not reduce latency or cost if the model still thinks.
 
 This is distinct from assistant `message.reasoning` / `reasoning_delta`, which are optional **outputs** when a provider exposes chain-of-thought text.
 
