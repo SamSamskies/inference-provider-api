@@ -1,21 +1,58 @@
-Inference Provider API
-======================
+# Inference Provider API
 
-`window.inference` capability for web browsers
-----------------------------------------------
+`window.inference` capability for web browsers.
 
 **Status:** Experimental Draft
+
+## Contents
+
+- [Example](#example)
+- [Types](#types)
+- [Behavior](#behavior)
+- [Errors](#errors)
+- [Feature discovery](#feature-discovery)
+- [Request options](#request-options)
+- [Tool calling](#tool-calling)
+- [Hosted web search](#hosted-web-search)
+- [Images](#images)
+- [Typed decisions (System One)](#typed-decisions-system-one)
+- [Bounded speech](#bounded-speech)
+- [Security](#security)
+- [Out of scope for this draft](#out-of-scope-for-this-draft)
 
 `window.inference` may be injected by a browser or extension. After checking that it exists, websites call:
 
 ```ts
 window.inference.request<R extends InferenceRequest>(request: R): AsyncIterable<InferenceChunkFor<R>>
-window.inference.getFeatures(): InferenceFeatures
+window.inference.getFeatures?(): InferenceFeatures
 ```
 
-`request` is required. `getFeatures` reports optional capabilities (see Feature discovery). Implementations that omit `getFeatures` are treated as advertising none.
+`request` is required. `getFeatures` is optional and reports supported capabilities (see [Feature discovery](#feature-discovery)); implementations that omit `getFeatures` are treated as advertising none.
+
+## Example
 
 ```ts
+for await (const chunk of window.inference.request({
+  method: "chat",
+  messages: [{ role: "user", content: "Hello" }],
+})) {
+  if (chunk.type === "accepted") {
+    // permission resolved; provider call may begin
+  } else if (chunk.type === "reasoning_delta") {
+    // append chunk.content to a reasoning UI (optional)
+  } else if (chunk.type === "delta") {
+    // append chunk.content to the reply UI
+  } else if (chunk.type === "done") {
+    // final message / usage; message.reasoning is set when reasoning was streamed
+  }
+}
+```
+
+## Types
+
+```ts
+// --- Content & chat requests ---
+
 type ImageMediaType =
   | "image/jpeg"
   | "image/png"
@@ -352,37 +389,11 @@ type Inference = {
 type DoneChunk = ChatDoneChunk;
 ```
 
-`InferenceError` is an `Error` with a `code` property. Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
+Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Typed decisions (`method: "decide"`), bounded transcription (`method: "transcribe"`), bounded speech synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (`reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
 
-Text chat (`method: "chat"` with `system` / `user` / `assistant` string messages) is required. Typed decisions (`method: "decide"`), bounded transcription (`method: "transcribe"`) and bounded speech synthesis (`method: "synthesize"`), tool calling, hosted web search, image input/output, and request `options` (for example `reasoningEffort`, `temperature`) are optional; implementations advertise them with `getFeatures`. String `content` on user and assistant messages stays valid so existing apps do not break.
+The method determines the chunk union: chat yields `ChatChunk`, decisions yield `DecisionChunk`, transcription yields `TranscriptionChunk`, and synthesis yields `SynthesisChunk`. `InferenceChunkFor<R>` distributes over an `InferenceRequest` union; equivalent overloads must also accept a union-typed request. `ChatRequest`, `ChatChunk`, and `ChatDoneChunk` retain the narrow chat contract; `DoneChunk` remains an alias of `ChatDoneChunk`.
 
-The method determines the chunk union: chat yields `ChatChunk`, decisions yield
-`DecisionChunk`, transcription yields `TranscriptionChunk`, and
-synthesis yields `SynthesisChunk`. The conditional mapping distributes over an
-`InferenceRequest` union. Equivalent overloads must also accept a union-typed
-request. `ChatRequest`, `ChatChunk`, and `ChatDoneChunk` retain the narrow chat
-contract; `DoneChunk` remains an alias of `ChatDoneChunk`.
-
-### Example
-
-```ts
-for await (const chunk of window.inference.request({
-  method: "chat",
-  messages: [{ role: "user", content: "Hello" }],
-})) {
-  if (chunk.type === "accepted") {
-    // permission resolved; provider call may begin
-  } else if (chunk.type === "reasoning_delta") {
-    // append chunk.content to a reasoning UI (optional)
-  } else if (chunk.type === "delta") {
-    // append chunk.content to the reply UI
-  } else if (chunk.type === "done") {
-    // final message / usage; message.reasoning is set when reasoning was streamed
-  }
-}
-```
-
-### Behavior
+## Behavior
 
 1. A request begins when the application starts iterating. The extension obtains permission for the calling origin before sending any content to a provider, prompting the user unless persistent permission already exists.
 2. The user chooses the provider and model, or the extension uses the route previously saved for that origin and method. Synthesis also binds the user-selected voice; pages cannot select it.
@@ -398,7 +409,21 @@ for await (const chunk of window.inference.request({
 12. `options` holds generation preferences (see Request options). They do not change the stream shape: applications must still treat `reasoning_delta` and `message.reasoning` as optional.
 13. Aborting `signal`, closing the page, or navigating it aborts an active request with the `aborted` error code. When the document is unloading, the page may be unable to observe that rejection; implementations must still cancel in-flight provider work.
 
-### Feature discovery
+## Errors
+
+`InferenceError` is an `Error` with a `code` property (`InferenceErrorCode`). Across extension isolated worlds, implementations may reconstruct errors from a serializable `{ name, message, code }` shape rather than preserving a subclass. Applications should check `error.code`, not `instanceof`.
+
+| Code | Meaning |
+| --- | --- |
+| `permission_denied` | The user denied permission for the origin, method, or capability, or the origin is blocked. |
+| `invalid_request` | The request is malformed, uses an unadvertised method/capability/format, includes forbidden fields, fails media/URL validation, or exceeds an applicable decision/speech resource limit. |
+| `unavailable` | The request is well-formed and advertised, but no provider is ready or the selected/saved route (provider, model, voice, or credentials) cannot honor it right now. |
+| `provider_error` | The upstream provider failed, returned malformed/inconsistent output, or ended a stream without a valid `done` chunk. |
+| `aborted` | The request was cancelled via `AbortSignal`, iterator closure, page navigation, or page unload. |
+
+The `invalid_request` vs. `unavailable` boundary is consistent across capabilities: unadvertised features, unknown fields, malformed inputs, and resource-limit violations are `invalid_request`; well-formed advertised requests that the *currently selected* route cannot fulfill are `unavailable`. Implementations must not silently degrade (for example, completing a plain chat reply after dropping `{ type: "web_search" }`, image parts, `output.images`, or decision attachments).
+
+## Feature discovery
 
 `getFeatures` is synchronous. It must not prompt, must not require permission, and must not perform network I/O. It returns a snapshot of **API surface this implementation supports**, not whether the user's current provider or model will honor a capability, and not whether the origin has a permission grant.
 
@@ -438,36 +463,35 @@ if (features.options?.temperature) {
 }
 ```
 
-Rules:
+### General discovery rules
 
-1. `toolCalling: true` means `request` accepts function tools, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. It does not mean the selected model can call functions, and it does not advertise `{ type: "web_search" }`.
-2. `webSearch: true` means `request` accepts `{ type: "web_search" }` in `tools`. It does not mean the selected provider can search, and not whether the origin has a grant. `webSearch` and `toolCalling` are independent: a search-only `tools` array must not require `toolCalling`; function tools must not require `webSearch`.
-3. `options.reasoningEffort: true` means `request.options.reasoningEffort` is accepted and the implementation attempts to map it to the provider. It does not mean the selected model supports adjustable thinking. Advertise options **per key**; a bare `options: {}` advertises none. The same per-key rule applies to `options.temperature` and any later `options` keys.
-4. An absent key and `false` both mean unsupported. Applications must ignore unknown keys (including unknown keys under chat `options` and chat `output`) so later capabilities can be added without breaking callers. Unknown keys already allow a later draft to add a nested object (for example for MCP) without breaking callers that check `features.webSearch`.
-5. The result must not include provider name, model id, or other user or account identity.
-6. Implementations that do not support tool calling must reject function tools, `toolChoice` values other than `"auto"` and `"none"`, `role: "tool"` messages, and assistant `toolCalls` with `invalid_request` — including implementations that omit `getFeatures`. A search-only `tools` array (`[{ type: "web_search" }]`) must not be rejected solely for lacking `toolCalling`. `"none"` and `"auto"` remain valid on a search-only request so the page can suppress hosted search without `toolCalling`.
-7. Implementations that do not support hosted web search must reject `{ type: "web_search" }` with `invalid_request` — including implementations that omit `getFeatures`. Function tools must not be rejected solely for lacking `webSearch`. Same reject rule as function tools, not the ignore rule used for `options`.
-8. If `tools` contains a kind that is not advertised, or an unknown `tools[].type`, the whole request is `invalid_request`. Do not silently drop hosted search or function tools. Extra keys on `{ type: "web_search" }` are ignored (forward compatible).
-9. Implementations must **ignore** unsupported `options` keys (must not reject the request solely for including them). Applications may send future keys for forward compatibility; they have no effect until advertised.
-10. Advertising `toolCalling` does not guarantee that the user's provider or model will emit `toolCalls`. The model may ignore tools and reply in text. Applications must handle a text-only `done` even when they offered tools. Implementations must not reject a well-formed tools request solely because the current model is weak at function calling.
-11. Advertising `webSearch` does not guarantee that the model will actually search, only that the implementation will enable search for providers that can honor it. Applications must still handle a text `done`. If the request includes `{ type: "web_search" }` and the **currently selected** provider cannot honor it (or required extra credentials are missing), do not complete a normal chat reply — see Hosted web search.
-12. Advertising an `options` key does not guarantee that the user's provider or model will honor that preference. Implementations map best-effort and must not fail a well-formed request solely because the current model cannot apply the option.
-13. `imageInput: true` means `request` accepts `ImagePart`s in `messages` (on `user` and `assistant` roles). It does not mean the selected model can see images, and not whether the origin has a grant. Independent of `imageOutput`.
-14. `imageOutput: true` means `request` accepts `output.images` and `done.message` may contain `ImagePart`s. It does not mean the selected model will draw, and not whether the origin has a grant. Independent of `imageInput`. Advertising `imageOutput` does **not** mean the implementation accepts round-tripped assistant image parts without `imageInput`.
-15. Implementations that do not support image input must reject `ImagePart`s in `messages` with `invalid_request` — including implementations that omit `getFeatures`. Do not drop image parts and answer as if they were seen. Same reject rule as function tools, not the ignore rule used for `options`.
-16. Implementations that do not support image output must reject `output.images: true` with `invalid_request` — including implementations that omit `getFeatures`. Extra keys under `output` are ignored (forward compatible). If the page does not set `output.images: true`, implementations must not put `ImagePart`s on `done.message` (text only, as today).
-17. Advertising `imageInput` / `imageOutput` does not guarantee that the user's provider or model can see or draw. Applications must still handle a text-only `done` when they set `output.images: true`. If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that, do not complete a normal chat reply — see Images.
+1. **Absent or `false` means unsupported.** Capabilities are independent of one another and of `methods`. Chat (`method: "chat"`) is always required and has no `methods.chat` entry.
+2. **Forward compatibility:** Applications must ignore unknown keys on `InferenceFeatures` (including under `options` and `output`). Implementations must ignore unknown keys under chat `options` and chat `output`, as well as extra keys on `{ type: "web_search" }`.
+3. **No identity leakage:** `getFeatures()` must not include provider name, model ID, voice ID, account state, or grant state. It may describe an identity-free union of implemented routes.
+4. **Reject unadvertised capabilities vs. ignore unadvertised options:**
+   - Unadvertised methods, tools, hosted search, image input/output, and decision media must be rejected with `invalid_request` (including by implementations that omit `getFeatures`).
+   - Unsupported `options` keys must be **ignored** rather than rejected, so applications can send future options safely.
+5. **Best-effort model behavior vs. route capability:** Advertising a capability does not guarantee the selected model will invoke a tool, perform a search, emit images, or honor a preference — applications must still handle a plain text `done` for chat. However, if the *currently selected* provider/route cannot honor a well-formed advertised capability (hosted search, image input/output, or an optional method/format), implementations must fail with `unavailable` rather than silently completing a degraded reply (except decision resource-limit violations, which are `invalid_request`).
 
-18. `methods.decide: true` advertises all three typed decision primitives and per-question refusals, not unlimited capacity or a guarantee that a selected route accepts any particular request size. `methods.transcribe` advertises bounded transcription and must contain at least one `acceptedMedia` constraint. `methods.synthesize: true` is the legacy MP3-only advertisement; an object declares exactly its nonempty `outputMediaTypes` list, with every entry a `SynthesisMediaType`. A WAV-only implementation may advertise `{ outputMediaTypes: ["audio/wav"] }`. `false` or missing entries mean unsupported; chat remains required without a `methods.chat` entry. Optional methods are independent of one another and of chat capability flags.
-19. Unknown or unadvertised methods are `invalid_request`. A well-formed advertised method that the selected provider/model/credentials cannot honor is `unavailable`, except that [decision resource-limit violations](#decision-request-and-validation) are `invalid_request`; do not substitute chat, omit questions, drop media, or silently change the approved route.
-20. Transcription constraints use normalized MIME essences and may include lowercase container and audio codec identifiers. Omitted narrower constraints mean no such preflight filter, not verified support for every codec. Speech discovery may describe the identity-free union of possible routes; approval must filter to matching input constraints or requested synthesis formats. Advertising a synthesis format does not guarantee the currently approved provider/model/voice route can produce it. No provider/model/voice identities or account state belong in discovery.
-21. `decisionMedia.imageMediaTypes` declares exactly the image MIME types accepted in decision `attachments`. When present, it must be a nonempty, duplicate-free list of canonical `ImageMediaType` values and `methods.decide` must be `true`. Missing `decisionMedia` means text/JSON decisions only; an empty or malformed list advertises no media support. `methods.decide` remains a boolean. This capability is independent of chat `imageInput` / `imageOutput`, speech, and grants. It may describe an identity-free union of implemented routes; it must not change based on the selected model, credentials, permission, or account. Unadvertised attachment types are `invalid_request`; advertised types unavailable on the approved route are `unavailable`. See [Decision media](#decision-media) for validation, route checks, and consent.
+### Per-capability discovery rules
 
-### Request options
+| Feature flag | What it advertises | Independence & rejection rules |
+| --- | --- | --- |
+| `toolCalling` | Accepts function tools, `toolChoice`, assistant `toolCalls`, and `role: "tool"` messages. | Independent of `webSearch`. When unsupported, reject function tools, `toolChoice` values other than `"auto"`/`"none"`, `role: "tool"`, and assistant `toolCalls` with `invalid_request`. Must not reject a well-formed tools request solely because the current model is weak at tool calling. |
+| `webSearch` | Accepts `{ type: "web_search" }` in `tools`. | Independent of `toolCalling`: search-only `tools` (`[{ type: "web_search" }]`, with optional `toolChoice: "auto"` or `"none"`) must not require `toolCalling`. When unsupported, reject `{ type: "web_search" }` with `invalid_request`. Unknown `tools[].type` or mixing an unadvertised kind rejects the whole request with `invalid_request`. |
+| `imageInput` | Accepts `ImagePart`s in `user` and `assistant` `messages`. | Independent of `imageOutput` and `decisionMedia`. When unsupported, reject `ImagePart`s in `messages` with `invalid_request` (do not drop them). |
+| `imageOutput` | Accepts `output.images: true`; `done.message` may contain `ImagePart`s. | Independent of `imageInput` (does not imply round-tripping assistant images without `imageInput`). When unsupported, reject `output.images: true` with `invalid_request`. If the page does not set `output.images: true`, `done.message` must not contain `ImagePart`s. |
+| `options.<key>` | Advertised **per key** (`reasoningEffort`, `temperature`); `options: {}` advertises none. | Best-effort mapping; do not fail a well-formed request solely because the current model cannot apply the option. |
+| `methods.decide` | Boolean `true` advertises all three decision primitives and per-question refusals. | Does not guarantee capacity for any particular request size. |
+| `decisionMedia.imageMediaTypes` | Nonempty, duplicate-free list of canonical `ImageMediaType` values accepted in decision `attachments`. Requires `methods.decide === true`. | Independent of chat `imageInput`/`imageOutput`. Absent, empty, or malformed advertises text/JSON decisions only. |
+| `methods.transcribe` | `{ acceptedMedia }` with at least one `TranscriptionInputConstraint` (normalized MIME essence; optional lowercase `containers` and `audioCodecs`). | Omitted narrower constraints mean no preflight filter, not verified support for every codec. Approval must filter to matching routes. |
+| `methods.synthesize` | `true` (legacy MP3-only) or `{ outputMediaTypes }` (nonempty list of `SynthesisMediaType`; e.g. `["audio/wav"]` for WAV-only). | Approval must filter to routes supporting the requested format. |
+
+## Request options
 
 `options` is a bag of generation preferences for a chat call — not model selection (the user still chooses provider and model). This draft defines `reasoningEffort` and `temperature`; later drafts may add further keys under the same object. Applications must ignore unknown keys; implementations must ignore keys they do not advertise. Other methods have closed request shapes and do not accept `options` in this draft.
 
-#### `reasoningEffort`
+### `reasoningEffort`
 
 Lets applications prefer less or more model reasoning / chain-of-thought (for example `"none"` or `"low"` for translation or autocomplete; `"high"` or `"xhigh"` for harder multi-step tasks). It controls **generation**, not merely whether the page displays reasoning: omitting UI for `reasoning_delta` does not reduce latency or cost if the model still thinks.
 
@@ -478,32 +502,32 @@ This is distinct from assistant `message.reasoning` / `reasoning_delta`, which a
 - `"low"`, `"medium"`, and `"high"` ask for increasing effort when the provider exposes an effort or budget control.
 - `"xhigh"` asks for effort above `"high"` when the provider exposes such a control. Mapping effort levels to provider-specific parameters, such as effort enums or token budgets, remains implementation-defined.
 - When `getFeatures().options?.reasoningEffort` is true, values outside `ReasoningEffort` are `invalid_request`.
-- When that feature key is absent or false, `options.reasoningEffort` is ignored (see Feature discovery).
+- When that feature key is absent or false, `options.reasoningEffort` is ignored (see [Feature discovery](#feature-discovery)).
 
 Applications that care about latency or cost for simple tasks should pass `"none"` or `"low"` when support is advertised. Applications must not assume reasoning output disappears, or that every model becomes non-thinking, solely because they requested `"none"`.
 
-#### `temperature`
+### `temperature`
 
 Lets applications prefer less or more sampling randomness (for example low values for translation or extraction; higher values for brainstorming). Orthogonal to `reasoningEffort`: temperature affects token sampling; reasoning effort affects thinking budget / chain-of-thought.
 
 - When omitted, the implementation uses its default (typically the provider or model default).
 - When present, the value must be a finite number in the closed interval `[0, 2]` (OpenAI-style scale). Implementations map or clamp onto provider-specific ranges when a provider uses a different scale (for example `[0, 1]`).
 - When `getFeatures().options?.temperature` is true, non-finite values or values outside `[0, 2]` are `invalid_request`.
-- When that feature key is absent or false, `options.temperature` is ignored (see Feature discovery).
+- When that feature key is absent or false, `options.temperature` is ignored (see [Feature discovery](#feature-discovery)).
 
 Applications must not assume every model honors temperature exactly; advertising means the implementation will attempt to pass it through.
 
-#### Permission
+### Options permission
 
 `options` alone does not require a new permission prompt and does not widen a persistent grant. Implementations **may** let the user override or clamp values such as `reasoningEffort` or `temperature` in extension settings (or optionally in the approval UI). Override and clamp controls are **optional** extension UX — this draft does **not** require them on the permission prompt or elsewhere. Consent remains origin + provider/model (+ tools and image input/output when present).
 
-### Tool calling
+## Tool calling
 
 Function tools are defined and **executed by the page**. The implementation relays JSON schemas, `toolCalls`, and `role: "tool"` results; it must not run application tool handlers or widen host permissions in order to execute tools.
 
-This draft specifies function tools and hosted web search (see Hosted web search). Other hosted tool types (for example MCP) are out of scope. The implementation is not an agent runtime: the page owns any multi-round function-tool loop (send tools → receive `toolCalls` → execute → send `role: "tool"` results → repeat). Hosted search turns stay hidden from the page.
+This draft specifies function tools and hosted web search (see [Hosted web search](#hosted-web-search)). Other hosted tool types (for example MCP) are out of scope. The implementation is not an agent runtime: the page owns any multi-round function-tool loop (send tools → receive `toolCalls` → execute → send `role: "tool"` results → repeat). Hosted search turns stay hidden from the page.
 
-#### Request
+### Request
 
 - `tools`, when present, must be a non-empty array of function tools and/or `{ type: "web_search" }`. Mixed arrays are allowed only when **both** `toolCalling` and `webSearch` are advertised; if the array contains a kind that is not advertised, the whole request is `invalid_request`. `parameters` on a function tool is a JSON Schema object for the function arguments. `{ type: "web_search" }` has no `function` and no parameters in this draft.
 - `toolChoice` remains a function-tool control. When omitted and `tools` is present, it defaults to `"auto"` (the model may reply in text or call function tools). `"none"` suppresses function calls **and** hosted search. `"required"` asks for at least one function call; a function object forces that function. `"auto"`, `"required"`, and a named function do not force a web search. There is no `{ type: "web_search" }` variant of `toolChoice` in this draft.
@@ -582,25 +606,25 @@ if (done.message.role === "assistant" && done.message.toolCalls?.length) {
 }
 ```
 
-The loop above is application code, not part of `window.inference`. A non-normative helper library ([`ipa-tools`](./packages/ipa-tools)) provides TypeScript types, a `complete` drain helper, and a `runTools` loop; implementations are not required to ship it.
+The loop above is application code, not part of `window.inference`. A non-normative helper library ([`ipa-tools`](./packages/ipa-tools)) provides TypeScript types, `complete`, `runTools`, `createAgent`, and `createInference`; implementations are not required to ship it.
 
-#### Permission
+### Tool calling permission
 
 A persistent allow grant for text chat does not cover a later request that includes `tools`, or a wider tool set than the grant records. A function-tools grant does not cover `{ type: "web_search" }`, and a hosted-search grant does not cover function tools. Implementations must prompt again in those cases, including when a persistent grant already exists for the origin.
 
-When a request includes function tools, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Hosted search has its own disclosure (see Hosted web search). Request-content preview remains optional (see Security).
+When a request includes function tools, the permission UI must list the function names so the user can see what the site is authorizing the model to request. Showing descriptions is optional. Hosted search has its own disclosure (see [Hosted web search](#hosted-web-search)). Request-content preview remains optional (see [Security](#security)).
 
 Implementations may treat a follow-up that only appends `role: "tool"` results for the just-approved assistant `toolCalls` as the same permission episode, so a multi-round tool loop does not re-prompt on every round. Adding or removing `{ type: "web_search" }` is a wider tool set and needs a new prompt (or a covering grant). A new user turn, a new or wider `tools` list, or a history that is not a continuation of that episode requires a new prompt (or a covering persistent grant). Those follow-ups often have no second preview: tool result bodies can reach the provider without appearing in the Allow UI.
 
-Applications SHOULD make the data a tool will return to the provider inspectable **before** the user allows inference. Do not rely on a later `role: "tool"` message for that disclosure. Practical options (any one can suffice):
+Applications should make the data a tool will return to the provider inspectable **before** the user allows inference. Do not rely on a later `role: "tool"` message for that disclosure. Practical options (any one can suffice):
 
 - Include the data, or a faithful truncated copy, in the first `messages` so an implementation preview can show it.
 - Name the class of data in the tool `description` (for example “returns the user’s currently loaded social posts”).
 - Disclose it in the page UI next to the action that starts `request`.
 
-This is a `SHOULD`, not a `MUST`. Live or huge tool results cannot always be inlined on the first turn. The requirement is honesty about what will be sent, not stuffing every payload into `messages`. Applications must not assume the permission UI reveals message content or later tool-result rounds.
+This is a recommendation, not a hard requirement: live or large tool results cannot always be inlined on the first turn. The goal is honesty about what will be sent, not stuffing every payload into `messages`. Applications must not assume the permission UI reveals message content or later tool-result rounds.
 
-### Hosted web search
+## Hosted web search
 
 Hosted web search is **not page-executed**. The implementation (or the selected provider) runs it. The page must not see `toolCalls` / `role: "tool"` turns for `web_search`, and must not implement `execute.web_search`.
 
@@ -633,19 +657,19 @@ tools: [
 ]
 ```
 
-#### Execution and stream
+### Execution and stream
 
 Stream shape is unchanged: `accepted` → optional `reasoning_delta` / `delta` → `done`. Search is folded into the assistant text. Citations, source lists, and search-status chunks are out of scope; implementations may put links in `message.content` as ordinary text.
 
 Who runs the search is an implementation detail (provider-hosted vs extension-executed, including a hidden local loop such as Ollama → ollama.com), as long as the page contract is the same.
 
-#### `toolChoice`
+### `toolChoice`
 
 `"none"` means “do not use tools this turn.” Hosted search is a tool, so `"none"` suppresses it as well as function calls. Pages that keep `{ type: "web_search" }` in `tools` can still disable it for a given turn without rebuilding the array. Implementations must omit or disable hosted search for that request (not warn-and-continue, and not run a hidden search loop).
 
 `"auto"` / `"required"` / a named function do not force a web search. `"required"` and a named function without `toolCalling` (or without any function tool in `tools`) are `invalid_request`.
 
-#### Permission
+### Hosted web search permission
 
 A chat-only persistent grant does not cover `{ type: "web_search" }`. A function-tools grant does not cover it either. Hosted search is a distinct identity in the grant.
 
@@ -653,20 +677,13 @@ When `tools` includes `{ type: "web_search" }`, the permission UI must disclose 
 
 Follow-up rounds that only append `role: "tool"` results for **page** function calls stay in the existing tools episode. Adding or removing `{ type: "web_search" }` is a wider tool set and needs a new prompt (or a covering grant).
 
-#### Provider cannot search
+### Provider cannot search
 
-Do **not** warn-and-continue: a successful `done` after the page asked for search, with no search, is a silent capability lie.
+Do **not** warn-and-continue: completing a plain chat reply after the page asked for search is a silent capability lie.
 
-If the request includes `{ type: "web_search" }` and the **currently selected** provider cannot honor it (or required extra credentials are missing), do not complete a normal chat reply. Implementations should disable Allow in the permission UI, or fail the request with **`unavailable`**.
+If the request includes `{ type: "web_search" }` and the **currently selected** provider cannot honor it (or required credentials are missing), implementations should disable Allow in the permission UI, or fail the request with **`unavailable`** (see [Errors](#errors)). Advertising `webSearch` does not guarantee the model will actually search; applications must still handle a text `done`.
 
-Use `unavailable` (not `invalid_request`) for this case:
-
-- `{ type: "web_search" }` on an implementation that advertised `webSearch` is a well-formed request. The failure is that *this* provider or credential set cannot honor it right now — same bucket as a missing key or a provider that is not ready.
-- `invalid_request` stays the code for unadvertised `{ type: "web_search" }`, unknown `tools[].type`, and other malformed requests. Using it for a provider mismatch would teach apps that the tool shape itself was wrong.
-
-Prefer disabling Allow so the user never hits the error; if the request still proceeds, throw `unavailable`. Advertising `webSearch` does not guarantee the model will actually search, only that the implementation will enable search for providers that can. Applications must still handle a text `done`.
-
-### Images
+## Images
 
 Vision and image generation stay on `method: "chat"`. One `ImagePart` type is used in `messages` and on `done.message`. String `content` remains valid. Do not hang image generation under `options` (unsupported options are ignored; silently not generating is the same class of lie as dropping `{ type: "web_search" }`). Do not add a page-facing `{ type: "image_generation" }` tool in this draft; implementations may map `output.images` to a provider tool internally.
 
@@ -712,20 +729,18 @@ if (features.imageOutput) {
 
 Edit / iterate is both in one request: image parts in `messages` **and** `output.images: true`. Round-trip like `reasoning`: if the next turn should see the picture, send that assistant message back, image parts included. `imageOutput` does **not** imply the implementation will accept those round-tripped parts without `imageInput`.
 
-A non-normative `generateImage` helper can live in `ipa-tools` later without a spec change.
-
-#### Encoding
+### Encoding
 
 - **Portable form:** `{ type: "image", mediaType, data }` where `data` is raw base64 (not a `data:` URL). This is what `done.message` uses.
 - **Blob:** On the page-facing API, `data` may be a `Blob`. Browser injectors must accept `Blob` and encode to base64 before crossing into an isolated world or service worker.
-- **`{ url }`:** Browser implementations that inject into a document SHOULD accept `{ type: "image", url }` on user and assistant parts and MUST resolve it **in the page** (same CORS as the site) to `{ mediaType, data }` before the provider or a privileged extension world sees the request. Infer `mediaType` from the response (`Content-Type` / `Blob.type`); do not require the page to pass it. Local models stay offline — they still receive bytes. Non-page IPA (for example Node) MAY reject `{ url }` with `invalid_request`. Fetch, CORS, or network failure is `invalid_request`, not a silent drop. `fetch()` CORS is stricter than `<img src>`; prefer Blob/base64 when the page already has bytes.
+- **`{ url }`:** Browser implementations that inject into a document should accept `{ type: "image", url }` on user and assistant parts and must resolve it **in the page** (same CORS as the site) to `{ mediaType, data }` before the provider or a privileged extension world sees the request. Infer `mediaType` from the response (`Content-Type` / `Blob.type`); do not require the page to pass it. Local models stay offline — they still receive bytes. Non-page IPA (for example Node) may reject `{ url }` with `invalid_request`. Fetch, CORS, or network failure is `invalid_request`, not a silent drop. `fetch()` CORS is stricter than `<img src>`; prefer Blob/base64 when the page already has bytes.
 - **XOR:** A part must have `data` or `url`, not both. Both or neither is `invalid_request`.
-- **MIME:** `image/jpeg`, `image/png`, `image/webp`, `image/gif`. Implementations MAY normalize `image/jpg` to `image/jpeg`. Other MIME types are `invalid_request`.
+- **MIME:** `image/jpeg`, `image/png`, `image/webp`, `image/gif`. Implementations may normalize `image/jpg` to `image/jpeg`. Other MIME types are `invalid_request`.
 - **Size:** Implementation-defined. Fail closed when the provider or transport rejects. This draft does not set a portable byte cap.
 - **No host fetch:** The implementation must not fetch image URLs itself in order to honor `{ url }`. Page-side resolve keeps local models offline and avoids extra host URL-fetch permissions.
 - Image parts are not allowed on `system` or `tool` messages.
 
-#### Stream
+### Stream
 
 Stream shape stays text-shaped: `accepted` → optional `reasoning_delta` / `delta` → `done`. No `image_delta` in this draft (same as no streaming `toolCall`s).
 
@@ -733,26 +748,19 @@ Stream shape stays text-shaped: `accepted` → optional `reasoning_delta` / `del
 - Reply with images: `content` is a `ContentPart[]`; concatenating `delta`s produces the concatenation of the `type: "text"` parts, in order. Image parts appear only on `done`.
 - Image-only reply: `content` is `[{ type: "image", ... }, ...]`, zero `delta`s. Keep `null` / `""` as “no text” for tool-only turns; do not use `null` for “here is a PNG.”
 
-#### Permission
+### Image permission
 
 A persistent chat grant covers neither image parts in `messages` nor `output.images`. `imageInput` and `imageOutput` are distinct grant identities (photos leaving the page vs paying for / receiving generated media), sibling to tools — not stuffed into the tools fingerprint. A request that includes image parts **and** `output.images` needs both.
 
-Permission UI must disclose each. Thumbnails stay optional like today’s content preview.
+Permission UI must disclose each. Thumbnails are optional, like request content previews.
 
-#### Provider cannot see or draw
+### Provider cannot see or draw
 
-Do **not** warn-and-continue: a successful `done` after the page sent image parts, as if they were seen, is a silent capability lie. Same for `output.images: true` with no generation path.
+Do **not** warn-and-continue: completing a plain chat reply after the page sent image parts or requested `output.images: true` is a silent capability lie.
 
-If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that (or required extra credentials are missing), do not complete a normal chat reply. Implementations should disable Allow in the permission UI, or fail the request with **`unavailable`**.
+If the request includes image parts and/or `output.images: true` and the **currently selected** provider cannot honor that (or required credentials are missing), implementations should disable Allow in the permission UI, or fail the request with **`unavailable`** (see [Errors](#errors)). Advertising `imageOutput` does not guarantee the model will draw; applications must still handle a text-only `done`.
 
-Use `unavailable` (not `invalid_request`) for this case:
-
-- Image parts / `output.images` on an implementation that advertised the matching flag is a well-formed request. The failure is that *this* provider or model cannot honor it right now — same bucket as hosted search.
-- `invalid_request` stays the code for unadvertised image parts / `output.images`, malformed parts, and other malformed requests.
-
-Prefer disabling Allow so the user never hits the error; if the request still proceeds, throw `unavailable`. Advertising `imageOutput` does not mean the model will draw. Applications must still handle a text-only `done`.
-
-### Typed decisions (System One)
+## Typed decisions (System One)
 
 `method: "decide"` evaluates a shared `state` and optional native image
 `attachments` against named, typed `questions`.
@@ -764,7 +772,7 @@ Native image mappings are also possible with [Gemini Decisions](https://aistudio
 and [OpenAI Decisions](https://developers.openai.com/api/docs/guides/decisions#check-an-image-for-visible-damage).
 This does not advertise every modality those providers accept.
 
-#### Decision request and validation
+### Decision request and validation
 
 Feature-detect `getFeatures().methods?.decide === true` before use. This flag
 describes API support, independently of credentials, installed models, or site
@@ -828,7 +836,7 @@ This draft deliberately bounds question instructions and descriptions to strings
 Structured instructions/criteria, per-question attachments, and additional
 primitives supported by some native APIs are outside this envelope.
 
-#### Decision media
+### Decision media
 
 `attachments` is optional. Omission and `[]` both mean a text/JSON-only request
 and require no media capability or media grant. If present it must be a dense
@@ -903,7 +911,7 @@ provider media on every exit where the provider supports deletion; otherwise
 document retention/expiry and do not reuse handles across requests or origins.
 No provider handles, credentials, or temporary-media URLs may leak to the page.
 
-#### Decision answers and stream
+### Decision answers and stream
 
 A successful stream is exactly **`accepted` → `done`**. There are no text,
 reasoning, audio, or partial-answer deltas. `done` contains a non-whitespace
@@ -953,7 +961,7 @@ The normal cancellation rules apply during permission and provider work.
 Aborting throws `aborted`, cancels in-flight provider work, and yields no
 `done`. Stopping iteration must release resources and cancel unfinished work.
 
-#### Decision permission
+### Decision permission
 
 Decisions require a separate origin-and-method grant. A chat or speech grant
 does not authorize `decide`; a decision grant does not authorize those methods.
@@ -1030,7 +1038,7 @@ MIME feature detection, local file input, refusal handling, cancellation, and
 unsupported selected routes. [Media conformance support](./packages/ipa-tools/test/conformance/README.md#decision-media)
 covers malformed/over-limit requests and approval snapshot/cancellation hooks.
 
-### Bounded speech
+## Bounded speech
 
 Transcription and synthesis are optional variants of the same `request` function.
 They use transcription and speech endpoints with operation-specific models and
@@ -1038,7 +1046,7 @@ stream shapes. They are distinct from chat audio: transcription promises a
 faithful transcript, while chat may summarize or answer questions. STT and TTS
 are capability categories, not additional method names.
 
-#### Transcription sources and validation
+### Transcription sources and validation
 
 `transcribe` accepts a prerecorded, finite media file containing a supported,
 decodable audio track. Audio-only files and provider-supported video containers
@@ -1095,7 +1103,7 @@ file as supplied, fail clearly instead of silently converting or dropping tracks
 Ignoring visuals is a semantic guarantee, not a guarantee that visual bytes stay
 local: disclose when the complete container may leave the page.
 
-#### Synthesis input and output
+### Synthesis input and output
 
 `synthesize.text` must be a string containing non-whitespace text. Implementations
 may set a documented maximum, measured in Unicode code points. The page supplies
@@ -1123,7 +1131,7 @@ Implementations must document conservative input/output limits and reject before
 approval when source metadata makes that possible. The standard fixes no
 provider-derived byte cap. Never truncate text or audio to fit a limit silently.
 
-#### Speech stream invariants
+### Speech stream invariants
 
 The common lazy iteration, permission, error, and cancellation rules apply.
 Permission and preflight failures precede `accepted`. A successful stream yields
@@ -1167,7 +1175,7 @@ the returned media type, attach controls, and play only following an explicit us
 action, subject to browser autoplay policy. See the browser-only
 [speech examples](./examples/speech/README.md).
 
-#### Speech permission and privacy
+### Speech permission and privacy
 
 Existing grants are chat-only. Transcription and synthesis require separate
 origin-and-method grants. A persistent grant binds the exact provider/model
@@ -1188,7 +1196,7 @@ autoplay speech. A page may use browser microphone permission to create a
 recording, stop recording, then submit the completed bounded `Blob` with separate
 IPA transcription approval; a live microphone stream is out of scope.
 
-### Security
+## Security
 
 The API is available only to top-level pages in a secure context that have a
 tuple origin — typically `https:` and loopback `http:` (`localhost`,
@@ -1227,7 +1235,7 @@ Chat image grants and existing text/JSON decision grants do not cover them.
 Native image bytes are part of the immutable approved input; neither ordinary
 URLs nor media-shaped values in decision state cause network fetching.
 
-### Out of scope for this draft
+## Out of scope for this draft
 
 - `method: "image"` (would duplicate chat and force a later migration)
 - Image parts on `system` or `tool` messages
