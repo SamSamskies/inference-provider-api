@@ -19,7 +19,11 @@ type DecisionDoneMapping = Assert<Equal<InferenceDoneFor<DecideRequest>, Decisio
 declare const ipa: Inference;
 declare const anyRequest: InferenceRequest;
 declare const backend: InferenceBackend;
-const chat = { method: "chat", messages: [{ role: "user", content: "Hello" }] } satisfies ChatRequest;
+const chat = {
+  method: "chat",
+  messages: [{ role: "user", content: "Hello" }],
+  options: { reasoningEffort: "xhigh" },
+} satisfies ChatRequest;
 const transcribe = { method: "transcribe", media: { data: new Blob([], { type: "audio/wav" }) } } satisfies TranscribeRequest;
 const synthesize = { method: "synthesize", text: "Hello" } satisfies SynthesizeRequest;
 const decide = { method: "decide", state: { ticket: "Checkout is broken" },

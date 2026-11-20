@@ -159,7 +159,7 @@ An inference/tool-description grant does not approve every side effect an applic
 Some topics that still need community discussion:
 
 - Which further capability constraints, if any, do applications need beyond tools and `options`?
-- Are `"auto" | "none" | "low" | "medium" | "high"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
+- Are `"auto" | "none" | "low" | "medium" | "high" | "xhigh"` the right `options.reasoningEffort` levels, or should the field become a provider-mapped budget/token object?
 - Which further keys belong under `options` (for example `maxTokens`)?
 - Should embeddings use this API or a separate API?
 - Should other hosted / provider-executed tools (for example MCP) be specified, or remain implementation-specific?

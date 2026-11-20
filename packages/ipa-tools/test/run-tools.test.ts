@@ -301,7 +301,7 @@ describe("runTools", () => {
       }
       return fakeRequest([{ role: "assistant", content: "done" }])(req);
     };
-    const requestOptions = { temperature: 0, reasoningEffort: "none" as const };
+    const requestOptions = { temperature: 0, reasoningEffort: "xhigh" as const };
 
     await runTools({
       request,

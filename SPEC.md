@@ -157,7 +157,7 @@ type InferenceOptions = {
 };
 
 /** Omitted or `"auto"` means the implementation / provider default. */
-type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high";
+type ReasoningEffort = "auto" | "none" | "low" | "medium" | "high" | "xhigh";
 
 type Message =
   | {
@@ -475,7 +475,8 @@ This is distinct from assistant `message.reasoning` / `reasoning_delta`, which a
 
 - When omitted, behavior is `"auto"`: the implementation uses its default (typically the provider or model default).
 - `"none"` asks to disable or minimize thinking when the provider supports that.
-- `"low"`, `"medium"`, and `"high"` ask for increasing effort when the provider exposes an effort or budget control. Implementations map these onto provider-specific parameters (for example effort enums or token budgets); exact mapping is implementation-defined.
+- `"low"`, `"medium"`, and `"high"` ask for increasing effort when the provider exposes an effort or budget control.
+- `"xhigh"` asks for effort above `"high"` when the provider exposes such a control. Mapping effort levels to provider-specific parameters, such as effort enums or token budgets, remains implementation-defined.
 - When `getFeatures().options?.reasoningEffort` is true, values outside `ReasoningEffort` are `invalid_request`.
 - When that feature key is absent or false, `options.reasoningEffort` is ignored (see Feature discovery).
 
