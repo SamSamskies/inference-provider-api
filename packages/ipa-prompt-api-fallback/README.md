@@ -1,8 +1,10 @@
 # ipa-prompt-api-fallback
 
+[![npm](https://img.shields.io/npm/v/ipa-prompt-api-fallback)](https://www.npmjs.com/package/ipa-prompt-api-fallback)
+
 Chrome [Prompt API](https://developer.chrome.com/docs/ai/prompt-api) (`LanguageModel`) compatibility backend for [`ipa-tools`](../ipa-tools) `createInference({ fallbacks })`.
 
-**This is not IPA.** There is no origin permission prompt, no user-chosen provider/model, and no `permission_denied` from the browser. Do **not** assign the adapter to `window.inference`. `isInferenceAvailable()` / `getInference()` / `waitForInference()` stay false/throwing on the fallback path.
+**This is not IPA.** There is no origin permission prompt, no user-chosen provider/model, and no `permission_denied` from the browser. Do **not** assign this adapter to `window.inference`. `isInferenceAvailable()`, `getInference()`, and `waitForInference()` stay false/throwing on the fallback path.
 
 ## Install
 
@@ -10,13 +12,11 @@ Chrome [Prompt API](https://developer.chrome.com/docs/ai/prompt-api) (`LanguageM
 npm install ipa-tools ipa-prompt-api-fallback
 ```
 
-[![npm](https://img.shields.io/npm/v/ipa-prompt-api-fallback)](https://www.npmjs.com/package/ipa-prompt-api-fallback)
-
-Version 0.3.1 requires `ipa-tools >=1.0.0`. Zero other runtime deps. Browser ESM only.
-
-This backend remains chat-only. It advertises neither `methods.transcribe` nor `methods.synthesize`, so `createInference` skips it for speech without creating a session or starting a download. Prompt API audio modality hints do not establish speech support. Direct speech requests also fail with `invalid_request`.
+Requires `ipa-tools >=1.0.0`. Zero other runtime dependencies. Browser ESM only.
 
 `ipa-tools` does **not** import this package. Your app imports both and passes the backend object into `fallbacks`.
+
+This backend is **chat-only**: it does not advertise `methods.decide`, `methods.transcribe`, or `methods.synthesize`, so `createInference` skips it for decisions and speech without creating a session or starting a download. Direct non-chat requests fail with `invalid_request`.
 
 ## Usage
 
@@ -36,7 +36,7 @@ const status = await inference.probe();
 
 sendButton.addEventListener("click", async () => {
   if (status.ipa === "unavailable" && status.promptApi !== "unavailable") {
-    const ok = await confirm(
+    const ok = window.confirm(
       status.promptApi === "downloadable" || status.promptApi === "downloading"
         ? "No inference extension found. Chrome can use an on-device model (a few GB download). Continue?"
         : "No inference extension found. Use Chrome’s on-device model on this device?"
@@ -52,16 +52,16 @@ sendButton.addEventListener("click", async () => {
 });
 ```
 
-Resolve happens lazily on first `complete` / `request` / `runTools` (inside a user gesture). `LanguageModel.create()` is **not** called at module load. `probe()` / `getPromptApiAvailability()` never start the download.
+Resolution happens lazily on the first `complete`, `request`, or `runTools` call (inside a user gesture). `LanguageModel.create()` is **not** called at module load, and `probe()` / `getPromptApiAvailability()` never start a download.
 
 ## Chrome requirements
 
 - Chrome with the Prompt API available (see [Chrome AI docs](https://developer.chrome.com/docs/ai/prompt-api)).
-- Hardware / storage requirements for Gemini Nano (often several GB on first download).
+- Hardware and storage for Gemini Nano (often several GB on first download).
 - User activation for `LanguageModel.create()`.
 - Disclose download size when `promptApi` is `"downloadable"` — Chrome will not warn for you.
 
-Raw availability (Chrome-specific) without going through `createInference`:
+To check raw Chrome availability without `createInference`:
 
 ```ts
 import { getPromptApiAvailability } from "ipa-prompt-api-fallback";
@@ -76,27 +76,29 @@ const promptApi = await getPromptApiAvailability();
 | `accepted` | Synthesized (not a permission prompt) |
 | `delta` / `done` | From `promptStreaming()` (lossy) |
 | `usage` | Omitted |
+| `decide` / `transcribe` / `synthesize` | Unsupported (unadvertised; direct requests fail with `invalid_request`) |
 | `tools` / `toolCalling` / `webSearch` | Unsupported (`getFeatures().toolCalling === false`; `webSearch` absent) |
-| `imageInput` / `imageOutput` / `output.images` | Unsupported (`imageInput` / `imageOutput` absent; image parts and `output.images` are `invalid_request`) |
+| `imageInput` / `imageOutput` / `output.images` | Unsupported (`imageInput` / `imageOutput` absent; image parts and `output.images` fail with `invalid_request`) |
+| `options` (`reasoningEffort` / `temperature`) | Unsupported (unadvertised; ignored) |
 | Provider / model picker | None — `done.model` is `"on-device"` |
 
 ## API
 
 | Export | Role |
 | --- | --- |
-| `createPromptApiBackend()` | `InferenceBackend` with `id: "promptApi"` |
-| `getPromptApiAvailability()` | Chrome `LanguageModel.availability()` wrapper |
-| `CreatePromptApiBackendOptions` | Optional expected input/output languages |
+| `createPromptApiBackend(options?)` | `InferenceBackend` with `id: "promptApi"` |
+| `getPromptApiAvailability(options?)` | Chrome `LanguageModel.availability()` wrapper |
+| `CreatePromptApiBackendOptions` | Optional `expectedInputs` / `expectedOutputs` (defaults to English text) |
 | `PromptApiAvailability` | `"unavailable" \| "downloadable" \| "downloading" \| "available"` |
 
 ## Local development
 
-From the repo root (npm workspaces):
+From the repository root (npm workspaces):
 
 ```bash
-npm install
+npm ci
 npm run build -w ipa-prompt-api-fallback
 npm test -w ipa-prompt-api-fallback
 ```
 
-POC: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback) (also on [GitHub Pages](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)).
+Demo: [`examples/prompt-api-fallback`](../../examples/prompt-api-fallback) ([live](https://samsamskies.github.io/inference-provider-api/prompt-api-fallback/)).
